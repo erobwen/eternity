@@ -1,0 +1,26 @@
+{
+  "name": "eternity",
+  "version": "1.0.0",
+  "description": "Experimental package",
+  "main": "eternity.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/erobwen/eternity.git"
+  },
+  "keywords": [
+    "reactive",
+    "database"
+  ],
+  "author": "Robert Renbris",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/erobwen/eternity/issues"
+  },
+  "homepage": "https://github.com/erobwen/eternity#readme",
+  "dependencies": {
+    "mocha": "^3.1.2"
+  }
+}
