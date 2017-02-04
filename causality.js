@@ -32,6 +32,24 @@
         return object;
     }
 
+    // Helper to quickly get a child array
+    function getArray() {
+        var argumentList = argumentsToArray(arguments);
+        var object = argumentList.shift();
+        while (argumentList.length > 0) {
+            var key = argumentList.shift();
+            if (typeof(object[key]) === 'undefined') {
+                if (argumentList.length === 0) {
+                    object[key] = [];
+                } else {
+                    object[key] = {};
+                }
+            }
+            object = object[key];
+        }
+        return object;
+    }
+    
     function isDefined(object, property) {
         return (typeof(object[property]) !== 'undefined');
     }
@@ -637,8 +655,9 @@
         let proxy = new Proxy(createdTarget, handler);
 
         handler.overrides = {
-            // Basics, id parts of object
             __id: nextId++,
+            __cacheId : cacheId,
+            __overlay : null,
             __target: createdTarget,
             __handler : handler,
             __proxy : proxy,
@@ -799,7 +818,7 @@
                 // Build a new macro context
                 enteredContext.children = [];
 
-                if (context !== null && typeof(context.independent) === 'undefined') {
+                if (context !== null && typeof(enteredContext.independent) === 'undefined') {
                     context.children.push(enteredContext);
                 }
                 context = enteredContext;
@@ -861,7 +880,7 @@
     function pulse(action) {
         inPulse++;
         callback();
-        if (--inPulse) postPulseCleanup();
+        if (--inPulse === 0) postPulseCleanup();
     }
 
     let transaction = postponeObserverNotification;
@@ -872,7 +891,7 @@
         callback();
         observerNotificationPostponed--;
         proceedWithPostponedNotifications();
-        if (--inPulse) postPulseCleanup();
+        if (--inPulse === 0) postPulseCleanup();
     }
 
     let contextsScheduledForPossibleDestruction = [];
@@ -1027,7 +1046,7 @@
                             observerSet.noMoreObserversCallback();
                         }
                     }
-                });
+                }.bind(this));
                 this.sources.lenght = 0;  // From repeater itself.
             }
         });
@@ -1057,6 +1076,7 @@
         if (activeRecorder !== null) {
             // console.log(activeRecorder);
             if (typeof(observerSet.initialized) === 'undefined') {
+                observerSet.description = description;
                 observerSet.isRoot = true;
                 observerSet.contents = {};
                 observerSet.contentsCounter = 0;
@@ -1234,7 +1254,6 @@
         return refreshRepeater({
             id: repeaterId++,
             description: description,
-            removed: false,
             action: repeaterAction,
             remove: function() {
                 // console.log("removeRepeater: " + repeater.id + "." + repeater.description);
@@ -1248,7 +1267,6 @@
     }
 
     function refreshRepeater(repeater) {
-        repeater.removed     = false;
         enterContext('repeater_refreshing', repeater);
         // console.log("parent context type: " + repeater.parent.type);
         // console.log("context type: " + repeater.type);
@@ -1257,9 +1275,7 @@
             repeater.action,
             function () {
                 // unlockSideEffects(function() {
-                if (!repeater.removed) {
-                    repeaterDirty(repeater);
-                }
+                repeaterDirty(repeater);
                 // });
             }
         );
@@ -1308,6 +1324,9 @@
      ************************************************************************/
 
     function compareArraysShallow(a, b) {
+        if( typeof a !== typeof b )
+            return false;
+        
         if (a.length === b.length) {
             for (let i = 0; i < a.length; i++) {
                 if (a[i] !== b[i]) {
@@ -1446,25 +1465,34 @@
         // Split arguments
         let argumentsList = argumentsToArray(arguments);
         let functionName = argumentsList.shift();
-        let functionCacher = getFunctionCacher(this, "_repeaters", functionName, argumentsList);
+        let functionCacher = getFunctionCacher(this.__handler, "_repeaters", functionName, argumentsList);
 
         if (!functionCacher.cacheRecordExists()) {
             // Never encountered these arguments before, make a new cache
             let cacheRecord = functionCacher.createNewRecord();
             cacheRecord.independent = true; // Do not delete together with parent
+            cacheRecord.remove = function() {
+                functionCacher.deleteExistingRecord();
+                cacheRecord.micro.remove();
+            };
             cacheRecord.contextObservers = {
                 noMoreObserversCallback : function() {
                     contextsScheduledForPossibleDestruction.push(cacheRecord);
                 }
             };
+            enterContext('cached_repeater', cacheRecord);
+            nextIsMicroContext = true;
 
-            cacheRecord.remove = function() {}; // Never removed directly, only when no observers & no direct application call
+            // cacheRecord.remove = function() {}; // Never removed directly, only when no observers & no direct application call
             cacheRecord.repeaterHandle = repeatOnChange(function() {
                 returnValue = this[functionName].apply(this, argumentsList);
-            });
+            }.bind(this));
+            leaveContext();
+
             registerAnyChangeObserver("functionCache.contextObservers", cacheRecord.contextObservers);
-            return cacheRecord.repeaterHandle;
+            return cacheRecord.repeaterHandle; // return something else...
         } else {
+            let cacheRecord = functionCacher.getExistingRecord();
             registerAnyChangeObserver("functionCache.contextObservers", cacheRecord.contextObservers);
             return functionCacher.getExistingRecord().repeaterHandle;
         }
@@ -1560,7 +1588,7 @@
         let functionName = argumentsList.shift();
 
         // Cached
-        let functionCacher = getFunctionCacher(this, "_cachedCalls", functionName, argumentsList);
+        let functionCacher = getFunctionCacher(this.__handler, "_cachedCalls", functionName, argumentsList);
 
         if (functionCacher.cacheRecordExists()) {
             let cacheRecord = functionCacher.getExistingRecord();
@@ -1569,7 +1597,7 @@
         }
 
         // Re cached
-        functionCacher = getFunctionCacher(this, "_reCachedCalls", functionName, argumentsList);
+        functionCacher = getFunctionCacher(this.__handler, "_reCachedCalls", functionName, argumentsList);
 
         if (functionCacher.cacheRecordExists()) {
             let cacheRecord = functionCacher.getExistingRecord();
@@ -1746,7 +1774,7 @@
         // Split argumentsp
         let argumentsList = argumentsToArray(arguments);
         let functionName = argumentsList.shift();
-        let functionCacher = getFunctionCacher(this, "_reCachedCalls", functionName, argumentsList);
+        let functionCacher = getFunctionCacher(this.__handler, "_reCachedCalls", functionName, argumentsList);
 
         if (!functionCacher.cacheRecordExists()) {
             // console.log("init reCache ");
@@ -1891,7 +1919,7 @@
 
     return {
         install: install,
-
+        
         create : create,
         c : create,
         uponChangeDo : uponChangeDo,
