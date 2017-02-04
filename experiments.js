@@ -9,12 +9,44 @@ function postPulseCleanup() {
 
 // Database em 
 
+persistentSystem = {
+	addedOutgoingToPersistentNode : function () {
+		
+	},
+	
+	persist : function(node) {
+		console.log("persist");
+		node.handler.independentlyPersistent = true;
+	},
+
+	unPersist : function(node) {
+		console.log("unPersist");
+		node.handler.independentlyPersistent = false;
+	}  
+};
+
+
 function createNode() {
 	let handler = {
+		
+		// Persistency stuff
+		independentlyPersistent : false,
+		hasPersistentImage : false, 
+		isUnstable : false,
+		justGotUnstable : false,
+		
 		get : function(target, key) {
 			key = key.toString();
 			if (key === 'handler') {
-				return this.handler;
+				return this;
+			} else if (key === 'persist') {
+				return function() {
+					persistentSystem.persist(this.proxy);
+				}.bind(this);
+			} else if (key === 'unPersist') {
+				return function() {
+					persistentSystem.unPersist(this.proxy);
+				}.bind(this);
 			}
 			
 			if (typeof(key) !== 'undefined') {
@@ -63,3 +95,4 @@ transaction(function() {
 	a.B = b;
 	b.A = a;	
 }); 
+a.persist();
