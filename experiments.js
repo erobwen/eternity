@@ -1,33 +1,134 @@
 
+
+
+
+// Emulated database system
+let persistentSystem = {
+	nextPersistentId : 1,
+	persistentobjects : {},
+		
+	function ensurePersistent(object, potentialParent, potentialParentProperty) {
+		if (typeof(object.handler.persistentId) === 'undefined') {
+			let persistentId = nextPersistentId++;
+			
+			object.handler.persistentId = persistentId;
+			object.handler.incomingSpanningTreeProperty = potentialProperty;
+			object.handler.incomingSpanningTreeReferer = potentialParent;
+			// TODO: store in database also? probably
+
+			let databaseRecord = {};
+			let objectTarget = object.handler.target; 
+			for (let property in objectTarget) {
+				let value = objectTarget[property];
+				if (isObject(value)) {
+					databaseRecord[property] = ensurePersistent(value, object, property);
+				} else {
+					databaseRecord[property] = value;
+				}
+			} 
+			persistentobjects[persistentId] = databaseRecord;
+			
+			let referToPersistent = isPersistent(value);
+				if (!referToPersistent) {
+					persistentSystem.addToPersistency(value);	
+				}
+				persistentSystem.setProperty();
+			}
+			return persistentId;
+		} else {
+			return object.handler.persistentId;
+		}
+	} 
+	
+	persist : function(object) {
+		console.log("persist");
+		object.handler.independentlyPersistent = true;
+	},
+
+	unPersist : function(object) {
+		console.log("unPersist");
+		object.handler.independentlyPersistent = false;
+	}
+};
+
 let inPulse = 0;
 let pulseEvents = [];
 function postPulseCleanup() {
 	console.log(pulseEvents);
-	pulseEvents.length = 0;
+
+	// This will not preserve order, but remove several assignments of the same object/property
+	let objectPropertyEventMap = {}
+	pulseEvents.forEach(function(event) {
+		let objectId = event.object.handler.id;
+		if (typeof(objectPropertyEventMap[objectId]) === 'undefined') {
+			objectPropertyEventMap[objectId] = {};
+		}
+		let propertyEventMap = objectPropertyEventMap[objectId];
+		if (typeof(propertyEventMap[event.property]) === 'undefined') {
+			propertyEventMap[event.property] = {object: event.object, property : event.property, oldValue: event.oldValue, value: event.value};
+		} else {
+			propertyEventMap[event.property].value = event.value; // Keep old value from first assignment, keep last assignment value
+		}
+	});
+	let compressedEvents = [];
+	for (objectId in objectPropertyEventMap) {
+		let propertyEventMap = objectPropertyEventMap[objectId];
+		for (property in propertyEventMap) {
+			compressedEvents.push(propertyEventMap[property]);
+		}
+	}
+	
+	let addToPersistency = [];
+	
+	compressedEvents.forEach(function(event) {
+		if (isPersistent(event.object)) {
+			let property = event.property;
+			let value = event.value;
+			let oldValue = event.oldValue;
+			if (value !== oldValue) {
+				if (isObject(value)) {
+					ensurePersistent(value);
+				}
+				
+				if (isObject(oldValue)) {
+					if (isPersistent(oldValue) 
+						&& oldValue.handler.incomingSpanningTreeProperty === event.property
+						&& oldValue.handler.incomingSpanningTreeReferer === event.object) {
+						
+						unstablePersistentObjects.push(oldValue);
+					}
+				} 
+			}
+		}
+	});
+				// pulseEvents.push({type : 'delete', object: this.proxy, link: oldValue}); 
+			// } else {
+				// pulseEvents.push({type : 'add', object: this.proxy, link: value}); 					
+	
+	
+	 pulseEvents.length = 0;
 }
 
 
-// Database em 
-
-persistentSystem = {
-	addedOutgoingToPersistentNode : function () {
-		
-	},
+function setLastActive(objectHandler) {
+	if (typeof(objectHandler.next) !== null) {
+		objectHandler.next.previous = objectHandler.previous;
+	}
+	if (typeof(objectHandler.previous) !== null) {
+		objectHandler.previous.next = objectHandler.next;
+	}
+	objectHandler.next = activeChainFirst;
+	activeChainFirst = objectHandler;
 	
-	persist : function(node) {
-		console.log("persist");
-		node.handler.independentlyPersistent = true;
-	},
-
-	unPersist : function(node) {
-		console.log("unPersist");
-		node.handler.independentlyPersistent = false;
-	}  
 };
 
+let activeChainFirst = null;
+let activeChainLast = null;
 
-function createNode() {
+let nextId = 1;
+function createobject() {
 	let handler = {
+		id : nextId++,
 		
 		// Persistency stuff
 		independentlyPersistent : false,
@@ -36,6 +137,8 @@ function createNode() {
 		justGotUnstable : false,
 		
 		get : function(target, key) {
+			setLastActive(this);
+
 			key = key.toString();
 			if (key === 'handler') {
 				return this;
@@ -57,13 +160,10 @@ function createNode() {
 		set : function(target, key, value) {
 			inPulse++;
 			
+			setLastActive(this);
 			let oldValue = target[key];
 			target[key] = value;
-			if (value === null) {
-				pulseEvents.push({event : 'delete', node: this.proxy, link: oldValue}); 
-			} else {
-				pulseEvents.push({event : 'add', node: this.proxy, link: value}); 					
-			}
+			pulseEvents.push({object: this.proxy, property : key, oldValue: oldValue, value: value}); 
 			
 			if (--inPulse === 0) postPulseCleanup();
 			return true;		
@@ -86,10 +186,10 @@ function transaction(callback) {
 }
 
 
-let a = createNode();
-let b = createNode();
-let c = createNode();
-let d = createNode();
+let a = createobject();
+let b = createobject();
+let c = createobject();
+let d = createobject();
 
 transaction(function() {
 	a.B = b;
