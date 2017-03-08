@@ -1,6 +1,11 @@
 
 
 
+function isObject(something) {
+	return typeof(something) === 'object' && typeof()
+}
+
+
 
 // Emulated database system
 let persistentSystem = {
@@ -16,12 +21,28 @@ let persistentSystem = {
 			object.handler.incomingSpanningTreeReferer = potentialParent;
 			// TODO: store in database also? probably
 
-			let databaseRecord = {};
+			let databaseRecord = { id : persistentId };
+			
 			let objectTarget = object.handler.target; 
 			for (let property in objectTarget) {
 				let value = objectTarget[property];
 				if (isObject(value)) {
-					databaseRecord[property] = ensurePersistent(value, object, property);
+					let referedRecord = ensurePersistent(value, object, property);
+					
+					// Store incoming reference in database (not necessary in database such as Neo4J etc. 
+					databaseRecord[property] = referedRecord;
+					if (typeof(referedRecord.incoming) === 'undefined') {
+						referedRecord.incoming = {};
+					}
+					let incoming = referedRecord.incoming;
+					if (typeof(incoming[property]) === 'undefined') {
+						incoming[property] = { count : 0 };
+					}
+					let incomingProperty = incoming[property];
+					if (incomingProperty.count > 100) {
+						
+					}
+					[persistentId] = true;
 				} else {
 					databaseRecord[property] = value;
 				}
@@ -34,9 +55,9 @@ let persistentSystem = {
 				}
 				persistentSystem.setProperty();
 			}
-			return persistentId;
+			return databaseRecord;
 		} else {
-			return object.handler.persistentId;
+			return persistentobjects[object.handler.persistentId];
 		}
 	} 
 	
