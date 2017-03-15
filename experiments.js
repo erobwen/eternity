@@ -1,5 +1,8 @@
 
 
+/*-----------------------------------------------
+ *           Helpers
+ *-----------------------------------------------*/
 
 function isObject(something) {
 	return typeof(something) === 'object' && typeof()
@@ -7,27 +10,66 @@ function isObject(something) {
 
 
 
+/*-----------------------------------------------
+ *       Emulated mongo-DB:ish database
+ *-----------------------------------------------*/
+
+ let database = {
+	dataRecords : [];
+	
+	saveNewRecord : function(dataRecord) {
+		this.dataRecords.push(JSON.stringify(dataRecord));
+		return this.dataRecords.length - 1;
+	},
+
+	updateRecord : function(id, contents) {
+		this.dataRecords[id] = JSON.stringify(contents);
+		return id;
+	}
+	
+	updateRecordPath : function(id, path, value) {
+		let record = this.getRecord(id);
+		let property = path[path.length - 1];
+		let index = 0;
+		let target = record;
+		while(index < path.length - 1) {
+			target = target[path[index]];
+			index++;
+		}
+		target[property] = value;
+		this.dataRecords[id] = JSON.stringify(record);
+	}
+	
+	getRecord : function(id) {
+		return JSON.parse(dataRecords[id]);
+	}
+ }
+ 
+/*-----------------------------------------------
+ *           Persistent system
+ *-----------------------------------------------*/
+
 // Emulated database system
 let persistentSystem = {
-	nextPersistentId : 1,
 	persistentobjects : {},
 		
-	function ensurePersistent(object, potentialParent, potentialParentProperty) {
-		if (typeof(object.handler.persistentId) === 'undefined') {
-			let persistentId = nextPersistentId++;
+	ensurePersistent : function(object, potentialParent, potentialParentProperty) {
+		if (typeof(object.handler.persistencyInformation) === 'undefined') {
+			let databaseRecord = {}
+			database.saveNewRecord(databaseRecord);
 			
-			object.handler.persistentId = persistentId;
-			object.handler.incomingSpanningTreeProperty = potentialProperty;
-			object.handler.incomingSpanningTreeReferer = potentialParent;
-			// TODO: store in database also? probably
+			let persistencyInformation = {
+				object : object
+				persistentId : persistentId;
+				incomingSpanningTreeProperty : potentialProperty;
+				incomingSpanningTreeReferer : potentialParent.handler.persistencyInformation;
+			};
 
-			let databaseRecord = { id : persistentId };
-			
 			let objectTarget = object.handler.target; 
 			for (let property in objectTarget) {
 				let value = objectTarget[property];
 				if (isObject(value)) {
-					let referedRecord = ensurePersistent(value, object, property);
+					let referedRecord = this.ensurePersistent(value, object, property);
 					
 					// Store incoming reference in database (not necessary in database such as Neo4J etc. 
 					databaseRecord[property] = referedRecord;
@@ -42,7 +84,7 @@ let persistentSystem = {
 					if (incomingProperty.count > 100) {
 						
 					}
-					[persistentId] = true;
+					databaseRecord[persistentId] = true;
 				} else {
 					databaseRecord[property] = value;
 				}
@@ -71,6 +113,92 @@ let persistentSystem = {
 		object.handler.independentlyPersistent = false;
 	}
 };
+
+
+/*-----------------------------------------------
+ *           Last active object chain
+ *-----------------------------------------------*/
+
+function setLastActive(objectHandler) {
+	if (typeof(objectHandler.next) !== null) {
+		objectHandler.next.previous = objectHandler.previous;
+	}
+	if (typeof(objectHandler.previous) !== null) {
+		objectHandler.previous.next = objectHandler.next;
+	}
+	objectHandler.next = activeChainFirst;
+	activeChainFirst = objectHandler;	
+};
+
+let activeChainFirst = null;
+let activeChainLast = null;
+
+
+/*-----------------------------------------------
+ *           Object creation
+ *-----------------------------------------------*/
+
+
+let nextId = 1;
+function createobject() {
+	let handler = {
+		id : nextId++,
+		
+		// Persistency stuff
+		independentlyPersistent : false,
+		hasPersistentImage : false, 
+		isUnstable : false,
+		justGotUnstable : false,
+		
+		get : function(target, key) {
+			setLastActive(this);
+
+			key = key.toString();
+			if (key === 'handler') {
+				return this;
+			} else if (key === 'persist') {
+				return function() {
+					persistentSystem.persist(this.proxy);
+				}.bind(this);
+			} else if (key === 'unPersist') {
+				return function() {
+					persistentSystem.unPersist(this.proxy);
+				}.bind(this);
+			}
+			
+			if (typeof(key) !== 'undefined') {
+				return target[key];
+			}
+		},
+		
+		set : function(target, key, value) {
+			inPulse++;
+			
+			setLastActive(this);
+			let oldValue = target[key];
+			target[key] = value;
+			pulseEvents.push({object: this.proxy, property : key, oldValue: oldValue, value: value}); 
+			
+			if (--inPulse === 0) postPulseCleanup();
+			return true;		
+		}
+	}
+
+	let proxy = new Proxy(
+		{}, 
+		handler
+	);
+	handler.proxy = proxy;
+	
+	return proxy;
+}
+
+
+
+/*-----------------------------------------------
+ *           Transactions
+ *-----------------------------------------------*/
+
 
 let inPulse = 0;
 let pulseEvents = [];
@@ -131,74 +259,6 @@ function postPulseCleanup() {
 }
 
 
-function setLastActive(objectHandler) {
-	if (typeof(objectHandler.next) !== null) {
-		objectHandler.next.previous = objectHandler.previous;
-	}
-	if (typeof(objectHandler.previous) !== null) {
-		objectHandler.previous.next = objectHandler.next;
-	}
-	objectHandler.next = activeChainFirst;
-	activeChainFirst = objectHandler;
-	
-};
-
-let activeChainFirst = null;
-let activeChainLast = null;
-
-let nextId = 1;
-function createobject() {
-	let handler = {
-		id : nextId++,
-		
-		// Persistency stuff
-		independentlyPersistent : false,
-		hasPersistentImage : false, 
-		isUnstable : false,
-		justGotUnstable : false,
-		
-		get : function(target, key) {
-			setLastActive(this);
-
-			key = key.toString();
-			if (key === 'handler') {
-				return this;
-			} else if (key === 'persist') {
-				return function() {
-					persistentSystem.persist(this.proxy);
-				}.bind(this);
-			} else if (key === 'unPersist') {
-				return function() {
-					persistentSystem.unPersist(this.proxy);
-				}.bind(this);
-			}
-			
-			if (typeof(key) !== 'undefined') {
-				return target[key];
-			}
-		},
-		
-		set : function(target, key, value) {
-			inPulse++;
-			
-			setLastActive(this);
-			let oldValue = target[key];
-			target[key] = value;
-			pulseEvents.push({object: this.proxy, property : key, oldValue: oldValue, value: value}); 
-			
-			if (--inPulse === 0) postPulseCleanup();
-			return true;		
-		}
-	}
-
-	let proxy = new Proxy(
-		{}, 
-		handler
-	);
-	handler.proxy = proxy;
-	
-	return proxy;
-}
 
 function transaction(callback) {
 	inPulse++;
@@ -206,6 +266,11 @@ function transaction(callback) {
 	if (--inPulse === 0) postPulseCleanup();
 }
 
+
+
+/*-----------------------------------------------
+ *           Experiments
+ *-----------------------------------------------*/
 
 let a = createobject();
 let b = createobject();
