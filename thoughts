@@ -1,0 +1,9 @@
+
+
+Thoughts:
+
+General back references are needed in order to solve the doctor/patient problem.
+Back references are not automatically streamed. 
+forAllIncoming will loop through all available incoming. 
+
+On the client it means only those incoming that are loaded, on the server it means all incoming in persistent storage. It could also mean that execution has to be asynchronous and take an object/method as function.

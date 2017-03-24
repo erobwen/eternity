@@ -5,10 +5,30 @@
  *-----------------------------------------------*/
 
 function isObject(something) {
-	return typeof(something) === 'object' && typeof()
+	return typeof(something) === 'object' && typeof(something.handler) !== 'undefined';
 }
 
+// Helper to quickly get a child object
+// function getMap(object, key) {
+    // if (typeof(object[key]) === 'undefined') {
+        // object[key] = {};
+    // }
+    // return object[key];
+// }
 
+// Helper to quickly get a child object
+function getMap() {
+	var argumentList = argumentsToArray(arguments);
+	var object = argumentList.shift();
+	while (argumentList.length > 0) {
+		var key = argumentList.shift();
+		if (typeof(object[key]) === 'undefined') {
+			object[key] = {};
+		}
+		object = object[key];
+	}
+	return object;
+}
 
 /*-----------------------------------------------
  *       Emulated mongo-DB:ish database
@@ -51,42 +71,154 @@ function isObject(something) {
 
 // Emulated database system
 let persistentSystem = {
-	persistentobjects : {},
+	// Objects loaded
+	loadedObjects : {},
+
+	// Images
+	dirtyImages : {},
+	pendingCreations : [],
+	
+	
+	/**
+	 * Is image
+	 */
+	isImage : function(something) {
+		return typeof(something) === 'object' && typeof(something.__isImage) !== 'undefined' && something.__isImage;
+	}
+	
+	
+	/**
+	 * Pulse management
+	 */
+	setDirty : function(image, path) {
+		if (typeof(path) !== 'undefined') {
+			// Make more elaborate dirty notification.
+		}
+		this.dirtyImages[image.__persistentId] = true; 
+	},
+	
+	processPendingCreations : function() {
+		this.pendingCreations.forEach(function(pendingCreation) {
+			let recordToSave = {  // A fresh DB record
+				__isFeather : pendingCreation.isFeather,
+-			}
+			if (pendingCreation.__isFeather) {
+				recordToSave.__homeImageId = pendingCreation.__homeImage.__persistentId;
+			}
+			pendingCreation.__persistentId = database.saveNewRecord();	
+		});
+	},		
+	
+	writeChangesToDatabase : function() {
+		this.processPendingCreations();
+		for(let id in this.dirtyImages) {
+			this.writeImageToDatabase(this.dirtyImages[id])
+		}
+	},
+	
+	serializeReferences : function(value) {
+		if(this.isImage(value)) {
+			return "__eternity__id__" + value.__persistentId;
+		} else if (typeof(value) === 'object') {
+			let newValue = {};
+			for(let property in value) {
+				newValue[property] = this.serializeReferences(value[property]);
+			}
+		} else {
+			return value;
+		}
+	},
+	
+	serializeImageReferences : function(image) {
+		let serialized = {};
+		for (let property in image) {
+			serialized[property] = this.serializeImageReferences(image[property]);
+		}
+		return serialized;
+	},
+	
+	writeImageToDatabase : function(image) {
+		database.updateRecord(pendingCreation.__persistentId, this.serializeImageReferences(image))
+	},
+	
+	/**
+	 * Creation helpers
+	 */	
+	newPersistentFeatherImage : function(homeImage) {
+		let pendingCreation = {
+			__isImage : true,
+			__isFeather : true,
+			__homeImage : homeImage
+		};
+		this.pendingCreations.push(pendingCreation);
+		return pendingCreation;
+	},
+
+	newPersistentObjectImage : function() {
+		let pendingCreation = {
+			__isImage : true,
+			__isFeather : false
+			__object : object
+			__incomingSpanningTreeProperty : potentialProperty;
+			__incomingSpanningTreeReferer : potentialParent.handler.persistentImage;
+		};
+		this.pendingCreations.push(pendingCreation);
+		return pendingCreation;
+	},
 		
+	getMap : function(targetImage, propertyName) {
+		if(typeof(targetImage[propertyName]) === 'undefined') {
+			this.setDirty(targetImage, [propertyName]);
+			targetImage[propertyName] = {};
+		}
+		return targetImage[propertyName];
+	},
+
+	getFeatherImage : function(targetImage, propertyName) {
+		if(typeof(targetImage[propertyName]) === 'undefined') {
+			this.setDirty(targetImage);
+			targetImage[propertyName] = this.newPersistentFeatherImage();
+		}
+		return targetImage[propertyName];
+	},
+	
+
+	/**
+	 *  Feather management
+	 */	
+	storeBackReferenceInFeather : function(sourceImage, propertyName, targetImage) {
+		let incomingIntegrated = this.getMap(targetImage, 'incomingIntegrated');
+		if (Object.keys(incomingIntegrated).count < 100) {
+			let key = sourceImage.id + ":" + propertyName;
+			incomingIntegrated[key] = sourceImage;
+			this.setDirty(targetImage, ['incomingIntegrated', key]);
+		} else {
+			let incomingFeathers = this.getMap(targetImage, 'incomingFeathers');
+			let propertyFeather = this.getFeatherImage(incomingFeathers, propertyName); 
+			if (typeof(targetImage.)
+			let incoming = getMap(targetImage, 'incomingIntegrated');
+		}
+	},
+	
+	
+	/**
+	 *  Persist objects
+	 */	
 	ensurePersistent : function(object, potentialParent, potentialParentProperty) {
-		if (typeof(object.handler.persistencyInformation) === 'undefined') {
-			let databaseRecord = {}
-			database.saveNewRecord(databaseRecord);
-			
-			let persistencyInformation = {
-				object : object
-				persistentId : persistentId;
-				incomingSpanningTreeProperty : potentialProperty;
-				incomingSpanningTreeReferer : potentialParent.handler.persistencyInformation;
-			};
+		if (typeof(object.handler.persistentImage) === 'undefined') {
+			// Install persistency information
+			let persistentImage = this.newPersistentImage();
+			object.handler.persistentImage = persistentImage;
 
 			let objectTarget = object.handler.target; 
 			for (let property in objectTarget) {
 				let value = objectTarget[property];
 				if (isObject(value)) {
-					let referedRecord = this.ensurePersistent(value, object, property);
+					let referedPersistentImage = this.ensurePersistent(value, object, property);
 					
-					// Store incoming reference in database (not necessary in database such as Neo4J etc. 
-					databaseRecord[property] = referedRecord;
-					if (typeof(referedRecord.incoming) === 'undefined') {
-						referedRecord.incoming = {};
-					}
-					let incoming = referedRecord.incoming;
-					if (typeof(incoming[property]) === 'undefined') {
-						incoming[property] = { count : 0 };
-					}
-					let incomingProperty = incoming[property];
-					if (incomingProperty.count > 100) {
-						
-					}
-					databaseRecord[persistentId] = true;
+					persistentImage[property] =  this.storeBackReferenceInFeather(persistentImage, property, referedPersistentImage);
 				} else {
-					databaseRecord[property] = value;
+					persistentImage[property] = value;
 				}
 			} 
 			persistentobjects[persistentId] = databaseRecord;
@@ -102,7 +234,7 @@ let persistentSystem = {
 			return persistentobjects[object.handler.persistentId];
 		}
 	} 
-	
+
 	persist : function(object) {
 		console.log("persist");
 		object.handler.independentlyPersistent = true;
@@ -112,6 +244,8 @@ let persistentSystem = {
 		console.log("unPersist");
 		object.handler.independentlyPersistent = false;
 	}
+	
+
 };
 
 
@@ -143,6 +277,10 @@ let nextId = 1;
 function createobject() {
 	let handler = {
 		id : nextId++,
+		
+		// Store incoming	
+		storeIncoming : true,
+		storeIncomingInTarget : true;
 		
 		// Persistency stuff
 		independentlyPersistent : false,
@@ -176,6 +314,15 @@ function createobject() {
 			
 			setLastActive(this);
 			let oldValue = target[key];
+			
+			// Save back reference
+			if(this.storeIncomingInTarget && isObject(value) && value.handler.storeIncoming) {
+				let incomingSets = getMap(value.handler, "__incoming");
+				let incomingSet = getMap(incomingSets, key);
+				let key = value.constructor.name + ":" + value.handler.id;
+				incomingSet[key] = this.proxy;
+			}
+			
 			target[key] = value;
 			pulseEvents.push({object: this.proxy, property : key, oldValue: oldValue, value: value}); 
 			
