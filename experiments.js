@@ -192,13 +192,13 @@ let persistentSystem = {
 		return pendingCreation;
 	},
 
-	newPersistentObjectImage : function() {
+	newPersistentObjectImage : function(parentObject, relation) {
 		let pendingCreation = {
 			__isImage : true,
 			__isFeather : false,
 			__object : object,
-			__incomingSpanningTreeProperty : potentialProperty,
-			__incomingSpanningTreeReferer : potentialParent.handler.persistentImage
+			__incomingSpanningTreeProperty : relation,
+			__incomingSpanningTreeReferer : parentObject.handler.persistentImage
 		};
 		this.pendingCreations.push(pendingCreation);
 		return pendingCreation;
@@ -273,7 +273,7 @@ let persistentSystem = {
 	ensurePersistent : function(object, potentialParent, potentialParentProperty) {
 		if (typeof(object.handler.persistentImage) === 'undefined') {
 			// Install persistency information
-			let persistentImage = this.newPersistentImage();
+			let persistentImage = this.newPersistentObjectImage(potentialParent, potentialParentProperty);
 			object.handler.persistentImage = persistentImage;
 
 			let objectTarget = object.handler.target; 
@@ -287,17 +287,9 @@ let persistentSystem = {
 					persistentImage[property] = value;
 				}
 			} 
-			persistentobjects[persistentId] = databaseRecord;
-			
-			let referToPersistent = isPersistent(value);
-				if (!referToPersistent) {
-					persistentSystem.addToPersistency(value);	
-				}
-				persistentSystem.setProperty();
-			}
-			return databaseRecord;
+			return persistentImage;
 		} else {
-			return persistentobjects[object.handler.persistentId];
+			return object.handler.persistentImage;
 		}
 	} 
 
