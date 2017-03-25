@@ -71,22 +71,60 @@ function getMap() {
 
 // Emulated database system
 let persistentSystem = {
-	// Objects loaded
-	loadedObjects : {},
-
+	
 	// Images
+	images : {},
 	dirtyImages : {},
 	pendingCreations : [],
-	
 	
 	/**
 	 * Is image
 	 */
 	isImage : function(something) {
 		return typeof(something) === 'object' && typeof(something.__isImage) !== 'undefined' && something.__isImage;
-	}
+	},
 	
-	
+	/**
+	 * Load image
+	 */
+	unserializeReferences : function(serialized) {
+		if (typeof(serialized) === 'string') {
+			if (serialized.startsWith("__eternity__id__")) {
+				// A reference to another database record
+				let id = Integer.parse(serialized.substr(16));
+				if (typeof(this.images[id]) !== 'undefined') {
+					return this.images[id];
+				} else {
+					let placeholder = { 
+						__loaded : false, 
+						__persistentId : id 
+					};
+					this.images[id] = placeholder;
+					return placeholder;
+					// return this.unserializeReferences(database.getRecord(id));
+				}
+			} else {
+				// An ordinary string
+				return serialized;
+			}
+		} else {
+			// A javascript object
+			for(let property in serialized) {
+				serialized[property] = this.unserializeReferences(serialized[property]);
+			}
+			return serialized;
+		}
+	}, 
+	 
+	ensureLoaded : function(image) {
+		if (!image.__loaded) {
+			let record = database.getRecord(image.__persistentId);
+			for (let property in record) {
+				image[property] = this.unserializeReferences(record[property]);
+			}
+		}
+	}, 
+	 
 	/**
 	 * Pulse management
 	 */
@@ -157,30 +195,31 @@ let persistentSystem = {
 	newPersistentObjectImage : function() {
 		let pendingCreation = {
 			__isImage : true,
-			__isFeather : false
-			__object : object
-			__incomingSpanningTreeProperty : potentialProperty;
-			__incomingSpanningTreeReferer : potentialParent.handler.persistentImage;
+			__isFeather : false,
+			__object : object,
+			__incomingSpanningTreeProperty : potentialProperty,
+			__incomingSpanningTreeReferer : potentialParent.handler.persistentImage
 		};
 		this.pendingCreations.push(pendingCreation);
 		return pendingCreation;
 	},
 		
-	getMap : function(targetImage, propertyName) {
-		if(typeof(targetImage[propertyName]) === 'undefined') {
+	getMapInImage : function(targetImage, baseMap, propertyName) {
+		if(typeof(baseMap[propertyName]) === 'undefined') {
 			this.setDirty(targetImage, [propertyName]);
-			targetImage[propertyName] = {};
+			baseMap[propertyName] = {};
 		}
-		return targetImage[propertyName];
+		return baseMap[propertyName];
 	},
 
-	getFeatherImage : function(targetImage, propertyName) {
-		if(typeof(targetImage[propertyName]) === 'undefined') {
-			this.setDirty(targetImage);
-			targetImage[propertyName] = this.newPersistentFeatherImage();
-		}
-		return targetImage[propertyName];
-	},
+	// getFeatherImage : function(targetImage, targetMap, propertyName) {
+		// if(typeof(targetMap[propertyName]) === 'undefined') {
+			// this.setDirty(targetImage);
+			// targetMap[propertyName] = this.newPersistentFeatherImage(targetImage);
+		// }
+		// this.ensureLoaded(targetMap[propertyName]);
+		// return targetMap[propertyName];
+	// },
 	
 
 	/**
@@ -193,10 +232,37 @@ let persistentSystem = {
 			incomingIntegrated[key] = sourceImage;
 			this.setDirty(targetImage, ['incomingIntegrated', key]);
 		} else {
-			let incomingFeathers = this.getMap(targetImage, 'incomingFeathers');
-			let propertyFeather = this.getFeatherImage(incomingFeathers, propertyName); 
-			if (typeof(targetImage.)
-			let incoming = getMap(targetImage, 'incomingIntegrated');
+			let incomingFeathers = this.getMapInImage(targetImage, targetImage, 'incomingFeathers');
+			let propertyFeatherRoot = this.getMapInImage(targetImage, incomingFeathers, propertyName);
+			
+			// Get or create last feather strand
+			if (typeof(propertyFeatherRoot.first) === 'undefined') {
+				this.setDirty(targetImage);
+				let newFeatherStrand = this.newPersistentFeatherImage(targetImage);
+				propertyFeatherRoot.first = newFeatherStrand;
+				propertyFeatherRoot.last = newFeatherStrand;
+			}
+			let lastFeatherStrand = propertyFeatherRoot.last;
+			this.ensureLoaded(lastFeatherStrand);
+			if(Object.keys(lastFeatherStrand) >= 512) {
+				let newFeatherStrand = this.newPersistentFeatherImage(targetImage);
+				
+				lastFeatherStrand.next = newFeatherStrand;
+				this.setDirty(lastFeatherStrand);
+				
+				propertyFeatherRoot.last = newFeatherStrand;
+				this.setDirty(targetImage);
+				
+				newFeatherStrand.previous = lastFeatherStrand;
+				this.setDirty(newFeatherStrand);
+				
+				lastFeatherStrand = newFeatherStrand;
+			}
+			
+			lastFeatherStrand[sourceImage.__persistentId] = sourceImage;
+			this.setDirty(lastFeatherStrand);
+			
+			return lastFeatherStrand;
 		}
 	},
 	
