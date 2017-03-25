@@ -244,6 +244,8 @@ let persistentSystem = {
 			}
 			let lastFeatherStrand = propertyFeatherRoot.last;
 			this.ensureLoaded(lastFeatherStrand);
+			
+			// If last feather strand is full, create a new one
 			if(Object.keys(lastFeatherStrand) >= 512) {
 				let newFeatherStrand = this.newPersistentFeatherImage(targetImage);
 				
@@ -259,6 +261,7 @@ let persistentSystem = {
 				lastFeatherStrand = newFeatherStrand;
 			}
 			
+			// Add back reference and note strand as dirty
 			lastFeatherStrand[sourceImage.__persistentId] = sourceImage;
 			this.setDirty(lastFeatherStrand);
 			
