@@ -7,3 +7,5 @@ Back references are not automatically streamed.
 forAllIncoming will loop through all available incoming. 
 
 On the client it means only those incoming that are loaded, on the server it means all incoming in persistent storage. It could also mean that execution has to be asynchronous and take an object/method as function.
+
+The client/doctor problem is solved by only loading outgoing references, and having back-references evaluated locally. If a user cannot load a specific medical record, he/she cannot 

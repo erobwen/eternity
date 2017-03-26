@@ -128,6 +128,34 @@ let persistentSystem = {
 	/**
 	 * Pulse management
 	 */
+	processPulseEvents : function() {
+	 	compressedEvents.forEach(function(event) {
+			if (isPersistent(event.object)) {
+				let property = event.property;
+				let value = event.value;
+				let oldValue = event.oldValue;
+				if (value !== oldValue) {
+					if (isObject(value)) {
+						ensurePersistent(value);
+					}
+					
+					if (isObject(oldValue)) { // && isPersistent(oldValue)
+						
+						// Spanning persistent tree was broken
+						if (oldValue.handler.incomingSpanningTreeProperty === event.property
+							&& oldValue.handler.incomingSpanningTreeReferer === event.object) {
+							
+							unstablePersistentObjects.push(oldValue);
+						}
+						
+						// Remove from feather
+						this.removeBackReferenceFromFeather(event.object.handler.image, property, oldValue.handler.image);
+					} 
+				}
+			}
+		})
+	},		
+
 	setDirty : function(image, path) {
 		if (typeof(path) !== 'undefined') {
 			// Make more elaborate dirty notification.
@@ -221,10 +249,24 @@ let persistentSystem = {
 		// return targetMap[propertyName];
 	// },
 	
-
 	/**
 	 *  Feather management
 	 */	
+	removeBackReferenceFromFeather : function(sourceImage, propertyName, targetImage) {
+		if (sourceImage[propertyName] === targetImage) {
+			// Internal back reference
+			let incomingIntegrated = this.getMap(targetImage, 'incomingIntegrated');
+			let key = sourceImage.id + ":" + propertyName;
+			delete incomingIntegrated[key];
+			this.setDirty(targetImage, ['incomingIntegrated', key]);			
+		} else {
+			// Feather back reference
+			let featherBarb = sourceImage[propertyName];
+			delete featherBarb[sourceImage.__persistentId];
+			this.setDirty(featherBarb);
+		}
+	},
+	 
 	storeBackReferenceInFeather : function(sourceImage, propertyName, targetImage) {
 		let incomingIntegrated = this.getMap(targetImage, 'incomingIntegrated');
 		if (Object.keys(incomingIntegrated).count < 100) {
@@ -233,39 +275,39 @@ let persistentSystem = {
 			this.setDirty(targetImage, ['incomingIntegrated', key]);
 		} else {
 			let incomingFeathers = this.getMapInImage(targetImage, targetImage, 'incomingFeathers');
-			let propertyFeatherRoot = this.getMapInImage(targetImage, incomingFeathers, propertyName);
+			let propertyFeatherShaft = this.getMapInImage(targetImage, incomingFeathers, propertyName);
 			
 			// Get or create last feather strand
-			if (typeof(propertyFeatherRoot.first) === 'undefined') {
+			if (typeof(propertyFeatherShaft.first) === 'undefined') {
 				this.setDirty(targetImage);
-				let newFeatherStrand = this.newPersistentFeatherImage(targetImage);
-				propertyFeatherRoot.first = newFeatherStrand;
-				propertyFeatherRoot.last = newFeatherStrand;
+				let newFeatherBarb = this.newPersistentFeatherImage(targetImage);
+				propertyFeatherShaft.first = newFeatherBarb;
+				propertyFeatherShaft.last = newFeatherBarb;
 			}
-			let lastFeatherStrand = propertyFeatherRoot.last;
-			this.ensureLoaded(lastFeatherStrand);
+			let lastFeatherBarb = propertyFeatherShaft.last;
+			this.ensureLoaded(lastFeatherBarb);
 			
 			// If last feather strand is full, create a new one
-			if(Object.keys(lastFeatherStrand) >= 512) {
-				let newFeatherStrand = this.newPersistentFeatherImage(targetImage);
+			if(Object.keys(lastFeatherBarb) >= 512) {
+				let newFeatherBarb = this.newPersistentFeatherImage(targetImage);
 				
-				lastFeatherStrand.next = newFeatherStrand;
-				this.setDirty(lastFeatherStrand);
+				lastFeatherBarb.next = newFeatherBarb;
+				this.setDirty(lastFeatherBarb);
 				
-				propertyFeatherRoot.last = newFeatherStrand;
+				propertyFeatherShaft.last = newFeatherBarb;
 				this.setDirty(targetImage);
 				
-				newFeatherStrand.previous = lastFeatherStrand;
-				this.setDirty(newFeatherStrand);
+				newFeatherBarb.previous = lastFeatherBarb;
+				this.setDirty(newFeatherBarb);
 				
-				lastFeatherStrand = newFeatherStrand;
+				lastFeatherBarb = newFeatherBarb;
 			}
 			
 			// Add back reference and note strand as dirty
-			lastFeatherStrand[sourceImage.__persistentId] = sourceImage;
-			this.setDirty(lastFeatherStrand);
+			lastFeatherBarb[sourceImage.__persistentId] = sourceImage;
+			this.setDirty(lastFeatherBarb);
 			
-			return lastFeatherStrand;
+			return lastFeatherBarb;
 		}
 	},
 	
@@ -437,33 +479,9 @@ function postPulseCleanup() {
 	
 	let addToPersistency = [];
 	
-	compressedEvents.forEach(function(event) {
-		if (isPersistent(event.object)) {
-			let property = event.property;
-			let value = event.value;
-			let oldValue = event.oldValue;
-			if (value !== oldValue) {
-				if (isObject(value)) {
-					ensurePersistent(value);
-				}
-				
-				if (isObject(oldValue)) {
-					if (isPersistent(oldValue) 
-						&& oldValue.handler.incomingSpanningTreeProperty === event.property
-						&& oldValue.handler.incomingSpanningTreeReferer === event.object) {
-						
-						unstablePersistentObjects.push(oldValue);
-					}
-				} 
-			}
-		}
-	});
-				// pulseEvents.push({type : 'delete', object: this.proxy, link: oldValue}); 
-			// } else {
-				// pulseEvents.push({type : 'add', object: this.proxy, link: value}); 					
-	
-	
-	 pulseEvents.length = 0;
+	persistentSystem.processPulseEvents(compressedEvents);
+
+	pulseEvents.length = 0;
 }
 
 
