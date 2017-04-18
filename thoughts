@@ -9,3 +9,30 @@ forAllIncoming will loop through all available incoming.
 On the client it means only those incoming that are loaded, on the server it means all incoming in persistent storage. It could also mean that execution has to be asynchronous and take an object/method as function.
 
 The client/doctor problem is solved by only loading outgoing references, and having back-references evaluated locally. If a user cannot load a specific medical record, he/she cannot 
+
+The concept of LOUI
+
+limited outgoing / unlimited incoming
+ 
+
+forAllCurrentlyIncoming
+forAllIncoming
+
+forAllCurrentlyLoadedIncoming
+forAllLoadedIncoming
+
+observeIncoming
+
+foobar.c_id();
+
+
+x = causality.create();
+x.c_id;
+x.foobar = function(this) {
+	this.foo = this.fie * 2;
+};
+x.c_repeat('foobar');
+
+
+
+

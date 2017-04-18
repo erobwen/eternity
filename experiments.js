@@ -414,6 +414,7 @@ function createobject() {
 		
 		set : function(target, key, value) {
 			inPulse++;
+			key = key.toString();
 			
 			setLastActive(this);
 			let oldValue = target[key];
