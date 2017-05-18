@@ -1,4 +1,7 @@
+let causality = require("causalityjs_advanced");
+causality.install();
 
+let mirror = require('./node_modules/causalityjs_advanced/mirror');
 
 /*-----------------------------------------------
  *           Helpers
@@ -35,7 +38,7 @@ function getMap() {
  *-----------------------------------------------*/
 
  let database = {
-	dataRecords : [];
+	dataRecords : [],
 	
 	saveNewRecord : function(dataRecord) {
 		this.dataRecords.push(JSON.stringify(dataRecord));
@@ -45,7 +48,7 @@ function getMap() {
 	updateRecord : function(id, contents) {
 		this.dataRecords[id] = JSON.stringify(contents);
 		return id;
-	}
+	},
 	
 	updateRecordPath : function(id, path, value) {
 		let record = this.getRecord(id);
@@ -58,7 +61,7 @@ function getMap() {
 		}
 		target[property] = value;
 		this.dataRecords[id] = JSON.stringify(record);
-	}
+	},
 	
 	getRecord : function(id) {
 		return JSON.parse(dataRecords[id]);
@@ -167,7 +170,7 @@ let persistentSystem = {
 		this.pendingCreations.forEach(function(pendingCreation) {
 			let recordToSave = {  // A fresh DB record
 				__isFeather : pendingCreation.isFeather,
--			}
+			}
 			if (pendingCreation.__isFeather) {
 				recordToSave.__homeImageId = pendingCreation.__homeImage.__persistentId;
 			}
@@ -336,46 +339,25 @@ let persistentSystem = {
 		} else {
 			return object.handler.persistentImage;
 		}
-	} 
+	},
 
 	persist : function(object) {
 		console.log("persist");
-		object.handler.independentlyPersistent = true;
+		object.independentlyPersistent = true;
 	},
 
 	unPersist : function(object) {
 		console.log("unPersist");
-		object.handler.independentlyPersistent = false;
+		object.independentlyPersistent = false;
 	}
-	
-
-};
-
-
-/*-----------------------------------------------
- *           Last active object chain
- *-----------------------------------------------*/
-
-function setLastActive(objectHandler) {
-	if (typeof(objectHandler.next) !== null) {
-		objectHandler.next.previous = objectHandler.previous;
-	}
-	if (typeof(objectHandler.previous) !== null) {
-		objectHandler.previous.next = objectHandler.next;
-	}
-	objectHandler.next = activeChainFirst;
-	activeChainFirst = objectHandler;	
 };
 
 let activeChainFirst = null;
 let activeChainLast = null;
 
 
-/*-----------------------------------------------
- *           Object creation
- *-----------------------------------------------*/
 
-
+/*
 let nextId = 1;
 function createobject() {
 	let handler = {
@@ -443,14 +425,9 @@ function createobject() {
 	
 	return proxy;
 }
+*/
 
-
-
-/*-----------------------------------------------
- *           Transactions
- *-----------------------------------------------*/
-
-
+/*
 let inPulse = 0;
 let pulseEvents = [];
 function postPulseCleanup() {
@@ -484,28 +461,22 @@ function postPulseCleanup() {
 
 	pulseEvents.length = 0;
 }
-
-
-
-function transaction(callback) {
-	inPulse++;
-	callback();
-	if (--inPulse === 0) postPulseCleanup();
-}
-
+*/
 
 
 /*-----------------------------------------------
  *           Experiments
  *-----------------------------------------------*/
-
-let a = createobject();
-let b = createobject();
-let c = createobject();
-let d = createobject();
+causality.addPostPulseAction(function(events) {
+	console.log(events);
+})
+let a = create();
+let b = create();
+let c = create();
+let d = create();
 
 transaction(function() {
 	a.B = b;
 	b.A = a;	
 }); 
-a.persist();
+persistentSystem.persist(a);
