@@ -1,5 +1,11 @@
+// Main causality object space
 let causality = require("causalityjs_advanced");
-causality.install();
+causality.install(global, {recordPulseEvents : true});
+
+// Object images object space
+const requireUncached = require('require-uncached');
+let causality2 = requireUncached("causalityjs_advanced");
+// console.log(causality === causality2); // prints false!
 
 let mirror = require('./node_modules/causalityjs_advanced/mirror');
 
