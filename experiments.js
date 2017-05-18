@@ -3,6 +3,9 @@ causality.install();
 
 let mirror = require('./node_modules/causalityjs_advanced/mirror');
 
+let objectlog = require('./objectlog.js');
+let log = objectlog.log;
+
 /*-----------------------------------------------
  *           Helpers
  *-----------------------------------------------*/
