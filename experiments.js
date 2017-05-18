@@ -1,13 +1,15 @@
-// Main causality object space
-let causality = require("causalityjs_advanced");
-causality.install(global, {recordPulseEvents : true});
+	// Main causality object space
+	let causality = require("causalityjs_advanced");
+	causality.install(global, {recordPulseEvents : true});
 
-// Object images object space
-const requireUncached = require('require-uncached');
-let causality2 = requireUncached("causalityjs_advanced");
-// console.log(causality === causality2); // prints false!
+	// Object images object space
+	const requireUncached = require('require-uncached');
+	let causality2 = requireUncached("causalityjs_advanced");
+	// console.log(causality === causality2); // prints false!
 
 let mirror = require('./node_modules/causalityjs_advanced/mirror');
+
+let mockMongoDB = require("./mockMongoDB.js");
 
 let objectlog = require('./objectlog.js');
 let log = objectlog.log;
@@ -42,41 +44,6 @@ function getMap() {
 	return object;
 }
 
-/*-----------------------------------------------
- *       Emulated mongo-DB:ish database
- *-----------------------------------------------*/
-
- let database = {
-	dataRecords : [],
-	
-	saveNewRecord : function(dataRecord) {
-		this.dataRecords.push(JSON.stringify(dataRecord));
-		return this.dataRecords.length - 1;
-	},
-
-	updateRecord : function(id, contents) {
-		this.dataRecords[id] = JSON.stringify(contents);
-		return id;
-	},
-	
-	updateRecordPath : function(id, path, value) {
-		let record = this.getRecord(id);
-		let property = path[path.length - 1];
-		let index = 0;
-		let target = record;
-		while(index < path.length - 1) {
-			target = target[path[index]];
-			index++;
-		}
-		target[property] = value;
-		this.dataRecords[id] = JSON.stringify(record);
-	},
-	
-	getRecord : function(id) {
-		return JSON.parse(dataRecords[id]);
-	}
- }
- 
 /*-----------------------------------------------
  *           Persistent system
  *-----------------------------------------------*/
@@ -113,7 +80,7 @@ let persistentSystem = {
 					};
 					this.images[id] = placeholder;
 					return placeholder;
-					// return this.unserializeReferences(database.getRecord(id));
+					// return this.unserializeReferences(mockMongoDB.getRecord(id));
 				}
 			} else {
 				// An ordinary string
@@ -130,7 +97,7 @@ let persistentSystem = {
 	 
 	ensureLoaded : function(image) {
 		if (!image.__loaded) {
-			let record = database.getRecord(image.__persistentId);
+			let record = mockMongoDB.getRecord(image.__persistentId);
 			for (let property in record) {
 				image[property] = this.unserializeReferences(record[property]);
 			}
@@ -183,7 +150,7 @@ let persistentSystem = {
 			if (pendingCreation.__isFeather) {
 				recordToSave.__homeImageId = pendingCreation.__homeImage.__persistentId;
 			}
-			pendingCreation.__persistentId = database.saveNewRecord();	
+			pendingCreation.__persistentId = mockMongoDB.saveNewRecord();	
 		});
 	},		
 	
@@ -216,7 +183,7 @@ let persistentSystem = {
 	},
 	
 	writeImageToDatabase : function(image) {
-		database.updateRecord(pendingCreation.__persistentId, this.serializeImageReferences(image))
+		mockMongoDB.updateRecord(pendingCreation.__persistentId, this.serializeImageReferences(image))
 	},
 	
 	/**
