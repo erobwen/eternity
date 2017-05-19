@@ -7,7 +7,7 @@ causality.install(global, {recordPulseEvents : true});
 const requireUncached = require('require-uncached');
 // let imageCausality = requireUncached("causalityjs_advanced");
 let imageCausality = requireUncached("./causality.js");
-imageCausality.setConfiguration({ mirrorRelations: true, exposeMirrorRelationIntermediary : true });
+imageCausality.setConfiguration({ recordPulseEvents : true, mirrorRelations: true, exposeMirrorRelationIntermediary : true });
 
 // Other used libraries
 // let mirror = require('./node_modules/causalityjs_advanced/mirror.js');
@@ -17,6 +17,7 @@ let mockMongoDB = require("./mockMongoDB.js");
 // Neat logging
 let objectlog = require('./objectlog.js');
 let log = objectlog.log;
+// let log = console.log;
 
 
 
@@ -212,8 +213,8 @@ function createDbImageRecursivley(entity, potentialParentImage, potentialParentP
 			dbImage._eternity_parent_property = potentialParentProperty;
 			object.static.dbImage = dbImage;
 			
-			for (property in object) {
-				dbImage[property] = createDbImageRecursivley(object, dbImage, property);
+			for (property in object) if (property !== '_independentlyPersistent') {
+				dbImage[property] = createDbImageRecursivley(object[property], dbImage, property);
 			}
 		}
 		
@@ -230,19 +231,21 @@ causality.addPostPulseAction(function(events) {
 		
 		// Mark unstable and flood create new images into existance.
 		events.forEach(function(event) {
+			log(event, 2);
 			
 			// Catch togging of independently persistent
 			if (event.type === 'set') {
+				log("set event");
 				let object = event.object;
 
 				if (event.property === '_independentlyPersistent') {
 					
 					// Setting of independently persistent
-					if (event.value && typeof(object.static.dbImage) === 'undefined') {
+					if (event.newValue && typeof(object.static.dbImage) === 'undefined') {
 						// Object had no image, flood-create new images.
 						let dbImage = imageCausality.create();
-						object.static.dbImage = createDbImageRecursivley(entity, null, null);
-					} else if (!event.value) {
+						object.static.dbImage = createDbImageRecursivley(object, null, null);
+					} else if (!event.newValue) {
 						// Had an image that becomes unstable
 						unstableImages.push(event.object.static.dbImage);
 					}
@@ -272,20 +275,30 @@ causality.addPostPulseAction(function(events) {
 		
 		// Process unstable ones. Initiate garbage collection
 	});
-	console.log(events);
+	// console.log(events);
+});
+
+imageCausality.addPostPulseAction(function(events) {
+	log(events, 3);
+});
+
+imageCausality.pulse(function(){
+	let a = create();
+	let b = create();
+	let c = create();
+	let d = create();
+
+	transaction(function() {
+		a.B = b;
+		b.A = a;
+	}); 
+	persistentSystem.persist(a);
+
+	log(a.static.dbImage, 4);	
 });
 
 
-let a = create();
-let b = create();
-let c = create();
-let d = create();
 
-transaction(function() {
-	a.B = b;
-	b.A = a;
-}); 
-persistentSystem.persist(a);
 
 
 	// getMapInImage : function(targetImage, baseMap, propertyName) {

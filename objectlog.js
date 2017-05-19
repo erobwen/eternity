@@ -118,6 +118,8 @@
 			} else {
 				context.log(entity + "");				
 			}
+		} else if (entity === null) {
+			context.log("null");
 		} else {
 			if (pattern === undefined || pattern === 0) {
 				if (entity instanceof Array) {
