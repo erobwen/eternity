@@ -1,26 +1,27 @@
-	// Main causality object space
-	let causality = require("causalityjs_advanced");
-	causality.install(global, {recordPulseEvents : true});
+// Main causality object space
+// let causality = require("causalityjs_advanced");
+let causality = require("./causality.js"); // Temoprary for faster coding
+causality.install(global, {recordPulseEvents : true});
 
-	// Object images object space
-	const requireUncached = require('require-uncached');
-	let causality2 = requireUncached("causalityjs_advanced");
-	// console.log(causality === causality2); // prints false!
+// Object images object space
+const requireUncached = require('require-uncached');
+let imageCausality = requireUncached("causalityjs_advanced");
+imageCausality.setConfiguration({ mirrorRelations: true, exposeMirrorRelationIntermediary : true });
 
-let mirror = require('./node_modules/causalityjs_advanced/mirror');
-
+// Other used libraries
+// let mirror = require('./node_modules/causalityjs_advanced/mirror.js');
+let mirror = require('./mirror.js');  // Temoprary for faster coding
 let mockMongoDB = require("./mockMongoDB.js");
 
+// Neat logging
 let objectlog = require('./objectlog.js');
 let log = objectlog.log;
+
+
 
 /*-----------------------------------------------
  *           Helpers
  *-----------------------------------------------*/
-
-function isObject(something) {
-	return typeof(something) === 'object' && typeof(something.handler) !== 'undefined';
-}
 
 // Helper to quickly get a child object
 // function getMap(object, key) {
@@ -68,7 +69,7 @@ let persistentSystem = {
 	 */
 	unserializeReferences : function(serialized) {
 		if (typeof(serialized) === 'string') {
-			if (serialized.startsWith("__eternity__id__")) {
+			if (serialized.startsWith("_eternity_id_")) {
 				// A reference to another database record
 				let id = Integer.parse(serialized.substr(16));
 				if (typeof(this.images[id]) !== 'undefined') {
@@ -163,7 +164,7 @@ let persistentSystem = {
 	
 	serializeReferences : function(value) {
 		if(this.isImage(value)) {
-			return "__eternity__id__" + value.__persistentId;
+			return "_eternity_id_" + value.__persistentId;
 		} else if (typeof(value) === 'object') {
 			let newValue = {};
 			for(let property in value) {
@@ -319,12 +320,12 @@ let persistentSystem = {
 
 	persist : function(object) {
 		console.log("persist");
-		object.independentlyPersistent = true;
+		object._independentlyPersistent = true;
 	},
 
 	unPersist : function(object) {
 		console.log("unPersist");
-		object.independentlyPersistent = false;
+		object._independentlyPersistent = false;
 	}
 };
 
@@ -443,7 +444,37 @@ function postPulseCleanup() {
 /*-----------------------------------------------
  *           Experiments
  *-----------------------------------------------*/
+
+function createDbImageRecursivley(entity) {
+	if (isObject(entity)) {
+		let object = entity;
+		
+		if (typeof(object.static.dbImage) === 'undefined') {
+			let dbImage = imageCausality.create(); 
+			object.static.dbImage = dbImage;
+			
+			for (property in object) {
+				dbImage[property] = createDbImageRecursivley(object);
+			}
+		}
+		
+		return object.static.dbImage;
+	} else {
+		return entity;
+	}
+} 
+ 
+ 
 causality.addPostPulseAction(function(events) {
+	events.forEach(function(event) {
+		if (event.type === 'set' && event.property === '_independentlyPersistent') {
+			let object = event.object;
+			if (typeof(object.static.dbImage) === 'undefined') {
+				object.static.dbImage = imageCausality.create();
+			}
+			
+		}
+	});
 	console.log(events);
 })
 let a = create();
@@ -453,6 +484,6 @@ let d = create();
 
 transaction(function() {
 	a.B = b;
-	b.A = a;	
+	b.A = a;
 }); 
 persistentSystem.persist(a);
