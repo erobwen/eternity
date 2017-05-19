@@ -903,6 +903,7 @@
 	let nextHandlerId = 1;
 	 
     function create(createdTarget, cacheId) {
+		
 		let __id = nextId++;
 		
 		let initializer = null;
@@ -1029,7 +1030,8 @@
         if (writeRestriction !== null) {
             writeRestriction[proxy.__id] = true;
         }
-
+		
+		emitCreationEvent(handler);
         return proxy;
     }
 
@@ -1251,16 +1253,16 @@
 	
     function pulse(action) {
         inPulse++;
-        callback();
+        action();
         if (--inPulse === 0) postPulseCleanup();
     }
 
     let transaction = postponeObserverNotification;
 
-    function postponeObserverNotification(callback) {
+    function postponeObserverNotification(action) {
         inPulse++;
         observerNotificationPostponed++;
-        callback();
+        action();
         observerNotificationPostponed--;
         proceedWithPostponedNotifications();
         if (--inPulse === 0) postPulseCleanup();
@@ -1298,6 +1300,12 @@
      *
      **********************************/
 
+	function emitCreationEvent(handler) {
+        if (recordPulseEvents) {
+			emitEvent(handler, { type: 'creation' });
+		}		
+	} 
+	 
     function emitSpliceEvent(handler, index, removed, added) {
         if (recordPulseEvents || typeof(handler.observers) !== 'undefined') {
             emitEvent(handler, { type: 'splice', index: index, removed: removed, added: added});

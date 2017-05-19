@@ -5,7 +5,8 @@ causality.install(global, {recordPulseEvents : true});
 
 // Object images object space
 const requireUncached = require('require-uncached');
-let imageCausality = requireUncached("causalityjs_advanced");
+// let imageCausality = requireUncached("causalityjs_advanced");
+let imageCausality = requireUncached("./causality.js");
 imageCausality.setConfiguration({ mirrorRelations: true, exposeMirrorRelationIntermediary : true });
 
 // Other used libraries
@@ -105,36 +106,6 @@ let persistentSystem = {
 		}
 	}, 
 	 
-	/**
-	 * Pulse management
-	 */
-	processPulseEvents : function() {
-	 	compressedEvents.forEach(function(event) {
-			if (isPersistent(event.object)) {
-				let property = event.property;
-				let value = event.value;
-				let oldValue = event.oldValue;
-				if (value !== oldValue) {
-					if (isObject(value)) {
-						ensurePersistent(value);
-					}
-					
-					if (isObject(oldValue)) { // && isPersistent(oldValue)
-						
-						// Spanning persistent tree was broken
-						if (oldValue.handler.incomingSpanningTreeProperty === event.property
-							&& oldValue.handler.incomingSpanningTreeReferer === event.object) {
-							
-							unstablePersistentObjects.push(oldValue);
-						}
-						
-						// Remove from feather
-						this.removeBackReferenceFromFeather(event.object.handler.image, property, oldValue.handler.image);
-					} 
-				}
-			}
-		})
-	},		
 
 	setDirty : function(image, path) {
 		if (typeof(path) !== 'undefined') {
@@ -212,111 +183,8 @@ let persistentSystem = {
 		return pendingCreation;
 	},
 		
-	getMapInImage : function(targetImage, baseMap, propertyName) {
-		if(typeof(baseMap[propertyName]) === 'undefined') {
-			this.setDirty(targetImage, [propertyName]);
-			baseMap[propertyName] = {};
-		}
-		return baseMap[propertyName];
-	},
 
-	// getFeatherImage : function(targetImage, targetMap, propertyName) {
-		// if(typeof(targetMap[propertyName]) === 'undefined') {
-			// this.setDirty(targetImage);
-			// targetMap[propertyName] = this.newPersistentFeatherImage(targetImage);
-		// }
-		// this.ensureLoaded(targetMap[propertyName]);
-		// return targetMap[propertyName];
-	// },
-	
-	/**
-	 *  Feather management
-	 */	
-	removeBackReferenceFromFeather : function(sourceImage, propertyName, targetImage) {
-		if (sourceImage[propertyName] === targetImage) {
-			// Internal back reference
-			let incomingIntegrated = this.getMap(targetImage, 'incomingIntegrated');
-			let key = sourceImage.id + ":" + propertyName;
-			delete incomingIntegrated[key];
-			this.setDirty(targetImage, ['incomingIntegrated', key]);			
-		} else {
-			// Feather back reference
-			let featherBarb = sourceImage[propertyName];
-			delete featherBarb[sourceImage.__persistentId];
-			this.setDirty(featherBarb);
-		}
-	},
-	 
-	storeBackReferenceInFeather : function(sourceImage, propertyName, targetImage) {
-		let incomingIntegrated = this.getMap(targetImage, 'incomingIntegrated');
-		if (Object.keys(incomingIntegrated).count < 100) {
-			let key = sourceImage.id + ":" + propertyName;
-			incomingIntegrated[key] = sourceImage;
-			this.setDirty(targetImage, ['incomingIntegrated', key]);
-		} else {
-			let incomingFeathers = this.getMapInImage(targetImage, targetImage, 'incomingFeathers');
-			let propertyFeatherShaft = this.getMapInImage(targetImage, incomingFeathers, propertyName);
-			
-			// Get or create last feather strand
-			if (typeof(propertyFeatherShaft.first) === 'undefined') {
-				this.setDirty(targetImage);
-				let newFeatherBarb = this.newPersistentFeatherImage(targetImage);
-				propertyFeatherShaft.first = newFeatherBarb;
-				propertyFeatherShaft.last = newFeatherBarb;
-			}
-			let lastFeatherBarb = propertyFeatherShaft.last;
-			this.ensureLoaded(lastFeatherBarb);
-			
-			// If last feather strand is full, create a new one
-			if(Object.keys(lastFeatherBarb) >= 512) {
-				let newFeatherBarb = this.newPersistentFeatherImage(targetImage);
-				
-				lastFeatherBarb.next = newFeatherBarb;
-				this.setDirty(lastFeatherBarb);
-				
-				propertyFeatherShaft.last = newFeatherBarb;
-				this.setDirty(targetImage);
-				
-				newFeatherBarb.previous = lastFeatherBarb;
-				this.setDirty(newFeatherBarb);
-				
-				lastFeatherBarb = newFeatherBarb;
-			}
-			
-			// Add back reference and note strand as dirty
-			lastFeatherBarb[sourceImage.__persistentId] = sourceImage;
-			this.setDirty(lastFeatherBarb);
-			
-			return lastFeatherBarb;
-		}
-	},
-	
-	
-	/**
-	 *  Persist objects
-	 */	
-	ensurePersistent : function(object, potentialParent, potentialParentProperty) {
-		if (typeof(object.handler.persistentImage) === 'undefined') {
-			// Install persistency information
-			let persistentImage = this.newPersistentObjectImage(potentialParent, potentialParentProperty);
-			object.handler.persistentImage = persistentImage;
 
-			let objectTarget = object.handler.target; 
-			for (let property in objectTarget) {
-				let value = objectTarget[property];
-				if (isObject(value)) {
-					let referedPersistentImage = this.ensurePersistent(value, object, property);
-					
-					persistentImage[property] =  this.storeBackReferenceInFeather(persistentImage, property, referedPersistentImage);
-				} else {
-					persistentImage[property] = value;
-				}
-			} 
-			return persistentImage;
-		} else {
-			return object.handler.persistentImage;
-		}
-	},
 
 	persist : function(object) {
 		console.log("persist");
@@ -329,132 +197,23 @@ let persistentSystem = {
 	}
 };
 
-let activeChainFirst = null;
-let activeChainLast = null;
-
-
-
-/*
-let nextId = 1;
-function createobject() {
-	let handler = {
-		id : nextId++,
-		
-		// Store incoming	
-		storeIncoming : true,
-		storeIncomingInTarget : true;
-		
-		// Persistency stuff
-		independentlyPersistent : false,
-		hasPersistentImage : false, 
-		isUnstable : false,
-		justGotUnstable : false,
-		
-		get : function(target, key) {
-			setLastActive(this);
-
-			key = key.toString();
-			if (key === 'handler') {
-				return this;
-			} else if (key === 'persist') {
-				return function() {
-					persistentSystem.persist(this.proxy);
-				}.bind(this);
-			} else if (key === 'unPersist') {
-				return function() {
-					persistentSystem.unPersist(this.proxy);
-				}.bind(this);
-			}
-			
-			if (typeof(key) !== 'undefined') {
-				return target[key];
-			}
-		},
-		
-		set : function(target, key, value) {
-			inPulse++;
-			key = key.toString();
-			
-			setLastActive(this);
-			let oldValue = target[key];
-			
-			// Save back reference
-			if(this.storeIncomingInTarget && isObject(value) && value.handler.storeIncoming) {
-				let incomingSets = getMap(value.handler, "__incoming");
-				let incomingSet = getMap(incomingSets, key);
-				let key = value.constructor.name + ":" + value.handler.id;
-				incomingSet[key] = this.proxy;
-			}
-			
-			target[key] = value;
-			pulseEvents.push({object: this.proxy, property : key, oldValue: oldValue, value: value}); 
-			
-			if (--inPulse === 0) postPulseCleanup();
-			return true;		
-		}
-	}
-
-	let proxy = new Proxy(
-		{}, 
-		handler
-	);
-	handler.proxy = proxy;
-	
-	return proxy;
-}
-*/
-
-/*
-let inPulse = 0;
-let pulseEvents = [];
-function postPulseCleanup() {
-	console.log(pulseEvents);
-
-	// This will not preserve order, but remove several assignments of the same object/property
-	let objectPropertyEventMap = {}
-	pulseEvents.forEach(function(event) {
-		let objectId = event.object.handler.id;
-		if (typeof(objectPropertyEventMap[objectId]) === 'undefined') {
-			objectPropertyEventMap[objectId] = {};
-		}
-		let propertyEventMap = objectPropertyEventMap[objectId];
-		if (typeof(propertyEventMap[event.property]) === 'undefined') {
-			propertyEventMap[event.property] = {object: event.object, property : event.property, oldValue: event.oldValue, value: event.value};
-		} else {
-			propertyEventMap[event.property].value = event.value; // Keep old value from first assignment, keep last assignment value
-		}
-	});
-	let compressedEvents = [];
-	for (objectId in objectPropertyEventMap) {
-		let propertyEventMap = objectPropertyEventMap[objectId];
-		for (property in propertyEventMap) {
-			compressedEvents.push(propertyEventMap[property]);
-		}
-	}
-	
-	let addToPersistency = [];
-	
-	persistentSystem.processPulseEvents(compressedEvents);
-
-	pulseEvents.length = 0;
-}
-*/
-
 
 /*-----------------------------------------------
  *           Experiments
  *-----------------------------------------------*/
-
-function createDbImageRecursivley(entity) {
+			
+function createDbImageRecursivley(entity, potentialParentImage, potentialParentProperty) {
 	if (isObject(entity)) {
 		let object = entity;
 		
 		if (typeof(object.static.dbImage) === 'undefined') {
-			let dbImage = imageCausality.create(); 
+			let dbImage = imageCausality.create();
+			dbImage._eternity_parent = potentialParentImage;
+			dbImage._eternity_parent_property = potentialParentProperty;
 			object.static.dbImage = dbImage;
 			
 			for (property in object) {
-				dbImage[property] = createDbImageRecursivley(object);
+				dbImage[property] = createDbImageRecursivley(object, dbImage, property);
 			}
 		}
 		
@@ -464,19 +223,59 @@ function createDbImageRecursivley(entity) {
 	}
 } 
  
+let unstableImages = [];
  
 causality.addPostPulseAction(function(events) {
-	events.forEach(function(event) {
-		if (event.type === 'set' && event.property === '_independentlyPersistent') {
-			let object = event.object;
-			if (typeof(object.static.dbImage) === 'undefined') {
-				object.static.dbImage = imageCausality.create();
-			}
+	imageCausality.pulse(function() {
+		
+		// Mark unstable and flood create new images into existance.
+		events.forEach(function(event) {
 			
-		}
+			// Catch togging of independently persistent
+			if (event.type === 'set') {
+				let object = event.object;
+
+				if (event.property === '_independentlyPersistent') {
+					
+					// Setting of independently persistent
+					if (event.value && typeof(object.static.dbImage) === 'undefined') {
+						// Object had no image, flood-create new images.
+						let dbImage = imageCausality.create();
+						object.static.dbImage = createDbImageRecursivley(entity, null, null);
+					} else if (!event.value) {
+						// Had an image that becomes unstable
+						unstableImages.push(event.object.static.dbImage);
+					}
+					
+				} else if (typeof(object.static.dbImage) !== 'undefined'){
+					let objectDbImage = object.static.dbImage;
+					
+					// Mark old value as unstable if another object with dbImage
+					let oldValue = event.oldValue;
+					if (isObject(oldValue)) {
+						if (typeof(oldValue.static.dbImage) !== 'undefined') {
+							let oldValueDbImage = oldValue.static.dbImage;
+							if (oldValueDbImage._eternity_parent === objectDbImage 
+								&& oldValueDbImage._eternity_parent_property === event.property) {
+								
+								unstableImages.push(oldValueDbImage);
+							}
+						}
+					}
+						
+					// Flood create new images
+					let newValue = event.newValue;
+					objectDbImage[event.property] = createDbImageRecursivley(newValue, objectDbImage, event.property);
+				}
+			}
+		});
+		
+		// Process unstable ones. Initiate garbage collection
 	});
 	console.log(events);
-})
+});
+
+
 let a = create();
 let b = create();
 let c = create();
@@ -487,3 +286,12 @@ transaction(function() {
 	b.A = a;
 }); 
 persistentSystem.persist(a);
+
+
+	// getMapInImage : function(targetImage, baseMap, propertyName) {
+		// if(typeof(baseMap[propertyName]) === 'undefined') {
+			// this.setDirty(targetImage, [propertyName]);
+			// baseMap[propertyName] = {};
+		// }
+		// return baseMap[propertyName];
+	// },
