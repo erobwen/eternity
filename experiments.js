@@ -210,7 +210,16 @@ let persistentSystem = {
  *-----------------------------------------------*/
 			
 			
-function createObjectDbImage(object) {
+function createObjectDbImage(object, potentialParentImage, potentialParentProperty) {
+	let imageContents = {};
+	for (property in object) {
+		let value = object[property];
+		if (!isObject(value)) {
+			imageContents[property] = value;
+		}
+	}
+	imageContents._eternity_parent = potentialParentImage;
+	imageContents._eternity_parent_property = potentialParentProperty;
 	let dbImage = imageCausality.create();
 	object.static.dbImage = dbImage;
 	dbImage.static.object = object;
@@ -222,13 +231,14 @@ function createDbImageRecursivley(entity, potentialParentImage, potentialParentP
 		let object = entity;
 		
 		if (typeof(object.static.dbImage) === 'undefined') {
-			let dbImage = createObjectDbImage(object);			
-			dbImage._eternity_parent = potentialParentImage;
-			dbImage._eternity_parent_property = potentialParentProperty;
-			
-			for (property in object) if (property !== '_independentlyPersistent') {
-				dbImage[property] = createDbImageRecursivley(object[property], dbImage, property);
+			let dbImage = createObjectDbImage(object, potentialParentImage, potentialParentProperty);
+			for (property in object) { 
+				let value = object[property];
+				if (isObject(value)) {
+					dbImage[property] = createDbImageRecursivley(value, dbImage, property);
+				}
 			}
+			object.static.dbImage = dbImage;
 		}
 		
 		return object.static.dbImage;
@@ -307,8 +317,8 @@ imageCausality.addPostPulseAction(function(events) {
 });
 
 imageCausality.pulse(function(){
-	let a = create();
-	let b = create();
+	let a = create({id : "a"});
+	let b = create({id : "b"});
 	let c = create();
 	let d = create();
 
