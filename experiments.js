@@ -7,7 +7,13 @@ causality.install(global, {recordPulseEvents : true});
 const requireUncached = require('require-uncached');
 // let imageCausality = requireUncached("causalityjs_advanced");
 let imageCausality = requireUncached("./causality.js");
-imageCausality.setConfiguration({ recordPulseEvents : true, mirrorRelations: true, exposeMirrorRelationIntermediary : true });
+imageCausality.setConfiguration({ 
+	recordPulseEvents : true, 
+	
+	mirrorRelations: true, 
+	exposeMirrorRelationIntermediary : true,
+	mirrorStructuresAsCausalityObjects : true
+});
 
 // Other used libraries
 // let mirror = require('./node_modules/causalityjs_advanced/mirror.js');
@@ -203,15 +209,22 @@ let persistentSystem = {
  *           Experiments
  *-----------------------------------------------*/
 			
+			
+function createObjectDbImage(object) {
+	let dbImage = imageCausality.create();
+	object.static.dbImage = dbImage;
+	dbImage.static.object = object;
+	return dbImage;
+}
+		
 function createDbImageRecursivley(entity, potentialParentImage, potentialParentProperty) {
 	if (isObject(entity)) {
 		let object = entity;
 		
 		if (typeof(object.static.dbImage) === 'undefined') {
-			let dbImage = imageCausality.create();
+			let dbImage = createObjectDbImage(object);			
 			dbImage._eternity_parent = potentialParentImage;
 			dbImage._eternity_parent_property = potentialParentProperty;
-			object.static.dbImage = dbImage;
 			
 			for (property in object) if (property !== '_independentlyPersistent') {
 				dbImage[property] = createDbImageRecursivley(object[property], dbImage, property);
@@ -223,8 +236,19 @@ function createDbImageRecursivley(entity, potentialParentImage, potentialParentP
 		return entity;
 	}
 } 
+
+function floodUnstable(potentiallyUnstableImage, parent, parentRelation) {
+	if (parent === null || (parent === unstableImage._eternity_parent && parentRelation === unstableImage._eternity_parent_property)) {
+		unstableImages.push(potentiallyUnstableImage);
+		for (property in potentiallyUnstableImage) {
+			floodUnstable(potentiallyUnstableImage[property], potentiallyUnstableImage, property);
+		}		
+	}
+}
  
 let unstableImages = [];
+
+
  
 causality.addPostPulseAction(function(events) {
 	imageCausality.pulse(function() {
@@ -247,7 +271,7 @@ causality.addPostPulseAction(function(events) {
 						object.static.dbImage = createDbImageRecursivley(object, null, null);
 					} else if (!event.newValue) {
 						// Had an image that becomes unstable
-						unstableImages.push(event.object.static.dbImage);
+						floodUnstable(event.object.static.dbImage, null, null);
 					}
 					
 				} else if (typeof(object.static.dbImage) !== 'undefined'){
@@ -261,7 +285,7 @@ causality.addPostPulseAction(function(events) {
 							if (oldValueDbImage._eternity_parent === objectDbImage 
 								&& oldValueDbImage._eternity_parent_property === event.property) {
 								
-								unstableImages.push(oldValueDbImage);
+								floodUnstable(oldValueDbImage, null, null);
 							}
 						}
 					}
