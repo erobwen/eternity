@@ -72,7 +72,7 @@
 				return context.count(entity + "");
 			}
 		} else {
-			if (pattern === undefined || pattern === 0) {
+			if (pattern === 0) {
 				if (entity instanceof Array) {
 					return context.count("[...]"); 
 				} else {
@@ -104,6 +104,10 @@
 	}
 
 	function logPattern(entity, pattern, context) {
+		if (typeof(pattern) === "undefined") {
+			pattern = 1;
+		} 
+		
 		// Setup of process
 		let outer = false;
 		if (typeof(context) === 'undefined') {
@@ -121,7 +125,7 @@
 		} else if (entity === null) {
 			context.log("null");
 		} else {
-			if (pattern === undefined || pattern === 0) {
+			if (pattern === 0) {
 				if (entity instanceof Array) {
 					context.log("[...]"); 
 				} else {

@@ -211,16 +211,19 @@ let persistentSystem = {
 			
 			
 function createObjectDbImage(object, potentialParentImage, potentialParentProperty) {
-	let imageContents = {};
+	let imageContents = {
+		_mirror_is_reflected : true,
+		_mirror_reflects : true,
+		_eternity_parent : potentialParentImage,
+		_eternity_parent_property : potentialParentProperty
+	};
 	for (property in object) {
 		let value = object[property];
 		if (!isObject(value)) {
 			imageContents[property] = value;
 		}
 	}
-	imageContents._eternity_parent = potentialParentImage;
-	imageContents._eternity_parent_property = potentialParentProperty;
-	let dbImage = imageCausality.create();
+	let dbImage = imageCausality.create(imageContents);
 	object.static.dbImage = dbImage;
 	dbImage.static.object = object;
 	return dbImage;
@@ -265,11 +268,11 @@ causality.addPostPulseAction(function(events) {
 		
 		// Mark unstable and flood create new images into existance.
 		events.forEach(function(event) {
-			log(event, 2);
+			// log(event, 2);
 			
 			// Catch togging of independently persistent
 			if (event.type === 'set') {
-				log("set event");
+				// log("set event");
 				let object = event.object;
 
 				if (event.property === '_independentlyPersistent') {
@@ -328,7 +331,7 @@ imageCausality.pulse(function(){
 	}); 
 	persistentSystem.persist(a);
 
-	log(a.static.dbImage, 4);	
+	log(a.static.dbImage, 2);	
 });
 
 
