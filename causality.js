@@ -8,9 +8,16 @@
         root.causality = factory(); // Support browser global
     }
 }(this, function () {	
-	// Neat logging
-	let objectlog = require('./objectlog.js');
-	let log = objectlog.log;
+    function values(obj) {
+        var vals = [];
+        for( var key in obj ) {
+            if ( obj.hasOwnProperty(key) ) {
+                vals.push(obj[key]);
+            }
+        }
+        return vals;
+    }
+	
 	let causalityCoreIdentity = {};
 
     // Helper to quickly get a child object (this function was a great idea, but caused performance issues in stress-tests)
@@ -800,12 +807,8 @@
 
 		// Emit event
 		if (exposeMirrorRelationIntermediary) {
-			// console.log("=================================");
-			// log(previousMirrorStructure);
-			// log(previousValue);
 			previousValue = previousMirrorStructure;
 			value = mirrorStructureValue;
-			// log(value);
 		}
 		emitSetEvent(this, key, value, previousValue);
 		
@@ -989,12 +992,11 @@
         handler.target = createdTarget;
 		
 		// createdTarget.__id = __id; // TODO ??? 
-		
-		handler.initializer = initializer;
-		
+				
         let proxy = new Proxy(createdTarget, handler);
 		
         handler.static = {
+			initializer : initializer,
 			__causalityCoreIdentity : causalityCoreIdentity,
             __id: __id,
             __cacheId : cacheId,
@@ -1063,9 +1065,10 @@
      **********************************/
 	 
 	function ensureInitialized(handler, target) {
-		if (handler.initializer !== null) {
-			handler.initializer(target);
-			handler.initializer = null;
+		if (handler.static.initializer !== null) {
+			let initializer = handler.static.initializer;
+			initializer(target);
+			handler.static.initializer = null;
 		}		 
 	}
 	 

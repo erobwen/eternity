@@ -250,12 +250,13 @@ function createDbImageRecursivley(entity, potentialParentImage, potentialParentP
 	}
 } 
 
+// TODO: Do this asynchronously
 function floodUnstable(potentiallyUnstableImage, parent, parentRelation) {
 	if (parent === null || (parent === unstableImage._eternity_parent && parentRelation === unstableImage._eternity_parent_property)) {
 		unstableImages.push(potentiallyUnstableImage);
 		for (property in potentiallyUnstableImage) {
 			floodUnstable(potentiallyUnstableImage[property], potentiallyUnstableImage, property);
-		}		
+		}
 	}
 }
  
@@ -315,7 +316,100 @@ causality.addPostPulseAction(function(events) {
 	// console.log(events);
 });
 
+function createReferences(entity) {
+	if (imageCausality.isObject(entity)) {
+		entity.
+	}
+}
+
+
+function copyWithIdsInsteadOfReferences(dbImage) {
+	if (imageCausality.isObject(dbImage)) {
+		let copy = {};
+		for(property in dbImage) {
+			copy[property] = createReferences(dbImage[property]);
+		}
+		return copy;
+	} else {
+		return dbImage; // Reuse non objects... this is only ok since the copy is never modified!
+	}
+} 
+
+let pendingImageCreations = {};
+let pendingImageUpdates = {}
+
+function hasBeenWrittenToDB(dbImage) {
+	return typeof(dbImage.static.mongoDbId) !== 'undefined';
+}
+
+function writePlaceholderForImageToDatabase(dbImage) {
+	let mongoDbId = mockMongoDB.saveNewRecord({});
+	dbImage.static.mongoDbId = mongoDbId;
+	dbImage.static.serializedMongoDbId = "_causality_persistent_id_" + dbId;
+	return mongoDbId;
+}
+
+function convertReferencesToDbIds(entity) {
+	if (imageCausality.isObject(entity)) {
+		let dbImage = entity;
+		if (!hasBeenWrittenToDB(entity)) {
+			writePlaceholderForImageToDatabase(dbImage);
+		}
+		return dbImage.static.serializedMongoDbId;
+	} else if (typeof(entity) === 'object') {
+		let converted = (entity instanceof Array) ? [] : {};
+		for (property in entity) {
+			converted[property] = convertReferencesToDbIds(entity[property]);
+		}
+		return converted;
+	} else {
+		return entity;
+	}
+}
+
+function writeImagimageeToDatabase(dbImage) {
+	let serialized = (dbImage instanceof Array) ? [] : {};
+	for (property in dbImage) {
+		serialized[property] = convertReferencesToDbIds(dbImage[property]);
+	}
+	if (!hasBeenWrittenToDB(dbImage)) {
+		mockMongoDB.saveNewRecord(serialized);
+	} else {
+		mockMongoDB.updateRecord(serialized);
+	}
+}
+
+function flushToDatabase() {
+	// This one could do a stepwise execution to not block the server. 
+	for (id in pendingImageCreations) {
+		writeImageToDatabase();
+	} 
+	
+}
+
 imageCausality.addPostPulseAction(function(events) {
+	// Extract updates and creations to be done.
+	events.forEach(function(event) {
+		let dbImage = event.object;
+		let imageId = dbImage.static.__id;
+			
+		if (event.type === 'creation') {
+			pendingImageCreations[imageId] = dbImage;
+			if (typeof(pendingImageUpdates[imageId]) !== 'undefined') {
+				// We will do a full write of this image, no need to update after.				
+				delete pendingImageUpdates[imageId]; 
+			}
+		} else if (event.type === 'set') {
+			if (typeof(pendingImageCreations[imageId]) === 'undefined') {
+				// Only update if we will not do a full write on this image. 
+				if (typeof(pendingImageUpdates[imageId]) === 'undefined') {
+					pendingImageUpdates[imageId] = {};
+				}
+				let imageUpdates = pendingImageUpdates[imageId];
+				imageUpdates[event.property] = event.value;				
+			}
+		}
+	});
 	log(events, 3);
 });
 
@@ -333,6 +427,11 @@ imageCausality.pulse(function(){
 
 	log(a.static.dbImage, 2);	
 });
+
+
+
+flushToDatabase();
+
 
 
 

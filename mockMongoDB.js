@@ -42,7 +42,7 @@
 	}		
 	
 	function deleteRecord(id) {
-		delete dataRecords[id];
+		dataRecords[id] = null; // Do not delete it as we want to keep nextId = records.length.
 	}	
 	
 	return {
