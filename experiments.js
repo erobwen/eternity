@@ -224,8 +224,8 @@ function createObjectDbImage(object, potentialParentImage, potentialParentProper
 		}
 	}
 	let dbImage = imageCausality.create(imageContents);
-	object.static.dbImage = dbImage;
-	dbImage.static.object = object;
+	object.const.dbImage = dbImage;
+	dbImage.const.object = object;
 	return dbImage;
 }
 		
@@ -233,7 +233,7 @@ function createDbImageRecursivley(entity, potentialParentImage, potentialParentP
 	if (isObject(entity)) {
 		let object = entity;
 		
-		if (typeof(object.static.dbImage) === 'undefined') {
+		if (typeof(object.const.dbImage) === 'undefined') {
 			let dbImage = createObjectDbImage(object, potentialParentImage, potentialParentProperty);
 			for (property in object) { 
 				let value = object[property];
@@ -241,10 +241,10 @@ function createDbImageRecursivley(entity, potentialParentImage, potentialParentP
 					dbImage[property] = createDbImageRecursivley(value, dbImage, property);
 				}
 			}
-			object.static.dbImage = dbImage;
+			object.const.dbImage = dbImage;
 		}
 		
-		return object.static.dbImage;
+		return object.const.dbImage;
 	} else {
 		return entity;
 	}
@@ -279,23 +279,23 @@ causality.addPostPulseAction(function(events) {
 				if (event.property === '_independentlyPersistent') {
 					
 					// Setting of independently persistent
-					if (event.newValue && typeof(object.static.dbImage) === 'undefined') {
+					if (event.newValue && typeof(object.const.dbImage) === 'undefined') {
 						// Object had no image, flood-create new images.
 						let dbImage = imageCausality.create();
-						object.static.dbImage = createDbImageRecursivley(object, null, null);
+						object.const.dbImage = createDbImageRecursivley(object, null, null);
 					} else if (!event.newValue) {
 						// Had an image that becomes unstable
-						floodUnstable(event.object.static.dbImage, null, null);
+						floodUnstable(event.object.const.dbImage, null, null);
 					}
 					
-				} else if (typeof(object.static.dbImage) !== 'undefined'){
-					let objectDbImage = object.static.dbImage;
+				} else if (typeof(object.const.dbImage) !== 'undefined'){
+					let objectDbImage = object.const.dbImage;
 					
 					// Mark old value as unstable if another object with dbImage
 					let oldValue = event.oldValue;
 					if (isObject(oldValue)) {
-						if (typeof(oldValue.static.dbImage) !== 'undefined') {
-							let oldValueDbImage = oldValue.static.dbImage;
+						if (typeof(oldValue.const.dbImage) !== 'undefined') {
+							let oldValueDbImage = oldValue.const.dbImage;
 							if (oldValueDbImage._eternity_parent === objectDbImage 
 								&& oldValueDbImage._eternity_parent_property === event.property) {
 								
@@ -316,36 +316,18 @@ causality.addPostPulseAction(function(events) {
 	// console.log(events);
 });
 
-function createReferences(entity) {
-	if (imageCausality.isObject(entity)) {
-		entity.
-	}
-}
-
-
-function copyWithIdsInsteadOfReferences(dbImage) {
-	if (imageCausality.isObject(dbImage)) {
-		let copy = {};
-		for(property in dbImage) {
-			copy[property] = createReferences(dbImage[property]);
-		}
-		return copy;
-	} else {
-		return dbImage; // Reuse non objects... this is only ok since the copy is never modified!
-	}
-} 
-
 let pendingImageCreations = {};
 let pendingImageUpdates = {}
 
 function hasBeenWrittenToDB(dbImage) {
-	return typeof(dbImage.static.mongoDbId) !== 'undefined';
+	console.log(dbImage);
+	return typeof(dbImage.const.mongoDbId) !== 'undefined';
 }
 
 function writePlaceholderForImageToDatabase(dbImage) {
 	let mongoDbId = mockMongoDB.saveNewRecord({});
-	dbImage.static.mongoDbId = mongoDbId;
-	dbImage.static.serializedMongoDbId = "_causality_persistent_id_" + dbId;
+	dbImage.const.mongoDbId = mongoDbId;
+	dbImage.const.serializedMongoDbId = "_causality_persistent_id_" + mongoDbId;
 	return mongoDbId;
 }
 
@@ -355,7 +337,7 @@ function convertReferencesToDbIds(entity) {
 		if (!hasBeenWrittenToDB(entity)) {
 			writePlaceholderForImageToDatabase(dbImage);
 		}
-		return dbImage.static.serializedMongoDbId;
+		return dbImage.const.serializedMongoDbId;
 	} else if (typeof(entity) === 'object') {
 		let converted = (entity instanceof Array) ? [] : {};
 		for (property in entity) {
@@ -367,7 +349,7 @@ function convertReferencesToDbIds(entity) {
 	}
 }
 
-function writeImagimageeToDatabase(dbImage) {
+function writeImageToDatabase(dbImage) {
 	let serialized = (dbImage instanceof Array) ? [] : {};
 	for (property in dbImage) {
 		serialized[property] = convertReferencesToDbIds(dbImage[property]);
@@ -382,7 +364,7 @@ function writeImagimageeToDatabase(dbImage) {
 function flushToDatabase() {
 	// This one could do a stepwise execution to not block the server. 
 	for (id in pendingImageCreations) {
-		writeImageToDatabase();
+		writeImageToDatabase(pendingImageCreations[id]);
 	} 
 	
 }
@@ -391,7 +373,7 @@ imageCausality.addPostPulseAction(function(events) {
 	// Extract updates and creations to be done.
 	events.forEach(function(event) {
 		let dbImage = event.object;
-		let imageId = dbImage.static.__id;
+		let imageId = dbImage.const.__id;
 			
 		if (event.type === 'creation') {
 			pendingImageCreations[imageId] = dbImage;
@@ -425,7 +407,7 @@ imageCausality.pulse(function(){
 	}); 
 	persistentSystem.persist(a);
 
-	log(a.static.dbImage, 2);	
+	log(a.const.dbImage, 2);	
 });
 
 

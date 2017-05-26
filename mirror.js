@@ -95,18 +95,18 @@
 		}
 	} 	 
 	 
-	function setupMirrorReference(referingObject, property, value, createFunction) {
+	function setupMirrorReference(referingObject, referingObjectId, property, value, createFunction) {
 		if (!property.startsWith("_mirror_")) {
 			// let referingObject = getReferingObject(object, property);
 			let relationName = gottenReferingObjectRelation;
 			// console.log("setProperty:");
 			// console.log(referingObject);
-			// console.log(referingObject.__id);
+			// console.log(referingObject.id);
 					
 			let referencedValue = value;
-			if (typeof(value) === 'object' && typeof(value._mirror_reflects) !== 'undefined') { //TODO: limit backwards referenes to mirror objects only.
+			if (typeof(value) === 'object') { //TODO: limit backwards referenes to mirror objects only.
 				let mirrorIncomingRelation = findIncomingRelation(referencedValue, property, createFunction);
-				let incomingRelationChunk = intitializeAndConstructMirrorStructure(mirrorIncomingRelation, referingObject, createFunction);
+				let incomingRelationChunk = intitializeAndConstructMirrorStructure(mirrorIncomingRelation, referingObject, referingObjectId, createFunction);
 				if (incomingRelationChunk !== null) {
 					referencedValue = incomingRelationChunk;
 				}
@@ -119,7 +119,7 @@
 	 
 	function setProperty(object, property, value, createFunction) {
 		let previousValue = object[property];
-		removeMirrorStructure(object, previousValue);
+		removeMirrorStructure(object.id, previousValue);
 		setupMirrorReference(object, property, value, createFunction);
 		object[property] = referencedValue;
 	}
@@ -143,11 +143,12 @@
 	function addInArray(array, referencedObject) { // TODO: Push in array
 		// Find relation name
 		let referingObject = getReferingObject(array, "[]");
+		let referingObjectId = referingObject.id;
 		let relationName = gottenReferingObjectRelation;
 
 		// Find right place in the incoming structure.
 		let mirrorIncomingRelation = findIncomingRelation(referencedObject, relationName);
-		let incomingRelationChunk = intitializeAndConstructMirrorStructure(mirrorIncomingRelation, referingObject);
+		let incomingRelationChunk = intitializeAndConstructMirrorStructure(mirrorIncomingRelation, referingObject, referingObjectId);
 		if (incomingRelationChunk !== null) {
 			array.push(incomingRelationChunk);
 		}
@@ -159,10 +160,10 @@
 		// let referer = array;
 		// if (typeof(array._mirror_index_parent) !== 'undefined') {
 			// TODO: loop recursivley
-			// refererId = array._mirror_index_parent.__id;
+			// refererId = array._mirror_index_parent.id;
 			// referer = array._mirror_index_parent
 		// } else {
-			// refererId = array.__id;
+			// refererId = array.id;
 			// referer = array;
 		// }
 		// Find relation name
@@ -171,7 +172,7 @@
 		
 		
 		array.forEach(function(observerSet) {
-			removeMirrorStructure(referingObject, observerSet);
+			removeMirrorStructure(referingObject.id, observerSet);
 		});
 		array.lenght = 0;  // From repeater itself.
 	}
@@ -293,11 +294,11 @@
 	/**
 	* Structure helpers
 	*/				
-	function removeMirrorStructure(referer, referedEntity) {
+	function removeMirrorStructure(refererId, referedEntity) {
 		if (typeof(referedEntity._mirror_incoming_relation) !== 'undefined') {
 			let incomingRelation = referedEntity;
 			let incomingRelationContents = incomingRelation['contents'];
-			delete incomingRelationContents[referer.__id];
+			delete incomingRelationContents[refererId];
 			let noMoreObservers = false;
 			incomingRelation.contentsCounter--;
 			if (incomingRelation.contentsCounter == 0) {
@@ -337,8 +338,8 @@
 		}
 	}
 	
-	function intitializeAndConstructMirrorStructure(mirrorIncomingRelation, referingObject, createFunction) {
-		let refererId = referingObject.__id;
+	function intitializeAndConstructMirrorStructure(mirrorIncomingRelation, referingObject, referingObjectId, createFunction) {
+		let refererId = referingObjectId;
 		// console.log("intitializeAndConstructMirrorStructure:");
 		// console.log(referingObject);
 		
@@ -467,7 +468,7 @@
 			if (sourceImage[propertyName] === targetImage) {
 				// Internal back reference
 				let incomingIntegrated = this.getMap(targetImage, 'incomingIntegrated');
-				let key = sourceImage.__id + ":" + propertyName;
+				let key = sourceImage.id + ":" + propertyName;
 				delete incomingIntegrated[key];
 				this.setDirty(targetImage, ['incomingIntegrated', key]);			
 			} else {
@@ -481,7 +482,7 @@
 		storeBackReferenceInFeather : function(sourceImage, propertyName, targetImage) {
 			let incomingIntegrated = this.getMap(targetImage, 'incomingIntegrated');
 			if (Object.keys(incomingIntegrated).count < 100) {
-				let key = sourceImage.__id + ":" + propertyName;
+				let key = sourceImage.id + ":" + propertyName;
 				incomingIntegrated[key] = sourceImage;
 				this.setDirty(targetImage, ['incomingIntegrated', key]);
 			} else {

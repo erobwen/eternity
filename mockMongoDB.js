@@ -15,17 +15,17 @@
 	let dataRecords = [];
 	
 	function saveNewRecord(dataRecord) {
-		this.dataRecords.push(JSON.stringify(dataRecord));
-		return this.dataRecords.length - 1;
+		dataRecords.push(JSON.stringify(dataRecord));
+		return dataRecords.length - 1;
 	}
 
 	function updateRecord(id, contents) {
-		this.dataRecords[id] = JSON.stringify(contents);
+		dataRecords[id] = JSON.stringify(contents);
 		return id;
 	}
 	
 	function updateRecordPath(id, path, value) {
-		let record = this.getRecord(id);
+		let record = getRecord(id);
 		let property = path[path.length - 1];
 		let index = 0;
 		let target = record;
@@ -34,7 +34,7 @@
 			index++;
 		}
 		target[property] = value;
-		this.dataRecords[id] = JSON.stringify(record);
+		dataRecords[id] = JSON.stringify(record);
 	}
 	
 	function getRecord(id) {
