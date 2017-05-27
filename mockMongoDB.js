@@ -14,6 +14,14 @@
 
 	let dataRecords = [];
 	
+	function getAllRecordsParsed() {
+		let parsedRecords = [];
+		dataRecords.forEach(function(record) {
+			parsedRecords.push(JSON.parse(record));
+		});
+		return parsedRecords;
+	}
+	
 	function saveNewRecord(dataRecord) {
 		dataRecords.push(JSON.stringify(dataRecord));
 		return dataRecords.length - 1;
@@ -50,7 +58,8 @@
 		updateRecord : updateRecord,
 		updateRecordPath : updateRecordPath,
 		getRecord : getRecord,
-		deleteRecord : deleteRecord
+		deleteRecord : deleteRecord,
+		getAllRecordsParsed : getAllRecordsParsed
 	};
 }));
 

@@ -194,12 +194,12 @@ let persistentSystem = {
 
 
 	persist : function(object) {
-		console.log("persist");
+		// console.log("persist");
 		object._independentlyPersistent = true;
 	},
 
 	unPersist : function(object) {
-		console.log("unPersist");
+		// console.log("unPersist");
 		object._independentlyPersistent = false;
 	}
 };
@@ -265,6 +265,8 @@ let unstableImages = [];
 
  
 causality.addPostPulseAction(function(events) {
+	console.log("=== Model pulse complete, update image and flood create images & flood unstable === ");
+	log(events, 2);
 	imageCausality.pulse(function() {
 		
 		// Mark unstable and flood create new images into existance.
@@ -310,9 +312,11 @@ causality.addPostPulseAction(function(events) {
 				}
 			}
 		});
-		
+
 		// Process unstable ones. Initiate garbage collection
 	});
+	console.log("=== End model pulse === ");
+		
 	// console.log(events);
 });
 
@@ -320,7 +324,7 @@ let pendingImageCreations = {};
 let pendingImageUpdates = {}
 
 function hasBeenWrittenToDB(dbImage) {
-	console.log(dbImage);
+	// console.log(dbImage);
 	return typeof(dbImage.const.mongoDbId) !== 'undefined';
 }
 
@@ -366,14 +370,17 @@ function flushToDatabase() {
 	for (id in pendingImageCreations) {
 		writeImageToDatabase(pendingImageCreations[id]);
 	} 
-	
 }
 
 imageCausality.addPostPulseAction(function(events) {
+	console.log("=== Image pulse complete, sort events according to object id and flush to database === ");
+	log(events, 2);
 	// Extract updates and creations to be done.
 	events.forEach(function(event) {
 		let dbImage = event.object;
-		let imageId = dbImage.const.__id;
+		log("Considering " + event.type + " event with object:");
+		log(dbImage, 2);
+		let imageId = dbImage.const.id;
 			
 		if (event.type === 'creation') {
 			pendingImageCreations[imageId] = dbImage;
@@ -392,27 +399,33 @@ imageCausality.addPostPulseAction(function(events) {
 			}
 		}
 	});
-	log(events, 3);
+	
+	console.log("=== Flush to database ====");
+	flushToDatabase();
+	log(mockMongoDB.getAllRecordsParsed(), 4);
+
+	console.log("=== End image pulse ===");
 });
 
-imageCausality.pulse(function(){
-	let a = create({id : "a"});
-	let b = create({id : "b"});
-	let c = create();
-	let d = create();
+// imageCausality.pulse(function(){
+	causality.pulse(function() {
+		let a = create({name : "a"});
+		let b = create({name : "b"});
+		let c = create({name : "c"});
+		let d = create({name : "d"});
 
-	transaction(function() {
-		a.B = b;
-		b.A = a;
-	}); 
-	persistentSystem.persist(a);
+		transaction(function() {
+			a.B = b;
+			b.A = a;
+		}); 
+		
+		persistentSystem.persist(a);
 
-	log(a.const.dbImage, 2);	
-});
+		// log(a.const.dbImage, 2);	
+	});
+// });
 
 
-
-flushToDatabase();
 
 
 

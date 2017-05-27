@@ -8,6 +8,8 @@
         root.causality = factory(); // Support browser global
     }
 }(this, function () {
+	
+	let bufferWidth = 100;
 
 	function indentString(level) {
 		let string = "";
@@ -119,6 +121,8 @@
 		if (typeof(entity) !== 'object') {
 			if (typeof(entity) === 'function') {
 				context.log("function( ... ) { ... }");				
+			} if (typeof(entity) === 'string') {
+				context.log('"' + entity + '"');								
 			} else {
 				context.log(entity + "");				
 			}
@@ -135,7 +139,7 @@
 				let isArray = (entity instanceof Array);
 				let startedHorizontal = false;
 				if (!context.horizontal) {
-					context.horizontal = horizontalLogWithinWidthLimit(entity, pattern, 120 - context.indentLevel * 2); // - 
+					context.horizontal = horizontalLogWithinWidthLimit(entity, pattern, bufferWidth - context.indentLevel * 2); // - 
 					startedHorizontal = true;
 				}
 				if (isArray) context.finishOpenLine(); // Should not be when enforced single row.
