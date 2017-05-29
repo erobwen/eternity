@@ -283,7 +283,6 @@ causality.addPostPulseAction(function(events) {
 					// Setting of independently persistent
 					if (event.newValue && typeof(object.const.dbImage) === 'undefined') {
 						// Object had no image, flood-create new images.
-						let dbImage = imageCausality.create();
 						object.const.dbImage = createDbImageRecursivley(object, null, null);
 					} else if (!event.newValue) {
 						// Had an image that becomes unstable
@@ -313,9 +312,10 @@ causality.addPostPulseAction(function(events) {
 			}
 		});
 
+		console.log("=== End model pulse post process === ");
 		// Process unstable ones. Initiate garbage collection
 	});
-	console.log("=== End model pulse === ");
+
 		
 	// console.log(events);
 });
@@ -366,6 +366,8 @@ function writeImageToDatabase(dbImage) {
 }
 
 function flushToDatabase() {
+	log(pendingImageCreations, 2);
+	log(pendingImageUpdates, 2);
 	// This one could do a stepwise execution to not block the server. 
 	for (id in pendingImageCreations) {
 		writeImageToDatabase(pendingImageCreations[id]);
@@ -374,7 +376,7 @@ function flushToDatabase() {
 
 imageCausality.addPostPulseAction(function(events) {
 	console.log("=== Image pulse complete, sort events according to object id and flush to database === ");
-	log(events, 2);
+	log(events, 3);
 	// Extract updates and creations to be done.
 	events.forEach(function(event) {
 		let dbImage = event.object;

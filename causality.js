@@ -1385,6 +1385,12 @@
             });
         }
     }
+	
+	function emitUnobservableEvent(event) {
+		if (recordPulseEvents) {
+			pulseEvents.push(event);
+		}
+	}
 
     function observeAll(array, callback) {
         array.forEach(function(element) {
@@ -1411,11 +1417,60 @@
 	* 
 	* createAction(function)
 	* createAction(functionName, arglist)
+	* createAction(functionPath, arglist)
 	* createAction(object, methodName, arglist)
 	*/
 	function createAction() {
-		
+		arguments = argumentsToArray(arguments);
+		let argumentsLength = arguments.length;
+        if (argumentsLength === 1) {
+            return arguments[0];
+        } else if (argumentsLength === 2){
+			if (arguments[0] instanceof Array) {
+				return createImmutable({
+					functionPath : createImmutable(arguments.unshift()),
+					arguments : createImmutable(arguments) 
+				});
+			} else {
+				return createImmutable({
+					functionName : arguments.unshift(),
+					arguments : createImmutable(arguments)
+				});
+			}
+        } else if (argumentsLength === 3) {
+			return createImmutable({
+				object : arguments.unshift(),
+				methodName : arguments.unshift(),
+				arguments : createImmutable(arguments)
+			});
+		}
 	}
+	
+	function performAction(action) {
+		if (typeof(action) === 'function') {
+			return action();
+		} else {
+			if (typeof(action.object) === 'undefined') {
+				if (typeof(action.functionPath) === 'undefined') {
+					// TODO: use window also...
+					return global[action.methodName].apply(null, action.arglist);
+				} else {
+					let tmpFunction = null;
+					action.functionPath.forEach(function(name) {
+						if (tmpFunction === null) {
+							tmpFunction = global[action.methodName];
+						} else {
+							tmpFunction = tmpFunction[name]; 
+						}
+					});
+					return tmpFunction.apply(null, action.arglist);
+				}
+			} else {
+				return action.object[action.methodName].apply(action.object, action.arglist);
+			}
+		}
+	}
+	
 
     /**********************************
      *  Dependency recording
@@ -1452,7 +1507,7 @@
 		mirror.createArrayIndex(context, "sources");
 		
         enterContext('recording', context);
-        let returnValue = doFirst();
+        let returnValue = performAction(doFirst);
         leaveContext();
 
         return returnValue;
@@ -1497,7 +1552,7 @@
                 let recorder = nextObserverToNotifyChange;
                 nextObserverToNotifyChange = nextObserverToNotifyChange.nextToNotify;
                 // blockSideEffects(function() {
-                recorder.uponChangeAction();
+                performAction(recorder.uponChangeAction);
                 // });
             }
             lastObserverToNotifyChange = null;
@@ -1548,7 +1603,7 @@
                 lastObserverToNotifyChange = observer;
             } else {
                 // blockSideEffects(function() {
-                observer.uponChangeAction();
+                performAction(observer.uponChangeAction);
                 // });
             }
         }
@@ -1708,15 +1763,18 @@
 		// object = object.const.handler;
 		// let functionCaches = getMap(object, cacheStoreName, functionName);
         if (typeof(object[cacheStoreName]) === 'undefined') {
-            object[cacheStoreName] = {};
+			let cacheStore = createImmutable({});
+			cacheStore.const.exclusiveReferer = object; // Only refered to by object. TODO: implement in more places...
+            object[cacheStoreName] = cacheStore; // TODO: These are actually not immutable, more like unobservable. They can change, but changes needs to register manually.... 
         }
         if (typeof(object[cacheStoreName][functionName]) === 'undefined') {
-            object[cacheStoreName][functionName] = {};
+            object[cacheStoreName][functionName] = createImmutable({});
         }
 		return object[cacheStoreName][functionName];
 	}
 	
     // Get cache(s) for this argument hash
+	// function caches has to be a full object.
     function getFunctionCacher(functionCaches, argumentList) {
         let uniqueHash = true;
         function makeArgumentHash(argumentList) {
@@ -1757,13 +1815,15 @@
                 if (uniqueHash) {
                     let result = functionCaches[argumentsHash];
                     delete functionCaches[argumentsHash];
+					emitUnobservableEvent({object: functionCaches, type: 'delete', oldValue: result});
                     return result;
                 } else {
-                    let functionArgumentHashCaches = getArray(functionCaches, "_nonpersistent_cacheBuckets" , argumentsHash);
-                    for (let i = 0; i < functionArgumentHashCaches.length; i++) {
-                        if (compareArraysShallow(functionArgumentHashCaches[i].functionArguments, functionArguments)) {
-                            let result = functionArgumentHashCaches[i];
-                            functionArgumentHashCaches.splice(i, 1);
+					let cacheBucket = functionCaches[argumentsHash];					
+                    for (let i = 0; i < cacheBucket.length; i++) {
+                        if (compareArraysShallow(cacheBucket[i].functionArguments, functionArguments)) {
+                            let result = cacheBucket[i];
+                            cacheBucket.splice(i, 1);
+							emitUnobservableEvent({object: functionCaches, type: 'splice', index: 1, added: [], removed: [result]});
                             return result;
                         }
                     }
@@ -1774,27 +1834,32 @@
                 if (uniqueHash) {
                     return functionCaches[argumentsHash]
                 } else {
-                    let functionArgumentHashCaches = getArray(functionCaches, "_nonpersistent_cacheBuckets" , argumentsHash);
-                    for (let i = 0; i < functionArgumentHashCaches.length; i++) {
-                        if (compareArraysShallow(functionArgumentHashCaches[i].functionArguments, functionArguments)) {
-                            return functionArgumentHashCaches[i];
+                    let cacheBucket = functionCaches[argumentsHash]
+                    for (let i = 0; i < cacheBucket.length; i++) {
+                        if (compareArraysShallow(cacheBucket[i].functionArguments, functionArguments)) {
+                            return cacheBucket[i];
                         }
                     }
                 }
             },
-
+			
             createNewRecord : function() {
                 if (uniqueHash) {
-                    if (typeof(functionCaches[argumentsHash]) === 'undefined') {
-                        functionCaches[argumentsHash] = createImmutable({});
-                    }
+					let newCacheRecord = createImmutable({});
+					functionCaches[argumentsHash] = newCacheRecord;
+					emitUnobservableEvent({object: functionCaches, type: 'set', property: argumentsHash, oldValueUndefined: true , value: newCacheRecord});
                     return functionCaches[argumentsHash];
-                    // return getMap(functionCaches, argumentsHash)
                 } else {
-                    let functionArgumentHashCaches = getArray(functionCaches, "_nonpersistent_cacheBuckets", argumentsHash);
-                    let record = createImmutable({});
-                    functionArgumentHashCaches.push(record);
-                    return record;
+                    if (typeof(functionCaches[argumentsHash]) === 'undefined') {
+						let cacheBucket = createImmutable([]);
+                        functionCaches[argumentsHash] = cacheBucket;
+						emitUnobservableEvent({object: functionCaches, type: 'set', property: argumentsHash , oldValueUndefined: true , value: cacheBucket});
+                    }
+                    let hashBucket = functionCaches[argumentsHash];
+                    let newCacheRecord = createImmutable({});
+                    hashBucket.push(newCacheRecord);
+					emitUnobservableEvent({object: hashBucket, type: 'splice', index: "foo", removed: null , added: [newCacheRecord]});
+                    return newCacheRecord;
                 }
             }
         };
@@ -1816,24 +1881,24 @@
 			getObjectAttatchedCache(this, "_repeaters", functionName), 
 			argumentsList,
 			function() {
-                returnValue = this[functionName].apply(this, argumentsList);
+                return this[functionName].apply(this, argumentsList);
             }.bind(this)
 		);
     }
 
-	function repeatForUniqueCall(repeatedFunction, argumentLists) {
-		if (typeof(repeatedFunction.__call_repeat_cache) === 'undefined') {
-			repeatedFunction.__call_repeat_cache = {};
-		}
-		let cache = repeatedFunction.__call_repeat_cache;
-		repeatForUniqueArgumentLists(
-			cache, 
-			argumentList, 
-			function() {
-                returnValue = repeatedFunction.apply(null, argumentsList);
-            }
-		);
-	}
+	// function repeatForUniqueCall(repeatedFunction, argumentLists) {
+		// if (typeof(repeatedFunction.__call_repeat_cache) === 'undefined') {
+			// repeatedFunction.__call_repeat_cache = {};
+		// }
+		// let cache = repeatedFunction.__call_repeat_cache;
+		// repeatForUniqueArgumentLists(
+			// cache, 
+			// argumentList, 
+			// function() {
+                // return repeatedFunction.apply(null, argumentsList); // Will this work if this is already bound?
+            // }
+		// );
+	// }
 	
 	function repeatForUniqueArgumentLists(cache, argumentsList, repeatedFunction) {
 		let functionCacher = getFunctionCacher(cache, argumentsList);
@@ -1900,13 +1965,23 @@
             return this[functionName].apply(this, argumentsArray);
         }
     }
-
+	
     function genericCallAndCacheFunction() {
-        // Split arguments
+		// Split arguments
         let argumentsList = argumentsToArray(arguments);
         let functionName = argumentsList.shift();
-		let cache = getObjectAttatchedCache(this, "_cachedCalls", functionName);
-        let functionCacher = getFunctionCacher(cache, argumentsList); // wierd, does not work with this inestead of handler...
+		
+		return callAndCacheForUniqueArgumentLists(
+			getObjectAttatchedCache(this, "_cachedCalls", functionName), 
+			argumentsList,
+			function() {
+                return this[functionName].apply(this, argumentsList);
+            }.bind(this)
+		);
+    }
+	
+	function callAndCacheForUniqueArgumentLists(cache, argumentsList, callAction) {
+        let functionCacher = getFunctionCacher(cache, argumentsList);
 
         if (!functionCacher.cacheRecordExists()) {
             let cacheRecord = functionCacher.createNewRecord();
@@ -1926,7 +2001,7 @@
                 function () {
                     let returnValue;
                     // blockSideEffects(function() {
-                    returnValue = this[functionName].apply(this, argumentsList);
+                    returnValue = callAction();
                     // }.bind(this));
                     return returnValue;
                 }.bind(this),
@@ -1948,7 +2023,8 @@
             registerAnyChangeObserver(cacheRecord.contextObservers);
             return cacheRecord.returnValue;
         }
-    }
+	}
+	
 
     function genericUnCacheFunction() {
         // Split arguments
