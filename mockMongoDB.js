@@ -23,11 +23,14 @@
 	}
 	
 	function saveNewRecord(dataRecord) {
+		console.log("saveNewRecord");
+		console.log(dataRecord);
 		dataRecords.push(JSON.stringify(dataRecord));
 		return dataRecords.length - 1;
 	}
 
 	function updateRecord(id, contents) {
+		console.log("updateRecord");
 		dataRecords[id] = JSON.stringify(contents);
 		return id;
 	}

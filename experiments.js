@@ -323,7 +323,7 @@ causality.addPostPulseAction(function(events) {
 let pendingImageCreations = {};
 let pendingImageUpdates = {}
 
-function hasBeenWrittenToDB(dbImage) {
+function hasAPlaceholder(dbImage) {
 	// console.log(dbImage);
 	return typeof(dbImage.const.mongoDbId) !== 'undefined';
 }
@@ -338,7 +338,7 @@ function writePlaceholderForImageToDatabase(dbImage) {
 function convertReferencesToDbIds(entity) {
 	if (imageCausality.isObject(entity)) {
 		let dbImage = entity;
-		if (!hasBeenWrittenToDB(entity)) {
+		if (!hasAPlaceholder(entity)) {
 			writePlaceholderForImageToDatabase(dbImage);
 		}
 		return dbImage.const.serializedMongoDbId;
@@ -358,16 +358,18 @@ function writeImageToDatabase(dbImage) {
 	for (property in dbImage) {
 		serialized[property] = convertReferencesToDbIds(dbImage[property]);
 	}
-	if (!hasBeenWrittenToDB(dbImage)) {
-		mockMongoDB.saveNewRecord(serialized);
+	if (!hasAPlaceholder(dbImage)) {
+		let mongoDbId = mockMongoDB.saveNewRecord(serialized);
+		dbImage.const.mongoDbId = mongoDbId;
+		dbImage.const.serializedMongoDbId = "_causality_persistent_id_" + mongoDbId;
 	} else {
-		mockMongoDB.updateRecord(serialized);
+		mockMongoDB.updateRecord(dbImage.const.mongoDbId, serialized);
 	}
 }
 
 function flushToDatabase() {
-	log(pendingImageCreations, 2);
-	log(pendingImageUpdates, 2);
+	// log(pendingImageCreations, 2);
+	// log(pendingImageUpdates, 2);
 	// This one could do a stepwise execution to not block the server. 
 	for (id in pendingImageCreations) {
 		writeImageToDatabase(pendingImageCreations[id]);
@@ -376,12 +378,12 @@ function flushToDatabase() {
 
 imageCausality.addPostPulseAction(function(events) {
 	console.log("=== Image pulse complete, sort events according to object id and flush to database === ");
-	log(events, 3);
+	// log(events, 3);
 	// Extract updates and creations to be done.
 	events.forEach(function(event) {
 		let dbImage = event.object;
-		log("Considering " + event.type + " event with object:");
-		log(dbImage, 2);
+		// log("Considering " + event.type + " event with object:");
+		// log(dbImage, 2);
 		let imageId = dbImage.const.id;
 			
 		if (event.type === 'creation') {
