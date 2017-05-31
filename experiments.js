@@ -10,9 +10,9 @@ let imageCausality = requireUncached("./causality.js");
 imageCausality.setConfiguration({ 
 	recordPulseEvents : true, 
 	
-	// mirrorRelations: true, 
-	// exposeMirrorRelationIntermediary : true,
-	// mirrorStructuresAsCausalityObjects : true
+	mirrorRelations: true, 
+	exposeMirrorRelationIntermediary : true,
+	mirrorStructuresAsCausalityObjects : true
 });
 // Other used libraries
 // let mirror = require('./node_modules/causalityjs_advanced/mirror.js');
@@ -337,13 +337,23 @@ function writePlaceholderForImageToDatabase(dbImage) {
 }
 
 function convertReferencesToDbIds(entity) {
+	console.log();
+	console.log("convertReferencesToDbIds: ");
+	log(entity, 2);
+	console.log(imageCausality.isObject(entity));
 	if (imageCausality.isObject(entity)) {
 		let dbImage = entity;
 		if (!hasAPlaceholder(entity)) {
 			writePlaceholderForImageToDatabase(dbImage);
 		}
 		return dbImage.const.serializedMongoDbId;
-	} else if (typeof(entity) === 'object') {
+	} else if (entity !== null && typeof(entity) === 'object') {
+		console.log("===========");
+		log(entity, 3);
+		console.log("===========");
+		
+		// entity.foo.bar;
+		
 		let converted = (entity instanceof Array) ? [] : {};
 		for (property in entity) {
 			converted[property] = convertReferencesToDbIds(entity[property]);
@@ -355,6 +365,8 @@ function convertReferencesToDbIds(entity) {
 }
 
 function writeImageToDatabase(dbImage) {
+	log(dbImage, 2);
+	console.log(imageCausality.isObject(dbImage));
 	let serialized = (dbImage instanceof Array) ? [] : {};
 	for (property in dbImage) {
 		serialized[property] = convertReferencesToDbIds(dbImage[property]);

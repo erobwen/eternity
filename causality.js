@@ -19,7 +19,7 @@
     }
 
 	// Instance identity
-	let causalityCoreIdentity = {};
+	let causalityInstanceIdentity = {};
 	
 	// Debugging
 	let objectlog = require('./objectlog.js');
@@ -228,33 +228,32 @@
 	}
 	
 	function findIncomingRelation(referencedObject, relationName, createFunction) {
+		if (typeof(createFunction) === 'undefined') {
+			createFunction = createImmutable;
+		}
 		if (referencedObject._mirror_incoming_relation === true)  {
 			// The referenced object is the incoming relation itself. 
 			return referencedObject;
 		} else if (typeof(referencedObject._mirror_incoming_relations) === 'undefined') {
 			// The argument is the referenced object itself, dig down into the structure. 
-			let mirrorIncomingRelations = { _mirror_incoming_relations : true, _mirror_referencedObject: referencedObject };
-			if (typeof(createFunction) !== 'undefined') mirrorIncomingRelations = createFunction(mirrorIncomingRelations); 
+			let mirrorIncomingRelations = createFunction({ _mirror_incoming_relations : true, _mirror_referencedObject: referencedObject });
 			
 			referencedObject._mirror_incoming_relations = mirrorIncomingRelations; 
-			let mirrorIncomingRelation = { _mirror_incoming_relation : true, _mirror_referencedObject: referencedObject };
-			if (typeof(createFunction) !== 'undefined') mirrorIncomingRelation = createFunction(mirrorIncomingRelation); 
+			let mirrorIncomingRelation = createFunction({ _mirror_incoming_relation : true, _mirror_referencedObject: referencedObject });
 			
 			mirrorIncomingRelations[relationName] = mirrorIncomingRelation;
 			return mirrorIncomingRelation;
 		} else {
 			if (referencedObject._mirror_incoming_relations === true) {
 				// The argument is the incoming relation set, will never happen?
-				let mirrorIncomingRelation = { _mirror_incoming_relation : true, _mirror_referencedObject: referencedObject };
-				if (typeof(createFunction) !== 'undefined') mirrorIncomingRelation = createFunction(mirrorIncomingRelation); 
+				let mirrorIncomingRelation = createFunction({ _mirror_incoming_relation : true, _mirror_referencedObject: referencedObject });
 				referencedObject[relationName] = mirrorIncomingRelation;
 				return mirrorIncomingRelation;
 			} else {
 				// The argument is the referenced object itself, but has already incoming relations defined. 
 				let mirrorIncomingRelations = referencedObject._mirror_incoming_relations;
 				if (typeof(mirrorIncomingRelations[relationName]) === 'undefined') {
-					mirrorIncomingRelation = { _mirror_incoming_relation : true, _mirror_referencedObject: referencedObject };
-					if (typeof(createFunction) !== 'undefined') mirrorIncomingRelation = createFunction(mirrorIncomingRelation);
+					mirrorIncomingRelation = createFunction({ _mirror_incoming_relation : true, _mirror_referencedObject: referencedObject });
 					mirrorIncomingRelations[relationName] = mirrorIncomingRelation;
 					return mirrorIncomingRelation;
 				} else {
@@ -313,6 +312,10 @@
 	}
 	
 	function intitializeAndConstructMirrorStructure(mirrorIncomingRelation, referingObject, referingObjectId, createFunction) {
+		if (typeof(createFunction) === 'undefined') {
+			createFunction = createImmutable;
+		}
+
 		let refererId = referingObjectId;
 		// console.log("intitializeAndConstructMirrorStructure:");
 		// console.log(referingObject);
@@ -335,17 +338,14 @@
 
 		// Move on to new chunk?
 		if (mirrorIncomingRelation.contentsCounter === sourcesObserverSetChunkSize) {
-			let newChunk = {
+			let newChunk = createFunction({
 				isRoot : false,
 				contents: {},
 				contentsCounter: 0,
 				next: null,
 				previous: null,
 				parent: null
-			};
-			if (typeof(createFunction) !== 'undefined') {
-				newChunk = createFunction(newChunk);
-			}
+			});
 
 			if (mirrorIncomingRelation.isRoot) {
 				newChunk.parent = mirrorIncomingRelation;
@@ -1256,7 +1256,7 @@
 		
         handler.const = {
 			initializer : initializer,
-			causalityInstanceIdentity : causalityCoreIdentity,
+			causalityInstanceIdentity : causalityInstanceIdentity,
             id: id,
             cacheId : cacheId,
             forwardsTo : null,
@@ -1312,7 +1312,20 @@
     }
 
 	function isObject(entity) {
-		return typeof(entity) === 'object' && entity !== null && typeof(entity.const) !== 'undefined' && entity.const.causalityInstanceIdentity === causalityCoreIdentity;
+		// console.log();
+		// console.log("isObject:");
+		// console.log(typeof(entity) === 'object');
+		// if (typeof(entity) === 'object') {
+			// console.log(entity !== null);
+			// if (entity !== null) {
+				// console.log(typeof(entity.const) !== 'undefined');
+				// if (typeof(entity.const) !== 'undefined')
+					// console.log(entity.const.causalityInstanceIdentity === causalityInstanceIdentity);				
+			// }
+		// }
+		// TODO: Fix the causality identity somehow. 
+		// return typeof(entity) === 'object' && entity !== null && typeof(entity.const) !== 'undefined' && entity.const.causalityInstanceIdentity === causalityInstanceIdentity;
+		return typeof(entity) === 'object' && entity !== null && typeof(entity.const) !== 'undefined' && typeof(entity.const.id) !== 'undefined';
 	}
 	
     /**********************************
