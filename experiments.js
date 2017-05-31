@@ -10,9 +10,9 @@ let imageCausality = requireUncached("./causality.js");
 imageCausality.setConfiguration({ 
 	recordPulseEvents : true, 
 	
-	mirrorRelations: true, 
-	exposeMirrorRelationIntermediary : true,
-	mirrorStructuresAsCausalityObjects : true
+	// mirrorRelations: true, 
+	// exposeMirrorRelationIntermediary : true,
+	// mirrorStructuresAsCausalityObjects : true
 });
 
 // Other used libraries
