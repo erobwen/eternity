@@ -14,10 +14,9 @@ imageCausality.setConfiguration({
 	// exposeMirrorRelationIntermediary : true,
 	// mirrorStructuresAsCausalityObjects : true
 });
-
 // Other used libraries
 // let mirror = require('./node_modules/causalityjs_advanced/mirror.js');
-let mirror = require('./mirror.js');  // Temoprary for faster coding
+// let mirror = require('./mirror.js');  // Temoprary for faster coding
 let mockMongoDB = require("./mockMongoDB.js");
 
 // Neat logging
@@ -226,6 +225,8 @@ function createObjectDbImage(object, potentialParentImage, potentialParentProper
 	let dbImage = imageCausality.create(imageContents);
 	object.const.dbImage = dbImage;
 	dbImage.const.object = object;
+	// console.log("dbImage.const.id: ");
+	// console.log(dbImage.const.id);
 	return dbImage;
 }
 		
@@ -414,10 +415,14 @@ imageCausality.addPostPulseAction(function(events) {
 // imageCausality.pulse(function(){
 	causality.pulse(function() {
 		let a = create({name : "a"});
+		// console.log(a.const.id);
 		let b = create({name : "b"});
+		// console.log(b.const.id);
 		let c = create({name : "c"});
+		// console.log(c.const.id);
 		let d = create({name : "d"});
-
+		// console.log(d.const.id);
+		
 		transaction(function() {
 			a.B = b;
 			b.A = a;
