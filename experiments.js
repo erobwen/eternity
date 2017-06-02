@@ -356,7 +356,8 @@ function convertReferencesToDbIds(entity) {
 		
 		let converted = (entity instanceof Array) ? [] : {};
 		for (property in entity) {
-			converted[property] = convertReferencesToDbIds(entity[property]);
+			if (property !== 'const')
+				converted[property] = convertReferencesToDbIds(entity[property]);
 		}
 		return converted;
 	} else {
@@ -369,7 +370,8 @@ function writeImageToDatabase(dbImage) {
 	console.log(imageCausality.isObject(dbImage));
 	let serialized = (dbImage instanceof Array) ? [] : {};
 	for (property in dbImage) {
-		serialized[property] = convertReferencesToDbIds(dbImage[property]);
+		if (property !== 'const')
+			serialized[property] = convertReferencesToDbIds(dbImage[property]);
 	}
 	if (!hasAPlaceholder(dbImage)) {
 		let mongoDbId = mockMongoDB.saveNewRecord(serialized);

@@ -39,228 +39,240 @@
 
     /***************************************************************
      *
-     *  Mirror setup
+     *  Specifiers
+	 * 
+	 * Specifiers has no id since they are never streamed independently of references. 
      *
      ***************************************************************/
-
-	function forAllIncoming(object, property, callback) {
-		registerAnyChangeObserver(getSpecifier(getSpecifier(object, "_incoming"), property));
-		withoutRecording(function() { // This is needed for setups where incoming structures are made out of causality objects. 
-			forAllIncomingInner(object, property, callback);
-		});
- 	}
-	
-	function forAllIncomingInner(object, property, callback) {
-		if (typeof(object._mirror_incoming_relations) !== 'undefined') {
-			let relations = object._mirror_incoming_relations;
-			if (typeof(relations[property]) !== 'undefined') {
-				let relation = relations[property];
-				let contents = relation.contents;
-				for (id in contents) {
-					let referer = contents[id];
-					callback(referer);
-				}
-				let currentChunk = relation.first
-				while (currentChunk !== null) {
-					let contents = currentChunk.contents;
-					for (id in contents) {
-						let referer = contents[id];
-						callback(referer);
-					}
-					currentChunk = currentChunk.next;
-				}
-			}
-		}
-	} 	 
-	
-	
-	function setupMirrorReference(referingObject, referingObjectId, property, value, createFunction) {
-		if (!property.startsWith("_mirror_")) {
-			// let referingObject = getReferingObject(object, property);
-			let relationName = gottenReferingObjectRelation;
-			// console.log("setProperty:");
-			// console.log(referingObject);
-			// console.log(referingObject.id);
-					
-			let referencedValue = value;
-			if (typeof(value) === 'object') { //TODO: limit backwards referenes to mirror objects only.
-				let mirrorIncomingRelation = findIncomingRelation(referencedValue, property, createFunction);
-				let incomingRelationChunk = intitializeAndConstructMirrorStructure(mirrorIncomingRelation, referingObject, referingObjectId, createFunction);
-				if (incomingRelationChunk !== null) {
-					referencedValue = incomingRelationChunk;
-				}
-			}
-			return referencedValue;
-		} else {
-			return value;
-		}
-	} 
-	
-	
-	function setProperty(object, property, value, createFunction) {
-		let previousValue = object[property];
-		removeMirrorStructure(object.const.id, previousValue);
-		setupMirrorReference(object, property, value, createFunction);
-		object[property] = referencedValue;
-	}
-	
-	function getProperty(object, property) {
-		// if (typeof(property) === 'string') {
-			// console.log("getProperty:");
-			// property = "" + property;
-			// console.log(property);
-		if (property.startsWith("_mirror_")) {
-			return object[property];
-		} else {
-			// console.log("Here!");
-			let referedEntity = object[property];
-			// console.log(referedEntity);
-			return findReferredObject(referedEntity);
-		}			
-		// }
-	}
 	 
-	 
-	function addInArray(array, referencedObject) { // TODO: Push in array
-		// Find relation name
-		let referingObject = getReferingObject(array, "[]");
-		let referingObjectId = referingObject.const.id;
-		let relationName = gottenReferingObjectRelation;
-
-		// Find right place in the incoming structure.
-		let mirrorIncomingRelation = findIncomingRelation(referencedObject, relationName);
-		let incomingRelationChunk = intitializeAndConstructMirrorStructure(mirrorIncomingRelation, referingObject, referingObjectId);
-		if (incomingRelationChunk !== null) {
-			array.push(incomingRelationChunk);
-		}
-	}
-
-			
-	function clearArray(array) {
-		// let refererId = null;
-		// let referer = array;
-		// if (typeof(array._mirror_index_parent) !== 'undefined') {
-			// TODO: loop recursivley
-			// refererId = array._mirror_index_parent.id;
-			// referer = array._mirror_index_parent
-		// } else {
-			// refererId = array.id;
-			// referer = array;
-		// }
-		// Find relation name
-		let referingObject = getReferingObject(array, "[]");
-		// let relationName = gottenReferingObjectRelation;
-		
-		
-		array.forEach(function(observerSet) {
-			removeMirrorStructure(referingObject.const.id, observerSet);
-		});
-		array.lenght = 0;  // From repeater itself.
-	}
-	
-
-	
-    let sourcesObserverSetChunkSize = 500;
-	
-	/**
-	* Creater helpers
-	*/	
-	function getSpecifier(object, specifierName, createFunction) {
-		if (typeof(object[specifierName]) === 'undefined' || object[specifierName] === null) {
+	function getSpecifier(javascriptObject, specifierName) {
+		if (typeof(javascriptObject[specifierName]) === 'undefined' || javascriptObject[specifierName] === null) {
 			let specifier = { 
-				_mirror_specifier_parent : object, 
-				_mirror_specifier_property : specifierName, 
-				_mirror_incoming_relation : true   // This is a reuse of this object as incoming node as well.
+				specifierParent : javascriptObject, 
+				specifierProperty : specifierName, 
+				isIncomingRelationStructure : true   // This is a reuse of this object as incoming node as well.
 			}
-			if (typeof(createFunction) !== 'undefined') {
-				object[specifierName] = createFunction(specifier);
+			if (mirrorStructuresAsCausalityObjects) {
+				javascriptObject[specifierName] = createImmutable(specifier);
 			} else {
-				object[specifierName] = specifier;
+				javascriptObject[specifierName] = specifier;				
 			}
 		}
-		return object[specifierName];
+		return javascriptObject[specifierName];
 	} 
 
-	function createArrayIndex(object, property, createFunction) {
-		let index = [];
-		if (typeof(createFunction) !== 'undefined') {
-			index = createFunction(index);
-		}
-		index._mirror_index_parent = object;
-		index._mirror_index_parent_relation = property;
-		index._mirror_outgoing_parent = object;
+	 
+    /***************************************************************
+     *
+     *  Indicies
+     *
+     ***************************************************************/
+	 
+	 function createImmutableArrayIndex(object, property) {
+		let index = createImmutable([]);
+
+		index.const.indexParent = object;
+		index.const.indexParentRelation = property;
+
 		object[property] = index;
 		return index;
 	}
 	
-	/*-----------------------------------------------
-	 *            Relation structures
-	 *-----------------------------------------------*/
+	
+	function createArrayIndex(object, property) {
+		let index = create([]);
+
+		index.const.indexParent = object;
+		index.const.indexParentRelation = property;
+
+		object[property] = index;
+		return index;
+	}
+	
+
+	function createObjectIndex(object, property) {
+		let index = create({});
+
+		index.const.indexParent = object;
+		index.const.indexParentRelation = property;
+
+		object[property] = index;
+		return index;
+	}
+
 	
 	/**
-	 * Traverse the index structure
+	 * Traverse the index structure. TODO: This should perahps be used for all assignments.... ?
 	 */
-	
 	let gottenReferingObject;
 	let gottenReferingObjectRelation;
 	function getReferingObject(possibleIndex, relationFromPossibleIndex) {
 		gottenReferingObject = possibleIndex;
 		gottenReferingObjectRelation = relationFromPossibleIndex;
-		while (typeof(gottenReferingObject._mirror_index_parent) !== 'undefined') {
-			gottenReferingObjectRelation = gottenReferingObject._mirror_index_parent_relation;
-			gottenReferingObject = gottenReferingObject._mirror_index_parent;
+		while (typeof(gottenReferingObject.const.indexParent) !== 'undefined') {
+			gottenReferingObjectRelation = gottenReferingObject.const.indexParentRelation;
+			gottenReferingObject = gottenReferingObject.const.indexParent;
 		}
 		
 		return gottenReferingObject;
 	}
+
+	
+    /***************************************************************
+     *
+     *  Incoming relations. 
+     *
+     ***************************************************************/
+
+    let incomingStructureChunkSize = 500;
+
+	function forAllIncoming(object, property, callback) {
+		registerAnyChangeObserver(getSpecifier(getSpecifier(object.const, "incomingObservers"), property));
+		withoutRecording(function() { // This is needed for setups where incoming structures are made out of causality objects. 
+			if (typeof(object.const.incoming) !== 'undefined') {
+				let relations = object.const.incoming;
+				if (typeof(relations[property]) !== 'undefined') {
+					let relation = relations[property];
+					let contents = relation.contents;
+					for (id in contents) {
+						let referer = contents[id];
+						callback(referer);
+					}
+					let currentChunk = relation.first
+					while (currentChunk !== null) {
+						let contents = currentChunk.contents;
+						for (id in contents) {
+							let referer = contents[id];
+							callback(referer);
+						}
+						currentChunk = currentChunk.next;
+					}
+				}
+			}
+		});
+ 	}
+	
+	
+	
+	/*-----------------------------------------------
+	 *            Relation structures
+	 *-----------------------------------------------*/
+	
+	
+	function createAndRemoveIncomingRelations(objectProxy, key, value, previousValue) {
+		// console.log("setup mirror relation");
+		
+		// Get refering object 
+        let referringRelation = key;
+        while (typeof(objectProxy.const.indexParent) !==  'undefined') {
+            referringRelation = objectProxy.const.indexParentRelation;
+            objectProxy = objectProxy.const.indexParent;
+        }
+		
+		// Tear down structure to old value
+		if (isObject(previousValue)) {
+			removeMirrorStructure(objectProxy.const.id, previousValue);
+			if (typeof(previousValue.const.incomingObservers) !== 'undefined') {
+				notifyChangeObservers(previousValue.const.incomingObservers[referringRelation]);
+			}
+		}
+
+		// Setup structure to new value
+		if (isObject(value)) {
+			let referencedValue = createIncomingStructure(objectProxy, objectProxy.const.id, referringRelation, value);
+			if (typeof(value.const.incomingObservers) !== 'undefined') {
+				notifyChangeObservers(value.const.incomingObservers[referringRelation]);
+			}
+			value = referencedValue;
+		}
+
+		return value;
+	}
+	
+	
+	function createAndRemoveArrayIncomingRelations(arrayProxy, index, removed, added) {
+		// Get refering object 
+		let referringRelation = "[]";
+		while (typeof(arrayProxy.const.indexParent) !==  'undefined') {
+			referringRelation = arrayProxy.const.indexParentRelation;
+			arrayProxy = arrayProxy.const.indexParent;
+		}
+		
+		// Create mirror relations for added
+		let addedAdjusted = [];
+		added.forEach(function(addedElement) {
+			if (isObject(addedElement)) {
+				// console.log("and here");
+				let referencedValue = createIncomingStructure(arrayProxy, arrayProxy.const.id, referringRelation, addedElement);
+				if (typeof(addedElement.const.incomingObservers) !== 'undefined') {
+					notifyChangeObservers(addedElement.const.incomingObservers[referringRelation]);
+				}
+				addedAdjusted.push(referencedValue);
+			} else {
+				addedAdjusted.push(addedElement);
+			}						
+		});
+		
+		// Remove mirror relations for removed
+		if (removed !== null) {
+			removed.forEach(function(removedElement) {
+				if (isObject(removedElement)) {
+					removeMirrorStructure(proxy.const.id, removedElement);
+					if (typeof(removedElement.const.incomingObservers) !== 'undefined') {
+						notifyChangeObservers(removedElement.const.incomingObservers[referringRelation]);
+					}
+				}					
+			});					
+		}
+		return addedAdjusted;
+	} 
 	
 	
 	/**
 	 * Traverse the incoming relation structure
 	 */
-	
 	function findReferredObject(referredItem) {
-		if (typeof(referredItem) === 'object' && typeof(referredItem._mirror_referencedObject) !== undefined) {
-			return referredItem._mirror_referencedObject;
+		if (typeof(referredItem) === 'object' && typeof(referredItem.referredObject) !== undefined) {
+			return referredItem.referredObject;
 		} else {
 			return referredItem;
 		}
 	}
 	
-	function findIncomingRelation(referencedObject, relationName, createFunction) {
-		if (typeof(createFunction) === 'undefined') {
-			createFunction = createImmutable;
-		}
-		if (referencedObject._mirror_incoming_relation === true)  {
-			// The referenced object is the incoming relation itself. 
-			return referencedObject;
-		} else if (typeof(referencedObject._mirror_incoming_relations) === 'undefined') {
-			// The argument is the referenced object itself, dig down into the structure. 
-			let mirrorIncomingRelations = createFunction({ _mirror_incoming_relations : true, _mirror_referencedObject: referencedObject });
-			
-			referencedObject._mirror_incoming_relations = mirrorIncomingRelations; 
-			let mirrorIncomingRelation = createFunction({ _mirror_incoming_relation : true, _mirror_referencedObject: referencedObject });
-			
-			mirrorIncomingRelations[relationName] = mirrorIncomingRelation;
-			return mirrorIncomingRelation;
+	function createIncomingStructure(referingObject, referingObjectId, property, object) {
+		let mirrorIncomingRelation = getIncomingRelationStructure(object, property);
+		let incomingRelationChunk = intitializeAndConstructMirrorStructure(mirrorIncomingRelation, referingObject, referingObjectId);
+		if (incomingRelationChunk !== null) {
+			return incomingRelationChunk;
 		} else {
-			if (referencedObject._mirror_incoming_relations === true) {
-				// The argument is the incoming relation set, will never happen?
-				let mirrorIncomingRelation = createFunction({ _mirror_incoming_relation : true, _mirror_referencedObject: referencedObject });
-				referencedObject[relationName] = mirrorIncomingRelation;
-				return mirrorIncomingRelation;
-			} else {
-				// The argument is the referenced object itself, but has already incoming relations defined. 
-				let mirrorIncomingRelations = referencedObject._mirror_incoming_relations;
-				if (typeof(mirrorIncomingRelations[relationName]) === 'undefined') {
-					mirrorIncomingRelation = createFunction({ _mirror_incoming_relation : true, _mirror_referencedObject: referencedObject });
-					mirrorIncomingRelations[relationName] = mirrorIncomingRelation;
-					return mirrorIncomingRelation;
-				} else {
-					return mirrorIncomingRelations[relationName];
-				}
-			}
+			return object;
 		}
+	} 
+	
+	
+	function getIncomingRelationStructure(referencedObject, relationName) {
+		// Create incoming structure
+		let incomingRelations;
+		if (typeof(referencedObject.const.incoming) === 'undefined') {
+			incomingRelations = { isIncomingRelationStructures : true, referredObject: referencedObject };
+			if (mirrorStructuresAsCausalityObjects) {
+				incomingRelations = create(incomingRelations);
+			}
+			referencedObject.const.incoming = incomingRelations;
+		} else {
+			incomingRelations = referencedObject.const.incoming;
+		}
+		
+		// Create incoming for this particular property
+		if (typeof(incomingRelations[relationName]) === 'undefined') {
+			let mirrorIncomingRelation = { isIncomingRelationStructure : true, relationName: relationName, referredObject: referencedObject };
+			if (mirrorStructuresAsCausalityObjects) {
+				mirrorIncomingRelation = create(mirrorIncomingRelation);
+			}
+			incomingRelations[relationName] = mirrorIncomingRelation;
+		}
+		
+		return incomingRelations[relationName];
 	}
 	
 	
@@ -268,7 +280,7 @@
 	* Structure helpers
 	*/				
 	function removeMirrorStructure(refererId, referedEntity) {
-		if (typeof(referedEntity._mirror_incoming_relation) !== 'undefined') {
+		if (typeof(referedEntity.isIncomingRelationStructure) !== 'undefined') {
 			let incomingRelation = referedEntity;
 			let incomingRelationContents = incomingRelation['contents'];
 			delete incomingRelationContents[refererId];
@@ -311,11 +323,7 @@
 		}
 	}
 	
-	function intitializeAndConstructMirrorStructure(mirrorIncomingRelation, referingObject, referingObjectId, createFunction) {
-		if (typeof(createFunction) === 'undefined') {
-			createFunction = createImmutable;
-		}
-
+	function intitializeAndConstructMirrorStructure(mirrorIncomingRelation, referingObject, referingObjectId) {
 		let refererId = referingObjectId;
 		// console.log("intitializeAndConstructMirrorStructure:");
 		// console.log(referingObject);
@@ -337,15 +345,18 @@
 		}
 
 		// Move on to new chunk?
-		if (mirrorIncomingRelation.contentsCounter === sourcesObserverSetChunkSize) {
-			let newChunk = createFunction({
+		if (mirrorIncomingRelation.contentsCounter === incomingStructureChunkSize) {
+			let newChunk = {
 				isRoot : false,
 				contents: {},
 				contentsCounter: 0,
 				next: null,
 				previous: null,
 				parent: null
-			});
+			};
+			if (mirrorStructuresAsCausalityObjects) {
+				newChunk = create(newChunk);
+			}
 
 			if (mirrorIncomingRelation.isRoot) {
 				newChunk.parent = mirrorIncomingRelation;
@@ -382,55 +393,6 @@
      ***************************************************************/
 
 	 
-	function createAndRemoveMirrorRelations(proxy, index, removed, added) {
-		// console.log("createAndRemoveMirrorRelations " + mirrorRelations);
-		if (mirrorRelations) {     
-			// console.log("inside");
-			// Get refering object 
-            let referringObject = proxy;
-			// console.log("heref");
-            let referringRelation = "[]";
-            while (typeof(referringObject._mirror_index_parent) !==  'undefined') {
-				// console.log(looping);
-                referringRelation = referringObject._mirror_index_parent_relation;
-                referringObject = referringObject._mirror_index_parent;
-            }
-			// console.log("??");
-			if (true) {
-				// Create mirror relations for added
-				let addedAdjusted = [];
-				added.forEach(function(addedElement) {
-					if (isObject(addedElement)) { // Cannot remove mirror reflects???.... )
-						// console.log("and here");
-						let referencedValue;
-						if (configuration.mirrorStructuresAsCausalityObjects) {
-							referencedValue = setupMirrorReference(referringObject, referringObject.const.id, referringRelation, addedElement, create);
-						} else {
-							referencedValue = setupMirrorReference(referringObject, referringObject.const.id, referringRelation, addedElement);
-						}
-						if (typeof(referencedValue._incoming) !== 'undefined' && typeof(referencedValue._incoming[referringRelation]) !== 'undefined') {
-							notifyChangeObservers(referencedValue._incoming[referringRelation]);
-						}
-						addedAdjusted.push(referencedValue);
-					} else {
-						addedAdjusted.push(addedElement);
-					}						
-				});
-				
-				// Remove mirror relations for removed
-				if (removed !== null) {
-					removed.forEach(function(removedElement) {
-						if (isObject(removedElement)) {
-							removeMirrorStructure(proxy.const.id, removedElement);
-							notifyChangeObservers(removedElement._incoming[referringRelation]);
-						}					
-					});					
-				}
-				return addedAdjusted;
-			}
-		}
-		return added;
-	} 
 
 	
     let constArrayOverrides = {
@@ -442,8 +404,8 @@
             observerNotificationNullified++;
             let result = this.target.pop();
             observerNotificationNullified--;
-            if (this._arrayObservers !== null) {
-                notifyChangeObservers(this._arrayObservers);
+            if (typeof(this.const._arrayObservers) !== 'undefined') {
+                notifyChangeObservers(this.const._arrayObservers);
             }
             emitSpliceEvent(this, index, [result], null);
             if (--inPulse === 0) postPulseCleanup();
@@ -460,16 +422,18 @@
 			let removed = null;
 			let added = argumentsArray;
 			
-			
-			if (mirrorRelations) {
- 				added = createAndRemoveMirrorRelations(this.const.object, index, removed, added); // TODO: implement for other array manipulators as well. 
+			if (mirrorRelations && updatingMirrorRelations === 0) {
+				updatingMirrorRelations++
+ 				added = createAndRemoveArrayIncomingRelations(this.const.object, index, removed, added); // TODO: implement for other array manipulators as well. 
+				// TODO: What about removed adjusted?
+				updatingMirrorRelations--
 			}
 			
             observerNotificationNullified++;
             this.target.push.apply(this.target, argumentsArray);
             observerNotificationNullified--;
-            if (this._arrayObservers !== null) {
-                notifyChangeObservers(this._arrayObservers);
+            if (typeof(this.const._arrayObservers) !== 'undefined') {
+                notifyChangeObservers(this.const._arrayObservers);
             }
             emitSpliceEvent(this, index, removed, added);
             if (--inPulse === 0) postPulseCleanup();
@@ -483,8 +447,8 @@
             observerNotificationNullified++;
             let result = this.target.shift();
             observerNotificationNullified--;
-            if (this._arrayObservers !== null) {
-                notifyChangeObservers(this._arrayObservers);
+            if (typeof(this.const._arrayObservers) !== 'undefined') {
+                notifyChangeObservers(this.const._arrayObservers);
             }
             emitSpliceEvent(this, 0, [result], null);
             if (--inPulse === 0) postPulseCleanup();
@@ -501,8 +465,8 @@
             observerNotificationNullified++;
             this.target.unshift.apply(this.target, argumentsArray);
             observerNotificationNullified--;
-            if (this._arrayObservers !== null) {
-                notifyChangeObservers(this._arrayObservers);
+            if (typeof(this.const._arrayObservers) !== 'undefined') {
+                notifyChangeObservers(this.const._arrayObservers);
             }
             emitSpliceEvent(this, 0, null, argumentsArray);
             if (--inPulse === 0) postPulseCleanup();
@@ -523,8 +487,8 @@
             observerNotificationNullified++;
             let result = this.target.splice.apply(this.target, argumentsArray);
             observerNotificationNullified--;
-            if (this._arrayObservers !== null) {
-                notifyChangeObservers(this._arrayObservers);
+            if (typeof(this.const._arrayObservers) !== 'undefined') {
+                notifyChangeObservers(this.const._arrayObservers);
             }
             emitSpliceEvent(this, index, removed, added);
             if (--inPulse === 0) postPulseCleanup();
@@ -549,8 +513,8 @@
             observerNotificationNullified++;
             let result = this.target.copyWithin(target, start, end);
             observerNotificationNullified--;
-            if (this._arrayObservers !== null) {
-                notifyChangeObservers(this._arrayObservers);
+            if (typeof(this.const._arrayObservers) !== 'undefined') {
+                notifyChangeObservers(this.const._arrayObservers);
             }
 
             emitSpliceEvent(this, target, added, removed);
@@ -570,8 +534,8 @@
             observerNotificationNullified++;
             let result = this.target[functionName].apply(this.target, argumentsArray);
             observerNotificationNullified--;
-            if (this._arrayObservers !== null) {
-                notifyChangeObservers(this._arrayObservers);
+            if (typeof(this.const._arrayObservers) !== 'undefined') {
+                notifyChangeObservers(this.const._arrayObservers);
             }
             emitSpliceEvent(this, 0, removed, this.target.slice(0));
             if (--inPulse === 0) postPulseCleanup();
@@ -593,8 +557,8 @@
 			observerNotificationNullified++;
 			this.target.push.apply(this.target, argumentsArray);
 			observerNotificationNullified--;
-			if (this._arrayObservers !== null) {
-				notifyChangeObservers(this._arrayObservers);
+			if (typeof(this.const._arrayObservers) !== 'undefined') {
+				notifyChangeObservers(this.const._arrayObservers);
 			}
 			emitSpliceEvent(this, index, null, argumentsArray);
 			if (--inPulse === 0) postPulseCleanup();
@@ -637,7 +601,7 @@
             return this.const[key];
         } else {
             if (inActiveRecording) {
-                registerAnyChangeObserver(getSpecifier(this, "_arrayObservers"));//object
+                registerChangeObserver(getSpecifier(this.const.object, "_arrayObservers"));//object
             }
             return target[key];
         }
@@ -661,7 +625,7 @@
             return this.const[key];
         } else {
             if (inActiveRecording) {
-                registerAnyChangeObserver(getSpecifier(this, "_arrayObservers"));//object
+                registerChangeObserver(getSpecifier(this.const, "_arrayObservers"));//object
             }
             return target[key];
         }
@@ -706,8 +670,8 @@
             target[key] = value;
             if( target[key] === value || (Number.isNaN(target[key]) && Number.isNaN(value)) ) { // Write protected?
                 emitSpliceReplaceEvent(this, key, value, previousValue);
-                if (this._arrayObservers !== null) {
-                    notifyChangeObservers(this._arrayObservers);
+                if (typeof(this.const._arrayObservers) !== 'undefined') {
+                    notifyChangeObservers(this.const._arrayObservers);
                 }
             }
         } else {
@@ -715,8 +679,8 @@
             target[key] = value;
             if( target[key] === value || (Number.isNaN(target[key]) && Number.isNaN(value)) ) { // Write protected?
                 emitSetEvent(this, key, value, previousValue);
-                if (this._arrayObservers !== null) {
-                    notifyChangeObservers(this._arrayObservers);
+                if (typeof(this.const._arrayObservers) !== 'undefined') {
+                    notifyChangeObservers(this.const._arrayObservers);
                 }
             }
         }
@@ -747,8 +711,8 @@
         delete target[key];
         if(!( key in target )) { // Write protected?
             emitDeleteEvent(this, key, previousValue);
-            if (this._arrayObservers !== null) {
-                notifyChangeObservers(this._arrayObservers);
+            if (typeof(this.const._arrayObservers) !== 'undefined') {
+                notifyChangeObservers(this.const._arrayObservers);
             }
         }
         if (--inPulse === 0) postPulseCleanup();
@@ -765,7 +729,7 @@
 		ensureInitialized(this, target);
 		
         if (inActiveRecording) {
-            registerAnyChangeObserver(getSpecifier(this, "_arrayObservers"));
+            registerChangeObserver(getSpecifier(this.const, "_arrayObservers"));
         }
         let result   = Object.keys(target);
         result.push('length');
@@ -781,7 +745,7 @@
 		ensureInitialized(this, target);
 		
         if (inActiveRecording) {
-            registerAnyChangeObserver(getSpecifier(this, "_arrayObservers"));
+            registerChangeObserver(getSpecifier(this.const, "_arrayObservers"));
         }
         return key in target;
     }
@@ -797,8 +761,8 @@
 		
         inPulse++;
 		// TODO: Elaborate here?
-        if (this._arrayObservers !== null) {
-            notifyChangeObservers(this._arrayObservers);
+        if (typeof(this.const._arrayObservers) !== 'undefined') {
+            notifyChangeObservers(this.const._arrayObservers);
         }
         if (--inPulse === 0) postPulseCleanup();
         return target;
@@ -813,7 +777,7 @@
 		ensureInitialized(this, target);
 		
         if (inActiveRecording) {
-            registerAnyChangeObserver(getSpecifier(this, "_arrayObservers"));
+            registerChangeObserver(getSpecifier(this.const, "_arrayObservers"));
         }
         return Object.getOwnPropertyDescriptor(target, key);
     }
@@ -849,9 +813,9 @@
 				let keyInTarget = key in target;
 				if (inActiveRecording) {
                     if (keyInTarget) {
-                        registerAnyChangeObserver(getSpecifier(getSpecifier(this, "_propertyObservers"), key));
+                        registerChangeObserver(getSpecifier(getSpecifier(this.const, "_propertyObservers"), key));
                     } else {
-                        registerAnyChangeObserver(getSpecifier(this, "_enumerateObservers"));
+                        registerChangeObserver(getSpecifier(this.const, "_enumerateObservers"));
                     }
                 }
 				return target[key];
@@ -892,50 +856,21 @@
 				let keyInTarget = key in target;
 				if (inActiveRecording) {
                     if (keyInTarget) {
-                        registerAnyChangeObserver(getSpecifier(getSpecifier(this, "_propertyObservers"), key));
+                        registerChangeObserver(getSpecifier(getSpecifier(this.const, "_propertyObservers"), key));
                     } else {
-                        registerAnyChangeObserver(getSpecifier(this, "_enumerateObservers"));
+                        registerChangeObserver(getSpecifier(this.const, "_enumerateObservers"));
                     }
                 }
-				if (mirrorRelations && keyInTarget && !exposeMirrorRelationIntermediary) {
+				if (mirrorRelations && updatingMirrorRelations === 0 && keyInTarget && !exposeMirrorRelationIntermediary) {
 					// console.log("causality.getHandlerObject:");
 					// console.log(key);
-					return getProperty(target, key);
+					return findReferredObject(target[key]);
 				} else {
 					return target[key];
 				}
             }
         }
     }
-	
-	function setupMirrorRelation(proxy, key, value, previousValue) {
-		// console.log("setup mirror relation");
-		// Get refering object 
-        let referringObject = proxy;
-        let referringRelation = key;
-        while (typeof(referringObject._mirror_index_parent) !==  'undefined') {
-            referringRelation = referringObject._mirror_index_parent_relation;
-            referringObject = referringObject._mirror_index_parent;
-        }
-		
-		// console.log("here too");
-		if (mirrorRelations) {
-			if (isObject(previousValue)) {
-				removeMirrorStructure(referringObject.const.id, previousValue);
-				notifyChangeObservers(previousValue._incoming[referringRelation]);
-			}
-			// console.log("here");
-			if (isObject(value)) {
-				// console.log("Setup mirror relation")
-				let referencedValue = setupMirrorReference(referringObject, referringObject.const.id, referringRelation, value);
-				if (typeof(referencedValue._incoming) !== 'undefined') {
-					notifyChangeObservers(referencedValue._incoming[referringRelation]);
-				}
-				value = referencedValue;
-			}
-		}
-		return value;
-	}
 	
 	/*
     function setHandlerObjectOptimized(target, key, value) {		
@@ -973,12 +908,12 @@
 		
 		// If assignment was successful, notify change
 		if (undefinedKey) {
-			if (typeof(this._enumerateObservers) !== 'undefined') {
-				notifyChangeObservers(this._enumerateObservers);
+			if (typeof(this.const._enumerateObservers) !== 'undefined') {
+				notifyChangeObservers(this.const._enumerateObservers);
 			}
 		} else {
-			if (typeof(this._propertyObservers) !== 'undefined' && typeof(this._propertyObservers[key]) !== 'undefined') {
-				notifyChangeObservers(this._propertyObservers[key]);
+			if (typeof(this.const._propertyObservers) !== 'undefined' && typeof(this.const._propertyObservers[key]) !== 'undefined') {
+				notifyChangeObservers(this.const._propertyObservers[key]);
 			}
 		}
 
@@ -1011,11 +946,11 @@
 		// Get previous value		// Get previous value
 		let previousValue;
 		let previousMirrorStructure;
-		if (mirrorRelations) {
+		if (mirrorRelations && updatingMirrorRelations === 0) {
 			// console.log("causality.getHandlerObject:");
 			// console.log(key);
 			previousMirrorStructure = target[key];
-			previousValue = getProperty(target, key);
+			previousValue = findReferredObject(target[key]);
 		} else {
 			previousValue = target[key]; 
 		}
@@ -1039,21 +974,23 @@
 		
 		// Perform assignment with regards to mirror structures.
 		let mirrorStructureValue;
-		if (mirrorRelations) {
-			mirrorStructureValue = setupMirrorRelation(this['const'].object, key, value, previousValue);
+		if (mirrorRelations && updatingMirrorRelations === 0) {
+			updatingMirrorRelations++;
+			mirrorStructureValue = createAndRemoveIncomingRelations(this['const'].object, key, value, previousValue);
 			target[key] = mirrorStructureValue; 
+			updatingMirrorRelations--;
 		} else {
 			target[key] = value;
 		}
 		
 		// If assignment was successful, notify change
 		if (undefinedKey) {
-			if (typeof(this._enumerateObservers) !== 'undefined') {
-				notifyChangeObservers(this._enumerateObservers);
+			if (typeof(this.const._enumerateObservers) !== 'undefined') {
+				notifyChangeObservers(this.const._enumerateObservers);
 			}
 		} else {
-			if (typeof(this._propertyObservers) !== 'undefined' && typeof(this._propertyObservers[key]) !== 'undefined') {
-				notifyChangeObservers(this._propertyObservers[key]);
+			if (typeof(this.const._propertyObservers) !== 'undefined' && typeof(this.const._propertyObservers[key]) !== 'undefined') {
+				notifyChangeObservers(this.const._propertyObservers[key]);
 			}
 		}
 
@@ -1090,8 +1027,8 @@
             delete target[key];
             if(!( key in target )) { // Write protected?
                 emitDeleteEvent(this, key, previousValue);
-                if (typeof(this._enumerateObservers) !== 'undefined') {
-                    notifyChangeObservers(this._enumerateObservers);
+                if (typeof(this.const._enumerateObservers) !== 'undefined') {
+                    notifyChangeObservers(this.const._enumerateObservers);
                 }
             }
             if (--inPulse === 0) postPulseCleanup();
@@ -1109,7 +1046,7 @@
 		ensureInitialized(this, target);
 		
         if (inActiveRecording) {
-            registerAnyChangeObserver(getSpecifier(this, "_enumerateObservers"));
+            registerChangeObserver(getSpecifier(this.const, "_enumerateObservers"));
         }
         let keys = Object.keys(target);
         return keys;
@@ -1124,7 +1061,7 @@
 		ensureInitialized(this, target);
 		
         if (inActiveRecording) {
-            registerAnyChangeObserver(getSpecifier(this, "_enumerateObservers"));
+            registerChangeObserver(getSpecifier(this.const, "_enumerateObservers"));
         }
         return (key in target);
     }
@@ -1143,8 +1080,8 @@
 		let returnValue = Reflect.defineProperty(target, key, descriptor);
 		// TODO: emitEvent here?
 
-        if (typeof(this._enumerateObservers) !== 'undefined') {
-            notifyChangeObservers(this._enumerateObservers);
+        if (typeof(this.const._enumerateObservers) !== 'undefined') {
+            notifyChangeObservers(this.const._enumerateObservers);
         }
         if (--inPulse === 0) postPulseCleanup();
         return returnValue;
@@ -1159,7 +1096,7 @@
 		ensureInitialized(this, target);
 		
         if (inActiveRecording) {
-            registerAnyChangeObserver(getSpecifier(this, '_enumerateObservers'));
+            registerChangeObserver(getSpecifier(this.const, '_enumerateObservers'));
         }
         return Object.getOwnPropertyDescriptor(target, key);
     }
@@ -1180,7 +1117,6 @@
 	} 
 	 
     function create(createdTarget, cacheId) {
-		// console.log(mirrorRelations);
 		inPulse++;
 		let id = nextId++;
 		
@@ -1199,7 +1135,7 @@
         if (createdTarget instanceof Array) {
             handler = {
 				id : id, // TODO: remove?
-                _arrayObservers : null,
+                // _arrayObservers : null,
                 // getPrototypeOf: function () {},
                 // setPrototypeOf: function () {},
                 // isExtensible: function () {},
@@ -1418,17 +1354,20 @@
     }
 
     let inActiveRecording = false;
+	let activeRecording = null;
 
     function updateInActiveRecording() {
         inActiveRecording = (microContext === null) ? false : ((microContext.type === "recording") && recordingPaused === 0);
+		activeRecording = inActiveRecording ? microContext : null;
     }
 
     function getActiveRecording() {
-        if ((microContext === null) ? false : ((microContext.type === "recording") && recordingPaused === 0)) {
-            return microContext;
-        } else {
-            return null;
-        }
+		return activeRecording;
+        // if ((microContext === null) ? false : ((microContext.type === "recording") && recordingPaused === 0)) {
+            // return microContext;
+        // } else {
+            // return null;
+        // }
     }
 
     function inActiveRepetition() {
@@ -1754,13 +1693,13 @@
             description: description,
             uponChangeAction: doAfterChange,
             remove : function() {
-                // Clear out previous observations
-				clearArray(this.sources);
+				this.sources.forEach(function(observerSet) {
+					removeMirrorStructure(context.const.id, observerSet);
+				});
+				this.sources.lenght = 0;  // From repeater itself.
             }
         });
-		// context.sources = [];
-		// context.sources._mirror_outgoing_parent = context;
-		createArrayIndex(context, "sources");
+		createImmutableArrayIndex(context, "sources");
 		
         enterContext('recording', context);
         let returnValue = performAction(doFirst);
@@ -1784,11 +1723,18 @@
     }
 
     function registerAnyChangeObserver(observerSet) { // instance can be a cached method if observing its return value, object
-		let activeRecorder = getActiveRecording();
-        if (activeRecorder !== null) {
-			addInArray(activeRecorder.sources, observerSet);
-        }
+		if (inActiveRecording) {
+			registerChangeObserver(observerSet);
+		}
     }
+	
+	function registerChangeObserver(observerSet) {
+		// Find right place in the incoming structure.
+		let incomingRelationChunk = intitializeAndConstructMirrorStructure(observerSet, activeRecording, activeRecording.const.id);
+		if (incomingRelationChunk !== null) {
+			activeRecording.sources.push(incomingRelationChunk);
+		}
+	}
 
 
     /** -------------
@@ -2652,6 +2598,9 @@
 	let configuration;
 	
 	let mirrorRelations = false;
+	
+	let updatingMirrorRelations = 0;
+	
 	let exposeMirrorRelationIntermediary;
 	let mirrorStructuresAsCausalityObjects;
 	
@@ -2730,7 +2679,6 @@
 		
 		// Mirror images
 		forAllIncoming : forAllIncoming,
-		forAllIncomingInner : forAllIncomingInner, // TODO: Remove this, for now it seems to be needed...
 		createArrayIndex : createArrayIndex
 	}
 	
