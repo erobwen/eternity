@@ -8,6 +8,7 @@
         root.causality = factory(); // Support browser global
     }
 }(this, function () {	
+
     function values(obj) {
         var vals = [];
         for( var key in obj ) {
