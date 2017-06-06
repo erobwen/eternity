@@ -59,13 +59,18 @@
 		dataRecords[id] = null; // Do not delete it as we want to keep nextId = records.length.
 	}	
 	
+	function getRecordsCount() {
+		return dataRecords.length;
+	}
+	
 	return {
 		saveNewRecord : saveNewRecord,
 		updateRecord : updateRecord,
 		updateRecordPath : updateRecordPath,
 		getRecord : getRecord,
 		deleteRecord : deleteRecord,
-		getAllRecordsParsed : getAllRecordsParsed
+		getAllRecordsParsed : getAllRecordsParsed,
+		getRecordsCount : getRecordsCount  
 	};
 }));
 

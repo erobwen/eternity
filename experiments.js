@@ -28,3 +28,6 @@ eternity.pulse(function() {
 
 console.log(eternity.mockMongoDB.getAllRecordsParsed());
 
+
+// let foo = create({name: "foo", const: {someProperty : 42}});
+// console.log(foo.const.someProperty);

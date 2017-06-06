@@ -72,8 +72,8 @@
 						if (isObject(oldValue)) {
 							if (typeof(oldValue.const.dbImage) !== 'undefined') {
 								let oldValueDbImage = oldValue.const.dbImage;
-								if (oldValueDbImage._eternity_parent === objectDbImage 
-									&& oldValueDbImage._eternity_parent_property === event.property) {
+								if (oldValueDbImage._eternityParent === objectDbImage 
+									&& oldValueDbImage._eternityParentProperty === event.property) {
 									
 									floodUnstable(oldValueDbImage, null, null);
 								}
@@ -96,8 +96,8 @@
 	
 	function createObjectDbImage(object, potentialParentImage, potentialParentProperty) {
 		let imageContents = {
-			_eternity_parent : potentialParentImage,
-			_eternity_parent_property : potentialParentProperty
+			_eternityParent : potentialParentImage,
+			_eternityParentProperty : potentialParentProperty
 		};
 		for (property in object) {
 			let value = object[property];
@@ -137,7 +137,7 @@
 	
 		// TODO: Do this asynchronously
 	function floodUnstable(potentiallyUnstableImage, parent, parentRelation) {
-		if (parent === null || (parent === unstableImage._eternity_parent && parentRelation === unstableImage._eternity_parent_property)) {
+		if (parent === null || (parent === unstableImage._eternityParent && parentRelation === unstableImage._eternityParentProperty)) {
 			unstableImages.push(potentiallyUnstableImage);
 			for (property in potentiallyUnstableImage) {
 				floodUnstable(potentiallyUnstableImage[property], potentiallyUnstableImage, property);
@@ -262,5 +262,21 @@
 	primaryCausality.mockMongoDB = mockMongoDB;
 
 	imageCausality.addPostPulseAction(postImagePulseAction);
+	
+	
+	
+	/*-----------------------------------------------
+	 *           Setup database
+	 *-----------------------------------------------*/
+	
+	// if (mockMongoDB.getRecordsCount() === 0) {
+		// primaryCausality.persistent = primaryCausality.create();
+	// } else {
+		// primaryCausality.persistent = primaryCausality.create(function() {
+			
+		// });		
+	// }
+	
+	
     return primaryCausality;
 }));
