@@ -25,15 +25,15 @@
 	function saveNewRecord(dataRecord) {
 		let id = dataRecords.length;
 		dataRecord.id = id;
-		console.log("saveNewRecord");
-		console.log(dataRecord);
+		// console.log("saveNewRecord");
+		// console.log(dataRecord);
 		dataRecords.push(JSON.stringify(dataRecord));
 		return id;
 	}
 
 	function updateRecord(id, contents) {
 		contents.id = id;
-		console.log("updateRecord");
+		// console.log("updateRecord");
 		dataRecords[id] = JSON.stringify(contents);
 		return id;
 	}

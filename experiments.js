@@ -1,6 +1,10 @@
 let eternity = require("./eternity.js");
 eternity.install();
 
+// Neat logging
+let objectlog = require('./objectlog.js');
+let log = objectlog.log;
+
 eternity.pulse(function() {
 	let a = create({name : "a"});
 	// console.log(a.const.id);
@@ -21,4 +25,6 @@ eternity.pulse(function() {
 	// log(a.const.dbImage, 2);	
 });
 
+
+console.log(eternity.mockMongoDB.getAllRecordsParsed());
 

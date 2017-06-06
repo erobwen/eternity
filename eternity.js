@@ -39,9 +39,9 @@
 
 
 	function postPulseAction(events) {
-		console.log("=== Model pulse complete, update image and flood create images & flood unstable === ");
+		// console.log("=== Model pulse complete, update image and flood create images & flood unstable === ");
 		
-		log(events, 2);
+		// log(events, 2);
 		imageCausality.pulse(function() {
 			
 			// Mark unstable and flood create new images into existance.
@@ -87,7 +87,7 @@
 				}
 			});
 
-			console.log("=== End model pulse post process === ");
+			// console.log("=== End model pulse post process === ");
 			// Process unstable ones. Initiate garbage collection
 		// console.log(events);
 		});
@@ -96,8 +96,6 @@
 	
 	function createObjectDbImage(object, potentialParentImage, potentialParentProperty) {
 		let imageContents = {
-			_mirror_is_reflected : true,
-			_mirror_reflects : true,
 			_eternity_parent : potentialParentImage,
 			_eternity_parent_property : potentialParentProperty
 		};
@@ -156,7 +154,7 @@
 	let pendingImageUpdates = {};
 	
 	function postImagePulseAction(events) {
-		console.log("=== Image pulse complete, sort events according to object id and flush to database === ");
+		// console.log("=== Image pulse complete, sort events according to object id and flush to database === ");
 		// log(events, 3);
 		// Extract updates and creations to be done.
 		events.forEach(function(event) {
@@ -183,11 +181,11 @@
 			}
 		});
 		
-		console.log("=== Flush to database ====");
+		// console.log("=== Flush to database ====");
 		flushToDatabase();
-		log(mockMongoDB.getAllRecordsParsed(), 4);
+		// log(mockMongoDB.getAllRecordsParsed(), 4);
 
-		console.log("=== End image pulse ===");
+		// console.log("=== End image pulse ===");
 	}
 
 	function hasAPlaceholder(dbImage) {
@@ -212,8 +210,8 @@
 	}
 
 	function writeImageToDatabase(dbImage) {
-		log(dbImage, 2);
-		console.log(imageCausality.isObject(dbImage));
+		// log(dbImage, 2);
+		// console.log(imageCausality.isObject(dbImage));
 		let serialized = (dbImage instanceof Array) ? [] : {};
 		for (property in dbImage) {
 			if (property !== 'const')
@@ -229,10 +227,10 @@
 	}
 	
 	function convertReferencesToDbIds(entity) {
-		console.log();
-		console.log("convertReferencesToDbIds: ");
-		log(entity, 2);
-		console.log(imageCausality.isObject(entity));
+		// console.log();
+		// console.log("convertReferencesToDbIds: ");
+		// log(entity, 2);
+		// console.log(imageCausality.isObject(entity));
 		if (imageCausality.isObject(entity)) {
 			let dbImage = entity;
 			if (!hasAPlaceholder(entity)) {
@@ -240,9 +238,9 @@
 			}
 			return dbImage.const.serializedMongoDbId;
 		} else if (entity !== null && typeof(entity) === 'object') {
-			console.log("===========");
-			log(entity, 3);
-			console.log("===========");
+			// console.log("===========");
+			// log(entity, 3);
+			// console.log("===========");
 			
 			// entity.foo.bar;
 			
@@ -261,6 +259,7 @@
 	let primaryCausality = requireUncached("./causality.js");
 	primaryCausality.setConfiguration({recordPulseEvents : true});
 	primaryCausality.addPostPulseAction(postPulseAction);
+	primaryCausality.mockMongoDB = mockMongoDB;
 
 	imageCausality.addPostPulseAction(postImagePulseAction);
     return primaryCausality;
