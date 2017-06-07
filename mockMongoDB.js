@@ -63,6 +63,10 @@
 		return dataRecords.length;
 	}
 	
+	function clearDatabase() {
+		dataRecords.length = 0;
+	}
+	
 	return {
 		saveNewRecord : saveNewRecord,
 		updateRecord : updateRecord,
@@ -70,7 +74,8 @@
 		getRecord : getRecord,
 		deleteRecord : deleteRecord,
 		getAllRecordsParsed : getAllRecordsParsed,
-		getRecordsCount : getRecordsCount  
+		getRecordsCount : getRecordsCount,
+		clearDatabase : clearDatabase
 	};
 }));
 

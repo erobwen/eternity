@@ -15,7 +15,9 @@
 
 	// const dbIdPrefix = "¤";
 	// const dbIdExpressionPrefix = "¤¤";
-		
+	
+	// Primary causality object space
+	let objectCausality
 		
 	// Image causality
 	// let imageCausality = requireUncached("causalityjs_advanced");
@@ -75,7 +77,7 @@
 						
 						// Mark old value as unstable if another object with dbImage
 						let oldValue = event.oldValue;
-						if (isObject(oldValue)) {
+						if (objectCausality.isObject(oldValue)) {
 							if (typeof(oldValue.const.dbImage) !== 'undefined') {
 								let oldValueDbImage = oldValue.const.dbImage;
 								if (oldValueDbImage._eternityParent === objectDbImage 
@@ -88,7 +90,10 @@
 							
 						// Flood create new images
 						let newValue = event.newValue;
-						objectDbImage[event.property] = createDbImageRecursivley(newValue, objectDbImage, event.property);
+						if (objectCausality.isObject(newValue)) {
+							newValue = createDbImageRecursivley(newValue, objectDbImage, event.property);
+						}
+						objectDbImage[event.property] = newValue;
 					}
 				}
 			});
@@ -100,7 +105,9 @@
 	} 
 	
 	
-	function createObjectDbImage(object, potentialParentImage, potentialParentProperty) {
+	function createDbImageFromObject(object, potentialParentImage, potentialParentProperty) {
+		// log(object, 3);
+		console.log(object);
 		let imageContents = {
 			_eternityParent : potentialParentImage,
 			_eternityParentProperty : potentialParentProperty
@@ -121,11 +128,17 @@
 	
 			
 	function createDbImageRecursivley(entity, potentialParentImage, potentialParentProperty) {
-		if (isObject(entity)) {
+		console.log("createDbImageRecursivley");
+		console.log("createDbImageRecursivley");
+		if (objectCausality.isObject(entity)) {
 			let object = entity;
+			console.log("foo");
+			console.log(object);
+			console.log(object.const);
+			console.log("foo");
 			
 			if (typeof(object.const.dbImage) === 'undefined') {
-				let dbImage = createObjectDbImage(object, potentialParentImage, potentialParentProperty);
+				let dbImage = createDbImageFromObject(object, potentialParentImage, potentialParentProperty);
 				for (property in object) { 
 					let value = object[property];
 					if (isObject(value)) {
@@ -261,14 +274,6 @@
 		}
 	}
 	
-	// Primary causality object space
-	let primaryCausality = requireUncached("./causality.js");
-	primaryCausality.setConfiguration({recordPulseEvents : true});
-	primaryCausality.addPostPulseAction(postPulseAction);
-	primaryCausality.mockMongoDB = mockMongoDB;
-
-	imageCausality.addPostPulseAction(postImagePulseAction);
-	
 	
 	/*-----------------------------------------------
 	 *           Loading
@@ -278,7 +283,7 @@
 	
 	function loadFromDbIdToObject(dbId, object) {
 		imageCausality.withoutRecording(function() {
-			let dbImage = createObjectDbImage(object, null, null);
+			let dbImage = createDbImageFromObject(object, null, null);
 			let dbRecord = mockMongoDB.getRecord(dbId);
 			
 			for (property in dbRecord) {
@@ -334,22 +339,55 @@
 		}
 	}
 	
+	function createLoadingPlaceholder(dbId) {
+		objectCausality.create(function(object) {
+			loadFromDbIdToObject(0, object);
+		});
+	}
 	
 	/*-----------------------------------------------
 	 *           Setup database
 	 *-----------------------------------------------*/
 	
-	if (mockMongoDB.getRecordsCount() === 0) {
-		primaryCausality.pulse(function() {
-			primaryCausality.persistent = primaryCausality.create();
-			createObjectDbImage(primaryCausality.persistent);			
-		});
-	} else {
-		primaryCausality.persistent = primaryCausality.create(function(object) {
-			loadFromDbIdToObject(0, object);
-		});		
+	function setupDatabase() {
+		if (mockMongoDB.getRecordsCount() === 0) {
+			objectCausality.pulse(function() {
+				objectCausality.persistent = objectCausality.create();
+				createDbImageFromObject(objectCausality.persistent);			
+			});
+		} else {
+			objectCausality.persistent = createLoadingPlaceholder(0);
+		}		
 	}
 	
+	function unloadAllAndClearMemory() {
+		objectCausality.resetObjectIds();
+		imageCausality.resetObjectIds();
+		dbIdToDbImageMap = {};
+		setupDatabase();
+	}
 	
-    return primaryCausality;
+	function clearDatabaseAndClearMemory() {
+		mockMongoDB.clearDatabase();
+		unloadAllAndClearMemory();
+	}
+	
+	/*-----------------------------------------------
+	 *           Setup object causality
+	 *-----------------------------------------------*/
+	
+	objectCausality = requireUncached("./causality.js");
+	
+	// Additions 
+	objectCausality.setConfiguration({recordPulseEvents : true});
+	objectCausality.addPostPulseAction(postPulseAction);
+	objectCausality.mockMongoDB = mockMongoDB;
+	objectCausality.unloadAllAndClearMemory = unloadAllAndClearMemory;
+	objectCausality.clearDatabaseAndClearMemory = clearDatabaseAndClearMemory;
+
+	imageCausality.addPostPulseAction(postImagePulseAction);
+	
+	
+	setupDatabase();
+    return objectCausality;
 }));

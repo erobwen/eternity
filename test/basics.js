@@ -1,9 +1,22 @@
 const assert = require('assert');
-require('../eternity');
+let eternity = require('../eternity');
 const log = console.log.bind(console);
 
 // Tests based on mobx test/array.js
 describe("basics", function () {
+	it('should create persistent globals', function() {
+		eternity.persistent.foo = 42;
+		
+		eternity.unloadAllAndClearMemory();
+		
+		assert.equals(42, eternity.persistent.foo);
+		
+		eternity.clearDatabaseAndClearMemory();
+		
+		assert.equals(true, typeof(eternity.persistent.foo) === 'undefined');
+	});
+	
+	/*
     it('should save properly for the first time', function () {
     
 	// imageCausality.pulse(function(){
@@ -27,11 +40,8 @@ describe("basics", function () {
 			// log(a.const.dbImage, 2);	
 		});
 	// });
-
-
-
-
     });
+	*/
 });
 
 

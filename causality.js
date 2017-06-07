@@ -1273,7 +1273,7 @@
 	function ensureInitialized(handler, target) {
 		if (handler.const.initializer !== null) {
 			let initializer = handler.const.initializer;
-			initializer(target);
+			initializer(handler.object);
 			handler.const.initializer = null;
 		}
 	}
@@ -1550,19 +1550,19 @@
     }
 
     function emitSpliceReplaceEvent(handler, key, value, previousValue) {
-        if (recordingPaused === 0 && recordPulseEvents || typeof(handler.observers) !== 'undefined') {
+        if (recordingPaused === 0 && (recordPulseEvents || typeof(handler.observers) !== 'undefined')) {
             emitEvent(handler, { type: 'splice', index: key, removed: [previousValue], added: [value] });
         }
     }
 
     function emitSetEvent(handler, key, value, previousValue) {
-		if (recordingPaused === 0 && recordPulseEvents || typeof(handler.observers) !== 'undefined') {
+		if (recordingPaused === 0 && (recordPulseEvents || typeof(handler.observers) !== 'undefined')) {
 			emitEvent(handler, {type: 'set', property: key, newValue: value, oldValue: previousValue});
         }
     }
 
     function emitDeleteEvent(handler, key, previousValue) {
-        if (recordingPaused === 0 && recordPulseEvents || typeof(handler.observers) !== 'undefined') {
+        if (recordingPaused === 0 && (recordPulseEvents || typeof(handler.observers) !== 'undefined')) {
             emitEvent(handler, {type: 'delete', property: key, deletedValue: previousValue});
         }
     }
@@ -2727,5 +2727,6 @@
 		removeFromActivityList : removeFromActivityList
 	}
 	Object.assign(module, languageExtensions);
+	Object.assign(module, debuggingAndTesting);
     return module;
 }));
