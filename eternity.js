@@ -339,6 +339,13 @@
 		}
 	}
 	
+	
+	function createImageLoadingPlaceholder(dbId) {
+		imageCausality.create(function(object) {
+			loadFromDbIdToImage(0, object);
+		});
+	}
+	
 	function createLoadingPlaceholder(dbId) {
 		objectCausality.create(function(object) {
 			loadFromDbIdToObject(0, object);
