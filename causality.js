@@ -1529,7 +1529,7 @@
      **********************************/
 	
 	function emitImmutableCreationEvent(object) {
-        if (recordPulseEvents) {
+        if (recordingPaused === 0 && recordPulseEvents) {
 			let event = { type: 'creation', object: object }
 			if (recordPulseEvents) {
 				pulseEvents.push(event);
@@ -1538,31 +1538,31 @@
 	} 
 	
 	function emitCreationEvent(handler) {
-        if (recordPulseEvents) {
+        if (recordingPaused === 0 && recordPulseEvents) {
 			emitEvent(handler, { type: 'creation' });
 		}		
 	} 
 	 
     function emitSpliceEvent(handler, index, removed, added) {
-        if (recordPulseEvents || typeof(handler.observers) !== 'undefined') {
+        if (recordingPaused === 0 && (recordPulseEvents || typeof(handler.observers) !== 'undefined')) {
             emitEvent(handler, { type: 'splice', index: index, removed: removed, added: added});
         }
     }
 
     function emitSpliceReplaceEvent(handler, key, value, previousValue) {
-        if (recordPulseEvents || typeof(handler.observers) !== 'undefined') {
+        if (recordingPaused === 0 && recordPulseEvents || typeof(handler.observers) !== 'undefined') {
             emitEvent(handler, { type: 'splice', index: key, removed: [previousValue], added: [value] });
         }
     }
 
     function emitSetEvent(handler, key, value, previousValue) {
-		if (recordPulseEvents || typeof(handler.observers) !== 'undefined') {
+		if (recordingPaused === 0 && recordPulseEvents || typeof(handler.observers) !== 'undefined') {
 			emitEvent(handler, {type: 'set', property: key, newValue: value, oldValue: previousValue});
         }
     }
 
     function emitDeleteEvent(handler, key, previousValue) {
-        if (recordPulseEvents || typeof(handler.observers) !== 'undefined') {
+        if (recordingPaused === 0 && recordPulseEvents || typeof(handler.observers) !== 'undefined') {
             emitEvent(handler, {type: 'delete', property: key, deletedValue: previousValue});
         }
     }
@@ -1582,7 +1582,7 @@
     }
 	
 	function emitUnobservableEvent(event) {
-		if (recordPulseEvents) {
+		if (recordingPaused === 0 && recordPulseEvents) {
 			pulseEvents.push(event);
 		}
 	}

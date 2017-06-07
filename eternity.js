@@ -10,6 +10,12 @@
 }(this, function () {
 	// Require uncached, to support multipple causalities. 
 	const requireUncached = require('require-uncached');
+	const dbIdPrefix = "_causality_persistent_id_";
+	const dbIdExpressionPrefix = "_causality_persistent_id_expression";
+
+	// const dbIdPrefix = "¤";
+	// const dbIdExpressionPrefix = "¤¤";
+		
 		
 	// Image causality
 	// let imageCausality = requireUncached("causalityjs_advanced");
@@ -196,7 +202,7 @@
 	function writePlaceholderForImageToDatabase(dbImage) {
 		let mongoDbId = mockMongoDB.saveNewRecord({});
 		dbImage.const.mongoDbId = mongoDbId;
-		dbImage.const.serializedMongoDbId = "_causality_persistent_id_" + mongoDbId;
+		dbImage.const.serializedMongoDbId = dbIdPrefix + mongoDbId;
 		return mongoDbId;
 	}
 
@@ -220,7 +226,7 @@
 		if (!hasAPlaceholder(dbImage)) {
 			let mongoDbId = mockMongoDB.saveNewRecord(serialized);
 			dbImage.const.mongoDbId = mongoDbId;
-			dbImage.const.serializedMongoDbId = "_causality_persistent_id_" + mongoDbId;
+			dbImage.const.serializedMongoDbId = dbIdPrefix + mongoDbId;
 		} else {
 			mockMongoDB.updateRecord(dbImage.const.mongoDbId, serialized);
 		}
@@ -264,18 +270,85 @@
 	imageCausality.addPostPulseAction(postImagePulseAction);
 	
 	
+	/*-----------------------------------------------
+	 *           Loading
+	 *-----------------------------------------------*/
+	
+	let dbIdToDbImageMap = {};
+	
+	function loadFromDbIdToObject(dbId, object) {
+		imageCausality.withoutRecording(function() {
+			let dbImage = createObjectDbImage(object, null, null);
+			let dbRecord = mockMongoDB.getRecord(dbId);
+			
+			for (property in dbRecord) {
+				if (property !== 'const') {
+					let value = loadDbValue(dbRecord[property]);
+					dbImage[property] = value;
+					object[property] = imageToObject(value);
+				}
+			}
+			
+			if (typeof(dbRecord.const) !== 'undefined') {
+				for (property in dbRecord.const) {
+					if (typeof(dbImage.const[property]) === 'undefined') {
+						let value = loadDbValue(dbRecord.const[property]);
+						dbImage.const[property] = value;
+						if (typeof(object.const[property]) === 'undefined') {
+							object.const[property] = imageToObject(value);													
+						}
+					}
+				}
+			}
+		});
+	}
+	
+	function imageToObject(potentialDbImage) {
+		if (imageCausality.isObject(potentialDbImage)) {
+			return potentialDbImage.const.dbImage;
+		} else if (typeof(potentialDbImage) === 'object'){ // TODO: handle the array case
+			let javascriptObject = {};
+			for (property in dbValue) {
+				javascriptObject[property] = imageToObject(dbValue[property]);
+			}
+			return javascriptObject;
+		} else {
+			return potentialDbImage;
+		}
+	}
+	
+	function loadDbValue(dbValue) {
+		if (typeof(dbValue) === 'string') {
+			if (dbValue.startsWith(dbIdPrefix)) {
+				let dbId = Integer.parse(dbValue.slice(dbIdPrefix.length));
+				return createLoadingPlaceholder(dbId);
+			}
+		} else if (typeof(dbValue) === 'object') { // TODO: handle the array case
+			let javascriptObject = {};
+			for (property in dbValue) {
+				javascriptObject[property] = loadDbValue(dbValue[property]);
+			}
+			return javascriptObject;
+		} else {
+			return dbValue;
+		}
+	}
+	
 	
 	/*-----------------------------------------------
 	 *           Setup database
 	 *-----------------------------------------------*/
 	
-	// if (mockMongoDB.getRecordsCount() === 0) {
-		// primaryCausality.persistent = primaryCausality.create();
-	// } else {
-		// primaryCausality.persistent = primaryCausality.create(function() {
-			
-		// });		
-	// }
+	if (mockMongoDB.getRecordsCount() === 0) {
+		primaryCausality.pulse(function() {
+			primaryCausality.persistent = primaryCausality.create();
+			createObjectDbImage(primaryCausality.persistent);			
+		});
+	} else {
+		primaryCausality.persistent = primaryCausality.create(function(object) {
+			loadFromDbIdToObject(0, object);
+		});		
+	}
 	
 	
     return primaryCausality;
