@@ -48,7 +48,7 @@
 
 	function postPulseAction(events) {
 		// console.log("=== Model pulse complete, update image and flood create images & flood unstable === ");
-		
+	
 		// log(events, 2);
 		imageCausality.pulse(function() {
 			
@@ -172,36 +172,41 @@
 	let pendingImageCreations = {};
 	let pendingImageUpdates = {};
 	
-	function postImagePulseAction(events) {
-		// console.log("=== Image pulse complete, sort events according to object id and flush to database === ");
-		// log(events, 3);
-		// Extract updates and creations to be done.
-		events.forEach(function(event) {
-			let dbImage = event.object;
-			// log("Considering " + event.type + " event with object:");
-			// log(dbImage, 2);
-			let imageId = dbImage.const.id;
-				
-			if (event.type === 'creation') {
-				pendingImageCreations[imageId] = dbImage;
-				if (typeof(pendingImageUpdates[imageId]) !== 'undefined') {
-					// We will do a full write of this image, no need to update after.				
-					delete pendingImageUpdates[imageId]; 
-				}
-			} else if (event.type === 'set') {
-				if (typeof(pendingImageCreations[imageId]) === 'undefined') {
-					// Only update if we will not do a full write on this image. 
-					if (typeof(pendingImageUpdates[imageId]) === 'undefined') {
-						pendingImageUpdates[imageId] = {};
+	function postImagePulseAction(events) {			
+		if (isLoading === 0) {
+			// console.log("=== Image pulse complete, sort events according to object id and flush to database === ");
+			// log(events, 3);
+			// Extract updates and creations to be done.
+			events.forEach(function(event) {
+				// if (event.mirrorStructureEvent) {}
+				let dbImage = event.object;
+				// log("Considering " + event.type + " event with object:");
+				// log(dbImage, 2);
+				let imageId = dbImage.const.id;
+					
+				if (event.type === 'creation') {
+					pendingImageCreations[imageId] = dbImage;
+					if (typeof(pendingImageUpdates[imageId]) !== 'undefined') {
+						// We will do a full write of this image, no need to update after.				
+						delete pendingImageUpdates[imageId]; 
 					}
-					let imageUpdates = pendingImageUpdates[imageId];
-					imageUpdates[event.property] = event.value;				
+				} else if (event.type === 'set') {
+					if (typeof(pendingImageCreations[imageId]) === 'undefined') {
+						// Only update if we will not do a full write on this image. 
+						if (typeof(pendingImageUpdates[imageId]) === 'undefined') {
+							pendingImageUpdates[imageId] = {};
+						}
+						let imageUpdates = pendingImageUpdates[imageId];
+						imageUpdates[event.property] = event.value;				
+					}
 				}
-			}
-		});
+			});
+			
+			// console.log("=== Flush to database ====");
+			flushToDatabase();
+			
+		}
 		
-		// console.log("=== Flush to database ====");
-		flushToDatabase();
 		// log(mockMongoDB.getAllRecordsParsed(), 4);
 
 		// console.log("=== End image pulse ===");
@@ -279,10 +284,12 @@
 	 *           Loading
 	 *-----------------------------------------------*/
 	
+	let isLoading = 0;
 	let dbIdToDbImageMap = {};
 	
 	function loadFromDbIdToObject(dbId, object) {
-		imageCausality.withoutRecording(function() {
+		isLoading++;
+		imageCausality.withoutEmittingEvents(function() {
 			let dbImage = createDbImageFromObject(object, null, null);
 			let dbRecord = mockMongoDB.getRecord(dbId);
 			
@@ -306,6 +313,7 @@
 				}
 			}
 		});
+		isLoading--;
 	}
 	
 	function imageToObject(potentialDbImage) {
@@ -346,7 +354,7 @@
 		});
 	}
 	
-	function createLoadingPlaceholder(dbId) {
+	function createObjectPlaceholderFromDbId(dbId) {
 		objectCausality.create(function(object) {
 			loadFromDbIdToObject(0, object);
 		});
