@@ -142,6 +142,14 @@
 		});
  	}
 	
+
+    let incomingRelationsDisabled = 0;
+
+    function disableIncomingRelations(action) {
+        incomingRelationsDisabled++;
+        action();
+        incomingRelationsDisabled--;
+    }
 	
 	
 	/*-----------------------------------------------
@@ -412,11 +420,11 @@
 			let removed = null;
 			let added = argumentsArray;
 			
-			if (mirrorRelations && updatingMirrorRelations === 0) {
-				updatingMirrorRelations++
+			if (mirrorRelations && incomingRelationsDisabled === 0) {
+				incomingRelationsDisabled++
  				added = createAndRemoveArrayIncomingRelations(this.const.object, index, removed, added); // TODO: implement for other array manipulators as well. 
 				// TODO: What about removed adjusted?
-				updatingMirrorRelations--
+				incomingRelationsDisabled--
 			}
 			
             observerNotificationNullified++;
@@ -851,7 +859,7 @@
                         registerChangeObserver(getSpecifier(this.const, "_enumerateObservers"));
                     }
                 }
-				if (mirrorRelations && updatingMirrorRelations === 0 && keyInTarget && !exposeMirrorRelationIntermediary) {
+				if (mirrorRelations && incomingRelationsDisabled === 0 && keyInTarget) {
 					// console.log("causality.getHandlerObject:");
 					// console.log(key);
 					return findReferredObject(target[key]);
@@ -936,7 +944,7 @@
 		// Get previous value		// Get previous value
 		let previousValue;
 		let previousMirrorStructure;
-		if (mirrorRelations && updatingMirrorRelations === 0) {
+		if (mirrorRelations && incomingRelationsDisabled === 0) {
 			// console.log("causality.getHandlerObject:");
 			// console.log(key);
 			previousMirrorStructure = target[key];
@@ -964,11 +972,11 @@
 		
 		// Perform assignment with regards to mirror structures.
 		let mirrorStructureValue;
-		if (mirrorRelations && updatingMirrorRelations === 0) {
-			updatingMirrorRelations++;
+		if (mirrorRelations && incomingRelationsDisabled === 0) {
+			incomingRelationsDisabled++;
 			mirrorStructureValue = createAndRemoveIncomingRelations(this['const'].object, key, value, previousValue);
 			target[key] = mirrorStructureValue; 
-			updatingMirrorRelations--;
+			incomingRelationsDisabled--;
 		} else {
 			target[key] = value;
 		}
@@ -985,9 +993,11 @@
 		}
 
 		// Emit event
-		if (exposeMirrorRelationIntermediary) {
-			previousValue = previousMirrorStructure;
-			value = mirrorStructureValue;
+		if (mirrorRelations && incomingRelationsDisabled === 0) {
+			// Emit extra event 
+			incomingRelationsDisabled++
+			emitSetEvent(this, key, mirrorStructureValue, previousMirrorStructure);
+			incomingRelationsDisabled--
 		}
 		emitSetEvent(this, key, value, previousValue);
 		
@@ -1273,8 +1283,8 @@
 	function ensureInitialized(handler, target) {
 		if (handler.const.initializer !== null) {
 			let initializer = handler.const.initializer;
-			initializer(handler.object);
 			handler.const.initializer = null;
+			initializer(handler.const.object);
 		}
 	}
 	 
@@ -1528,8 +1538,16 @@
      *
      **********************************/
 	
+    let emitEventPaused = 0;
+
+    function withoutEmittingEvents(action) {
+        emitEventPaused++;
+        action();
+        emitEventPaused--;
+	}
+
 	function emitImmutableCreationEvent(object) {
-        if (recordingPaused === 0 && recordPulseEvents) {
+        if (recordPulseEvents) {
 			let event = { type: 'creation', object: object }
 			if (recordPulseEvents) {
 				pulseEvents.push(event);
@@ -1538,51 +1556,56 @@
 	} 
 	
 	function emitCreationEvent(handler) {
-        if (recordingPaused === 0 && recordPulseEvents) {
+        if (recordPulseEvents) {
 			emitEvent(handler, { type: 'creation' });
 		}		
 	} 
 	 
     function emitSpliceEvent(handler, index, removed, added) {
-        if (recordingPaused === 0 && (recordPulseEvents || typeof(handler.observers) !== 'undefined')) {
+        if (recordPulseEvents || typeof(handler.observers) !== 'undefined') {
             emitEvent(handler, { type: 'splice', index: index, removed: removed, added: added});
         }
     }
 
     function emitSpliceReplaceEvent(handler, key, value, previousValue) {
-        if (recordingPaused === 0 && (recordPulseEvents || typeof(handler.observers) !== 'undefined')) {
+        if (recordPulseEvents || typeof(handler.observers) !== 'undefined') {
             emitEvent(handler, { type: 'splice', index: key, removed: [previousValue], added: [value] });
         }
     }
 
     function emitSetEvent(handler, key, value, previousValue) {
-		if (recordingPaused === 0 && (recordPulseEvents || typeof(handler.observers) !== 'undefined')) {
+		if (recordPulseEvents || typeof(handler.observers) !== 'undefined') {
 			emitEvent(handler, {type: 'set', property: key, newValue: value, oldValue: previousValue});
         }
     }
 
     function emitDeleteEvent(handler, key, previousValue) {
-        if (recordingPaused === 0 && (recordPulseEvents || typeof(handler.observers) !== 'undefined')) {
+        if (recordPulseEvents || typeof(handler.observers) !== 'undefined') {
             emitEvent(handler, {type: 'delete', property: key, deletedValue: previousValue});
         }
     }
 
     function emitEvent(handler, event) {
-        // console.log(event);
-        // event.objectId = handler.const.id;
-		event.object = handler.const.object; 
-		if (recordPulseEvents) {
-			pulseEvents.push(event);
+		if (emitEventPaused === 0) {
+			if (mirrorRelations) {
+				event.mirrorStructureEvent = incomingRelationsDisabled !== 0
+			}
+			// console.log(event);
+			// event.objectId = handler.const.id;
+			event.object = handler.const.object; 
+			if (recordPulseEvents) {
+				pulseEvents.push(event);
+			}
+			if (typeof(handler.observers) !== 'undefined') {
+				handler.observers.forEach(function(observerFunction) {
+					observerFunction(event);
+				});
+			}
 		}
-        if (typeof(handler.observers) !== 'undefined') {
-            handler.observers.forEach(function(observerFunction) {
-                observerFunction(event);
-            });
-        }
     }
 	
 	function emitUnobservableEvent(event) {
-		if (recordingPaused === 0 && recordPulseEvents) {
+		if (recordPulseEvents) {
 			pulseEvents.push(event);
 		}
 	}
@@ -2599,8 +2622,6 @@
 	
 	let mirrorRelations = false;
 	
-	let updatingMirrorRelations = 0;
-	
 	let exposeMirrorRelationIntermediary;
 	let mirrorStructuresAsCausalityObjects;
 	
@@ -2672,6 +2693,7 @@
         withoutSideEffects : withoutSideEffects,
         withoutRecording : withoutRecording,
         withoutNotifyChange : nullifyObserverNotification,
+		withoutEmittingEvents : withoutEmittingEvents,
 		
 		// Pulses and transactions
         pulse : pulse, // A sequence of transactions, end with cleanup.
