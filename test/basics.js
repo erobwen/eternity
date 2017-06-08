@@ -6,10 +6,13 @@ const log = console.log.bind(console);
 describe("basics", function () {
 	it('should create persistent globals', function() {
 		eternity.persistent.foo = 42;
+		assert.equal(42, eternity.persistent.foo);
+		assert.equal(1, eternity.mockMongoDB.getRecordsCount());
+		assert.equal(42, eternity.mockMongoDB.getRecord(0).foo);
 		
 		eternity.unloadAllAndClearMemory();
 		
-		// assert.equals(42, eternity.persistent.foo);
+		assert.equals(42, eternity.persistent.foo);
 		
 		// eternity.clearDatabaseAndClearMemory();
 		
