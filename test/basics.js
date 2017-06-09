@@ -12,7 +12,7 @@ describe("basics", function () {
 		
 		eternity.unloadAllAndClearMemory();
 		
-		assert.equals(42, eternity.persistent.foo);
+		assert.equal(42, eternity.persistent.foo);
 		
 		// eternity.clearDatabaseAndClearMemory();
 		

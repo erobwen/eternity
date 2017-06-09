@@ -105,7 +105,7 @@
 	} 
 	
 	
-	function createDbImageFromObject(object, potentialParentImage, potentialParentProperty) {
+	function createIsolatedDbImageFromLoadedObject(object, potentialParentImage, potentialParentProperty) {
 		// log(object, 3);
 		// console.log(object);
 		let imageContents = {
@@ -118,12 +118,21 @@
 				imageContents[property] = value;
 			}
 		}
-		let dbImage = imageCausality.create(imageContents);
+		return createDbImageConnectedWithObject(object, imageContents);
+	}
+	
+	function createDbImageConnectedWithObject(object, contents) {
+		if (typeof(contents) === 'undefined') {
+			contents = {};
+		}
+		let dbImage = imageCausality.create(contents);
+		connectObjectWithDbImage(object, dbImage);
+		return dbImage;		
+	}
+	
+	function connectObjectWithDbImage(object, dbImage) {
 		object.const.dbImage = dbImage;
-		dbImage.const.object = object;
-		// console.log("dbImage.const.id: ");
-		// console.log(dbImage.const.id);
-		return dbImage;
+		dbImage.const.correspondingObject = object;		
 	}
 	
 			
@@ -138,7 +147,7 @@
 			console.log("foo");
 			
 			if (typeof(object.const.dbImage) === 'undefined') {
-				let dbImage = createDbImageFromObject(object, potentialParentImage, potentialParentProperty);
+				let dbImage = createIsolatedDbImageFromLoadedObject(object, potentialParentImage, potentialParentProperty);
 				for (property in object) { 
 					let value = object[property];
 					if (isObject(value)) {
@@ -176,29 +185,32 @@
 		// console.log("=== Image pulse complete, sort events according to object id and flush to database === ");
 		// log(events, 3);
 		// Extract updates and creations to be done.
-		events.forEach(function(event) {
-			// if (event.mirrorStructureEvent) {}
-			let dbImage = event.object;
-			// log("Considering " + event.type + " event with object:");
-			// log(dbImage, 2);
-			let imageId = dbImage.const.id;
-				
-			if (event.type === 'creation') {
-				pendingImageCreations[imageId] = dbImage;
-				if (typeof(pendingImageUpdates[imageId]) !== 'undefined') {
-					// We will do a full write of this image, no need to update after.				
-					delete pendingImageUpdates[imageId]; 
+		imageCausality.disableIncomingRelations(function () {
+			events.forEach(function(event) {
+				if (!isMacroEvent(event)) {
+					let dbImage = event.object;
+					// log("Considering " + event.type + " event with object:");
+					// log(dbImage, 2);
+					let imageId = dbImage.const.id;
+						
+					if (event.type === 'creation') {
+						pendingImageCreations[imageId] = dbImage;
+						if (typeof(pendingImageUpdates[imageId]) !== 'undefined') {
+							// We will do a full write of this image, no need to update after.				
+							delete pendingImageUpdates[imageId]; 
+						}
+					} else if (event.type === 'set') {
+						if (typeof(pendingImageCreations[imageId]) === 'undefined') {
+							// Only update if we will not do a full write on this image. 
+							if (typeof(pendingImageUpdates[imageId]) === 'undefined') {
+								pendingImageUpdates[imageId] = {};
+							}
+							let imageUpdates = pendingImageUpdates[imageId];
+							imageUpdates[event.property] = event.value;				
+						}
+					}				
 				}
-			} else if (event.type === 'set') {
-				if (typeof(pendingImageCreations[imageId]) === 'undefined') {
-					// Only update if we will not do a full write on this image. 
-					if (typeof(pendingImageUpdates[imageId]) === 'undefined') {
-						pendingImageUpdates[imageId] = {};
-					}
-					let imageUpdates = pendingImageUpdates[imageId];
-					imageUpdates[event.property] = event.value;				
-				}
-			}
+			});			
 		});
 		
 		// console.log("=== Flush to database ====");
@@ -209,6 +221,17 @@
 		// console.log("=== End image pulse ===");
 	}
 
+	
+	function isMacroEvent(event) {
+		return imageEventHasObjectValue(event) && !event.incomingStructureEvent;
+	}
+	
+	
+	function imageEventHasObjectValue(event) {
+		return imageCausality.isObject(event.value) || imageCausality.isObject(event.oldValue);
+	}
+	
+	
 	function hasAPlaceholder(dbImage) {
 		// console.log(dbImage);
 		return typeof(dbImage.const.mongoDbId) !== 'undefined';
@@ -231,20 +254,22 @@
 	}
 
 	function writeImageToDatabase(dbImage) {
-		// log(dbImage, 2);
-		// console.log(imageCausality.isObject(dbImage));
-		let serialized = (dbImage instanceof Array) ? [] : {};
-		for (property in dbImage) {
-			if (property !== 'const')
-				serialized[property] = convertReferencesToDbIds(dbImage[property]);
-		}
-		if (!hasAPlaceholder(dbImage)) {
-			let mongoDbId = mockMongoDB.saveNewRecord(serialized);
-			dbImage.const.mongoDbId = mongoDbId;
-			dbImage.const.serializedMongoDbId = dbIdPrefix + mongoDbId;
-		} else {
-			mockMongoDB.updateRecord(dbImage.const.mongoDbId, serialized);
-		}
+		imageCausality.disableIncomingRelations(function() {
+			// log(dbImage, 2);
+			// console.log(imageCausality.isObject(dbImage));
+			let serialized = (dbImage instanceof Array) ? [] : {};
+			for (property in dbImage) {
+				if (property !== 'const')
+					serialized[property] = convertReferencesToDbIds(dbImage[property]);
+			}
+			if (!hasAPlaceholder(dbImage)) {
+				let mongoDbId = mockMongoDB.saveNewRecord(serialized);
+				dbImage.const.mongoDbId = mongoDbId;
+				dbImage.const.serializedMongoDbId = dbIdPrefix + mongoDbId;
+			} else {
+				mockMongoDB.updateRecord(dbImage.const.mongoDbId, serialized);
+			}			
+		});
 	}
 	
 	function convertReferencesToDbIds(entity) {
@@ -283,31 +308,79 @@
 	
 	let dbIdToDbImageMap = {};
 	
-	function loadFromDbIdToObject(dbId, object) {
-		imageCausality.withoutEmittingEvents(function() {
-			let dbImage = createDbImageFromObject(object, null, null);
-			let dbRecord = mockMongoDB.getRecord(dbId);
-			
-			for (property in dbRecord) {
-				if (property !== 'const') {
-					let value = loadDbValue(dbRecord[property]);
-					dbImage[property] = value;
-					object[property] = imageToObject(value);
-				}
+	function createImagePlaceholderFromDbId(dbId) {
+		return imageCausality.create(function(dbImage) {
+			loadFromDbIdToImage(dbId, dbImage);
+		});
+	}
+	
+	function createObjectPlaceholderFromDbImage(dbImage) {
+		// Consider: connect here? 
+		let placeholder = imageCausality.create();
+		connectObjectWithDbImage(object, dbImage);
+		placeholder.const.initializer = function(object) {
+			loadFromDbImageToObject(dbImage, object);
+		};
+	}
+	
+	function createObjectPlaceholderFromDbId(dbId) {
+		return objectCausality.create(function(object) {
+			loadFromDbIdToObject(dbId, object);
+		});
+	}
+	
+	function loadFromDbIdToImage(dbId, dbImage) {
+		let dbRecord = mockMongoDB.getRecord(dbId);
+		
+		for (property in dbRecord) {
+			if (property !== 'const') {
+				let value = loadDbValue(dbRecord[property]);
+				dbImage[property] = value;
 			}
-			
-			if (typeof(dbRecord.const) !== 'undefined') {
-				for (property in dbRecord.const) {
-					if (typeof(dbImage.const[property]) === 'undefined') {
-						let value = loadDbValue(dbRecord.const[property]);
-						dbImage.const[property] = value;
-						if (typeof(object.const[property]) === 'undefined') {
-							object.const[property] = imageToObject(value);													
-						}
+		}
+		
+		if (typeof(dbRecord.const) !== 'undefined') {
+			for (property in dbRecord.const) {
+				if (typeof(dbImage.const[property]) === 'undefined') {
+					let value = loadDbValue(dbRecord.const[property]);
+					dbImage.const[property] = value;
+					if (typeof(object.const[property]) === 'undefined') {
+						object.const[property] = imageToObject(value);													
 					}
 				}
 			}
+		}		
+	}
+	
+	function loadFromDbIdToObject(dbId, object) {
+		imageCausality.withoutEmittingEvents(function() {
+			// Ensure there is an image.
+			if (typeof(object.const.dbImage) === 'undefined') {
+				connectObjectWithDbImage(object, createImagePlaceholderFromDbId(dbId))
+			}
+	
+			loadFromDbImageToObject(object.const.dbImage, object);
 		});
+	}
+	
+	function loadFromDbImageToObject(dbImage, object) {
+			for (property in dbImage) {
+				let value = dbImage[property];
+				// TODO: Do recursivley if there are plain javascript objects
+				if (imageCausality.isObject(value)) {
+					value = getObjectFromImage(dbImage);
+				}
+				object[property]
+			}
+			
+			// loadFromDbIdToImage(dbId, dbImage);			
+	}
+	
+	function getObjectFromImage(dbImage) {
+		if (typeof(dbImage.const.correspondingObject) === 'undefined') {
+			dbImage.const.correspondingObject = createObjectPlaceholderFromDbImage(dbImage);
+		}
+		return dbImage.const.correspondingObject;
 	}
 	
 	function imageToObject(potentialDbImage) {
@@ -328,7 +401,7 @@
 		if (typeof(dbValue) === 'string') {
 			if (dbValue.startsWith(dbIdPrefix)) {
 				let dbId = Integer.parse(dbValue.slice(dbIdPrefix.length));
-				return createLoadingPlaceholder(dbId);
+				return createImagePlaceholderFromDbId(dbId);
 			}
 		} else if (typeof(dbValue) === 'object') { // TODO: handle the array case
 			let javascriptObject = {};
@@ -342,17 +415,6 @@
 	}
 	
 	
-	function createImageLoadingPlaceholder(dbId) {
-		imageCausality.create(function(object) {
-			loadFromDbIdToImage(0, object);
-		});
-	}
-	
-	function createObjectPlaceholderFromDbId(dbId) {
-		objectCausality.create(function(object) {
-			loadFromDbIdToObject(0, object);
-		});
-	}
 	
 	/*-----------------------------------------------
 	 *           Setup database
@@ -362,7 +424,7 @@
 		if (mockMongoDB.getRecordsCount() === 0) {
 			objectCausality.pulse(function() {
 				objectCausality.persistent = objectCausality.create();
-				createDbImageFromObject(objectCausality.persistent);			
+				createIsolatedDbImageFromLoadedObject(objectCausality.persistent);			
 			});
 		} else {
 			objectCausality.persistent = createObjectPlaceholderFromDbId(0);
