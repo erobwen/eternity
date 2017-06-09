@@ -12,6 +12,9 @@ describe("basics", function () {
 		
 		eternity.unloadAllAndClearMemory();
 		
+		console.log(eternity.mockMongoDB.getAllRecordsParsed());
+		console.log(eternity.persistent.foo);
+		console.log(eternity.persistent);
 		assert.equal(42, eternity.persistent.foo);
 		
 		// eternity.clearDatabaseAndClearMemory();

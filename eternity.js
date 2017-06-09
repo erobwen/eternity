@@ -309,6 +309,7 @@
 	let dbIdToDbImageMap = {};
 	
 	function createImagePlaceholderFromDbId(dbId) {
+		console.log("createImagePlaceholderFromDbId");
 		return imageCausality.create(function(dbImage) {
 			loadFromDbIdToImage(dbId, dbImage);
 		});
@@ -330,10 +331,12 @@
 	}
 	
 	function loadFromDbIdToImage(dbId, dbImage) {
+		console.log("loadFromDbIdToImage");
 		let dbRecord = mockMongoDB.getRecord(dbId);
 		
 		for (property in dbRecord) {
-			if (property !== 'const') {
+			console.log("loading property: " + property);
+			if (property !== 'const' && property !== 'id') {
 				let value = loadDbValue(dbRecord[property]);
 				dbImage[property] = value;
 			}
@@ -353,6 +356,7 @@
 	}
 	
 	function loadFromDbIdToObject(dbId, object) {
+		console.log("loadFromDbIdToObject");
 		imageCausality.withoutEmittingEvents(function() {
 			// Ensure there is an image.
 			if (typeof(object.const.dbImage) === 'undefined') {
@@ -364,16 +368,16 @@
 	}
 	
 	function loadFromDbImageToObject(dbImage, object) {
-			for (property in dbImage) {
-				let value = dbImage[property];
-				// TODO: Do recursivley if there are plain javascript objects
-				if (imageCausality.isObject(value)) {
-					value = getObjectFromImage(dbImage);
-				}
-				object[property]
+		console.log("loadFromDbImageToObject");
+		for (property in dbImage) {
+			console.log(property);
+			let value = dbImage[property];
+			// TODO: Do recursivley if there are plain javascript objects
+			if (imageCausality.isObject(value)) {
+				value = getObjectFromImage(dbImage);
 			}
-			
-			// loadFromDbIdToImage(dbId, dbImage);			
+			object[property] = value;
+		}
 	}
 	
 	function getObjectFromImage(dbImage) {
