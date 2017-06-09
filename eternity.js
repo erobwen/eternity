@@ -114,7 +114,7 @@
 		};
 		for (property in object) {
 			let value = object[property];
-			if (!isObject(value)) {
+			if (!objectCausality.isObject(value)) {
 				imageContents[property] = value;
 			}
 		}
@@ -137,20 +137,19 @@
 	
 			
 	function createDbImageRecursivley(entity, potentialParentImage, potentialParentProperty) {
-		console.log("createDbImageRecursivley");
-		console.log("createDbImageRecursivley");
+		// console.log("createDbImageRecursivley");
 		if (objectCausality.isObject(entity)) {
 			let object = entity;
-			console.log("foo");
-			console.log(object);
-			console.log(object.const);
-			console.log("foo");
+			// console.log("foo");
+			// console.log(object);
+			// console.log(object.const);
+			// console.log("foo");
 			
 			if (typeof(object.const.dbImage) === 'undefined') {
 				let dbImage = createIsolatedDbImageFromLoadedObject(object, potentialParentImage, potentialParentProperty);
 				for (property in object) { 
 					let value = object[property];
-					if (isObject(value)) {
+					if (objectCausality.isObject(value)) {
 						dbImage[property] = createDbImageRecursivley(value, dbImage, property);
 					}
 				}
@@ -308,15 +307,21 @@
 	
 	let dbIdToDbImageMap = {};
 	
-	function createImagePlaceholderFromDbId(dbId) {
-		console.log("createImagePlaceholderFromDbId");
-		return imageCausality.create(function(dbImage) {
-			loadFromDbIdToImage(dbId, dbImage);
-		});
+	function getImagePlaceholderFromDbId(dbId) {
+		if (typeof(dbIdToDbImageMap[dbId]) === 'undefined') {
+			console.log("createImagePlaceholderFromDbId: " + dbId);
+			let placeholder = imageCausality.create();
+			placeholder.const.dbId = dbId; //causes loop!!! could it be the initializer
+			placeholder.const.initializer = function(dbImage) {
+				loadFromDbIdToImage(dbId, dbImage);
+			}
+			dbIdToDbImageMap[dbId] = placeholder;
+		}
+		return dbIdToDbImageMap[dbId];
 	}
 	
 	function createObjectPlaceholderFromDbImage(dbImage) {
-		// Consider: connect here? 
+		console.log("createObjectPlaceholderFromDbImage");
 		let placeholder = imageCausality.create();
 		connectObjectWithDbImage(object, dbImage);
 		placeholder.const.initializer = function(object) {
@@ -325,17 +330,18 @@
 	}
 	
 	function createObjectPlaceholderFromDbId(dbId) {
+		console.log("createObjectPlaceholderFromDbImage");
 		return objectCausality.create(function(object) {
 			loadFromDbIdToObject(dbId, object);
 		});
 	}
 	
 	function loadFromDbIdToImage(dbId, dbImage) {
-		console.log("loadFromDbIdToImage");
+		console.log("loadFromDbIdToImage: " + dbId);
 		let dbRecord = mockMongoDB.getRecord(dbId);
 		
 		for (property in dbRecord) {
-			console.log("loading property: " + property);
+			// console.log("loading property: " + property);
 			if (property !== 'const' && property !== 'id') {
 				let value = loadDbValue(dbRecord[property]);
 				dbImage[property] = value;
@@ -360,7 +366,7 @@
 		imageCausality.withoutEmittingEvents(function() {
 			// Ensure there is an image.
 			if (typeof(object.const.dbImage) === 'undefined') {
-				connectObjectWithDbImage(object, createImagePlaceholderFromDbId(dbId))
+				connectObjectWithDbImage(object, getImagePlaceholderFromDbId(dbId))
 			}
 	
 			loadFromDbImageToObject(object.const.dbImage, object);
@@ -368,10 +374,13 @@
 	}
 	
 	function loadFromDbImageToObject(dbImage, object) {
-		console.log("loadFromDbImageToObject");
+		console.log("loadFromDbImageToObject" + dbImage.const.dbId);
 		for (property in dbImage) {
+			console.log("-------");			
 			console.log(property);
 			let value = dbImage[property];
+			console.log("-------");
+			console.log(value);
 			// TODO: Do recursivley if there are plain javascript objects
 			if (imageCausality.isObject(value)) {
 				value = getObjectFromImage(dbImage);
@@ -381,6 +390,7 @@
 	}
 	
 	function getObjectFromImage(dbImage) {
+		console.log("getObjectFromImage");
 		if (typeof(dbImage.const.correspondingObject) === 'undefined') {
 			dbImage.const.correspondingObject = createObjectPlaceholderFromDbImage(dbImage);
 		}
@@ -404,8 +414,8 @@
 	function loadDbValue(dbValue) {
 		if (typeof(dbValue) === 'string') {
 			if (dbValue.startsWith(dbIdPrefix)) {
-				let dbId = Integer.parse(dbValue.slice(dbIdPrefix.length));
-				return createImagePlaceholderFromDbId(dbId);
+				let dbId = parseInt(dbValue.slice(dbIdPrefix.length));
+				return getImagePlaceholderFromDbId(dbId);
 			}
 		} else if (typeof(dbValue) === 'object') { // TODO: handle the array case
 			let javascriptObject = {};
