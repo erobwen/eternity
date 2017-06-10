@@ -951,6 +951,7 @@
 			previousMirrorStructure = target[key];
 			previousValue = findReferredObject(target[key]);
 		} else {
+			console.log("basic assign: " + key);
 			previousValue = target[key]; 
 		}
         
@@ -979,6 +980,7 @@
 			target[key] = mirrorStructureValue; 
 			incomingRelationsDisabled--;
 		} else {
+			console.log("basic assign...");
 			target[key] = value;
 		}
 		

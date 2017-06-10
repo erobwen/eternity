@@ -315,26 +315,38 @@
 	function getImagePlaceholderFromDbId(dbId) {
 		console.log("getImagePlaceholderFromDbId: " + dbId);
 		if (typeof(dbIdToDbImageMap[dbId]) === 'undefined') {
-			console.log("createImagePlaceholderFromDbId: " + dbId);
-			let placeholder = imageCausality.create();
+
+				// console.log("---");
+			dbIdToDbImageMap[dbId] = createImagePlaceholderFromDbId(dbId);
 			// console.log("---");
+		}
+		console.log("placeholder keys:");
+		printKeys(dbIdToDbImageMap);
+		// console.log(dbIdToDbImageMap);
+		// console.log("finished getImagePlaceholderFromDbId|||||||||||||||||||||||||<: " + dbId);
+		return dbIdToDbImageMap[dbId];
+	}
+	
+	function createImagePlaceholderFromDbId(dbId) {
+		console.log("createImagePlaceholderFromDbId: " + dbId);
+		let placeholder;
+		placeholder = imageCausality.create({});
+		if (dbId < 1) {
+			
 			placeholder.const.dbId = dbId;
-			// console.log("---");
 			placeholder.const.initializer = function(dbImage) {
 				if (dbImage.const.dbId === 1)
 					dbImage.foo.bar;
 				console.log("");
-				console.log("> initialize image < " + dbImage.const.dbId );
+				console.log("> initialize image < ");
 				loadFromDbIdToImage(dbImage);
-				console.log("> finished initialize image < " + dbImage.const.dbId );
+				console.log("> finished initialize image < ");
+				console.log("keys:");
+				printKeys(dbImage)
 			}
-			// console.log("---");
-			dbIdToDbImageMap[dbId] = placeholder;
-			// console.log("---");
+			
 		}
-		// console.log(dbIdToDbImageMap);
-		// console.log("finished getImagePlaceholderFromDbId|||||||||||||||||||||||||<: " + dbId);
-		return dbIdToDbImageMap[dbId];
+		return placeholder;
 	}
 	
 	function createObjectPlaceholderFromDbImage(dbImage) {
@@ -344,23 +356,26 @@
 		connectObjectWithDbImage(object, dbImage);
 		placeholder.const.initializer = function(object) {
 			console.log("");
-			console.log("> initialize object < " + object.const.dbId );
+			console.log("> initialize object < ");
 			console.log("B");
 			loadFromDbImageToObject(object);
-			console.log("> finished initialize object < " + object.const.dbId );
+			console.log("> finished initialize object < ");
 		};
 	}
 	
 	function createObjectPlaceholderFromDbId(dbId) {
-		console.log("createObjectPlaceholderFromDbImage");
-		let placeholder = objectCausality.create();
-		placeholder.const.dbId = dbId;
-		placeholder.const.initializer = function(object) {
-			console.log("");
-			console.log("> initialize object from id < " + dbId );
-			loadFromDbIdToObject(object);
-			console.log("> finished initialize object from id < " + dbId );
-		};
+		let placeholder;
+		if (dbId < 1) {
+			console.log("createObjectPlaceholderFromDbImage");
+			placeholder = objectCausality.create();
+			placeholder.const.dbId = dbId;
+			placeholder.const.initializer = function(object) {
+				console.log("");
+				console.log("> initialize object from id < ");
+				loadFromDbIdToObject(object);
+				console.log("> finished initialize object from id < ");
+			};
+		}
 		return placeholder;
 	}
 	
@@ -373,19 +388,32 @@
 			
 			let dbId = dbImage.const.dbId;
 			
-			// console.log("¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤4loadFromDbIdToImage: " + dbId);
+			console.log("loadFromDbIdToImage: " + dbId);
 			let dbRecord = mockMongoDB.getRecord(dbId);
-			// console.log(dbRecord);
+			console.log(dbRecord);
 			for (property in dbRecord) {
-				// console.log("loadFromDbIdToImage: " + dbId + " property: " + property);
+				console.log("loadFromDbIdToImage: " + dbId + " property: " + property);
+				printKeys(dbImage);
 				if (property !== 'const' && property !== 'id') {
-					let value = loadDbValue(dbRecord[property]);
-					// console.log("value");
-					// console.log(value);
+					console.log("soon assigning: " + property);
+					console.log(dbRecord);
+					let recordValue = dbRecord[property];
+					console.log("soon assigning: " + property);
+					console.log(dbRecord);
+					let value = loadDbValue(recordValue);
+					
+					console.log("assigning: " + property);
+					console.log(dbRecord);
 					dbImage[property] = value;
+					console.log("loadFromDbIdToImage ...");
+					printKeys(dbImage);
 				}				
 			}
+			console.log("finished loadFromDbIdToImage: ");
+			console.log(dbImage.const.dbId);
+			printKeys(dbImage);
 			dbImage.const.loaded = true;
+			console.log("-- ");
 		});
 		
 		// if (typeof(dbRecord.const) !== 'undefined') {
@@ -418,6 +446,10 @@
 			console.log("A");
 			loadFromDbImageToObject(object);
 		});
+	}
+	
+	function printKeys(object) {
+		console.log(Object.keys(object));
 	}
 	
 	function loadFromDbImageToObject(object) {
