@@ -131,8 +131,13 @@
 	}
 	
 	function connectObjectWithDbImage(object, dbImage) {
-		object.const.dbImage = dbImage;
-		dbImage.const.correspondingObject = object;		
+		imageCausality.blockInitialize(function() {
+			console.log("connectObjectWithDbImage: " + dbImage.const.dbId);
+			dbImage.const.correspondingObject = object;					
+		});
+		objectCausality.blockInitialize(function() {
+			object.const.dbImage = dbImage;
+		});
 	}
 	
 			
@@ -308,79 +313,126 @@
 	let dbIdToDbImageMap = {};
 	
 	function getImagePlaceholderFromDbId(dbId) {
+		console.log("getImagePlaceholderFromDbId: " + dbId);
 		if (typeof(dbIdToDbImageMap[dbId]) === 'undefined') {
 			console.log("createImagePlaceholderFromDbId: " + dbId);
 			let placeholder = imageCausality.create();
-			placeholder.const.dbId = dbId; //causes loop!!! could it be the initializer
+			// console.log("---");
+			placeholder.const.dbId = dbId;
+			// console.log("---");
 			placeholder.const.initializer = function(dbImage) {
-				loadFromDbIdToImage(dbId, dbImage);
+				if (dbImage.const.dbId === 1)
+					dbImage.foo.bar;
+				console.log("");
+				console.log("> initialize image < " + dbImage.const.dbId );
+				loadFromDbIdToImage(dbImage);
+				console.log("> finished initialize image < " + dbImage.const.dbId );
 			}
+			// console.log("---");
 			dbIdToDbImageMap[dbId] = placeholder;
+			// console.log("---");
 		}
+		// console.log(dbIdToDbImageMap);
+		// console.log("finished getImagePlaceholderFromDbId|||||||||||||||||||||||||<: " + dbId);
 		return dbIdToDbImageMap[dbId];
 	}
 	
 	function createObjectPlaceholderFromDbImage(dbImage) {
 		console.log("createObjectPlaceholderFromDbImage");
-		let placeholder = imageCausality.create();
+		let placeholder = objectCausality.create();
+		placeholder.const.dbId = dbImage.const.dbId;
 		connectObjectWithDbImage(object, dbImage);
 		placeholder.const.initializer = function(object) {
-			loadFromDbImageToObject(dbImage, object);
+			console.log("");
+			console.log("> initialize object < " + object.const.dbId );
+			console.log("B");
+			loadFromDbImageToObject(object);
+			console.log("> finished initialize object < " + object.const.dbId );
 		};
 	}
 	
 	function createObjectPlaceholderFromDbId(dbId) {
 		console.log("createObjectPlaceholderFromDbImage");
-		return objectCausality.create(function(object) {
-			loadFromDbIdToObject(dbId, object);
+		let placeholder = objectCausality.create();
+		placeholder.const.dbId = dbId;
+		placeholder.const.initializer = function(object) {
+			console.log("");
+			console.log("> initialize object from id < " + dbId );
+			loadFromDbIdToObject(object);
+			console.log("> finished initialize object from id < " + dbId );
+		};
+		return placeholder;
+	}
+	
+	function loadFromDbIdToImage(dbImage) {
+		imageCausality.disableIncomingRelations(function() {			
+			if (typeof(dbImage.const.loaded) !== 'undefined') {
+				console.log("dubble loading!");
+				dbImage.foo.bar.fum;
+			}
+			
+			let dbId = dbImage.const.dbId;
+			
+			// console.log("¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤4loadFromDbIdToImage: " + dbId);
+			let dbRecord = mockMongoDB.getRecord(dbId);
+			// console.log(dbRecord);
+			for (property in dbRecord) {
+				// console.log("loadFromDbIdToImage: " + dbId + " property: " + property);
+				if (property !== 'const' && property !== 'id') {
+					let value = loadDbValue(dbRecord[property]);
+					// console.log("value");
+					// console.log(value);
+					dbImage[property] = value;
+				}				
+			}
+			dbImage.const.loaded = true;
 		});
+		
+		// if (typeof(dbRecord.const) !== 'undefined') {
+			// for (property in dbRecord.const) {
+				// if (typeof(dbImage.const[property]) === 'undefined') {
+					// let value = loadDbValue(dbRecord.const[property]);
+					// dbImage.const[property] = value;
+					// if (typeof(object.const[property]) === 'undefined') {
+						// object.const[property] = imageToObject(value);													
+					// }
+				// }
+			// }
+		// }		
 	}
 	
-	function loadFromDbIdToImage(dbId, dbImage) {
-		console.log("loadFromDbIdToImage: " + dbId);
-		let dbRecord = mockMongoDB.getRecord(dbId);
-		
-		for (property in dbRecord) {
-			// console.log("loading property: " + property);
-			if (property !== 'const' && property !== 'id') {
-				let value = loadDbValue(dbRecord[property]);
-				dbImage[property] = value;
-			}
-		}
-		
-		if (typeof(dbRecord.const) !== 'undefined') {
-			for (property in dbRecord.const) {
-				if (typeof(dbImage.const[property]) === 'undefined') {
-					let value = loadDbValue(dbRecord.const[property]);
-					dbImage.const[property] = value;
-					if (typeof(object.const[property]) === 'undefined') {
-						object.const[property] = imageToObject(value);													
-					}
-				}
-			}
-		}		
-	}
-	
-	function loadFromDbIdToObject(dbId, object) {
-		console.log("loadFromDbIdToObject");
+	function loadFromDbIdToObject(object) {
+		let dbId = object.const.dbId;
+		console.log("loadFromDbIdToObject: " + dbId);
 		imageCausality.withoutEmittingEvents(function() {
 			// Ensure there is an image.
 			if (typeof(object.const.dbImage) === 'undefined') {
-				connectObjectWithDbImage(object, getImagePlaceholderFromDbId(dbId))
+				console.log("create placeholder for image:" + dbId);
+				let placeholder = getImagePlaceholderFromDbId(dbId);
+				connectObjectWithDbImage(object, placeholder);
+				console.log("finished placeholder for image: " + dbId);
+				// console.log(placeholder);
+				// console.log("---- finished placeholder for image ----");
+				// console.log("here");
 			}
-	
-			loadFromDbImageToObject(object.const.dbImage, object);
+			console.log("A");
+			loadFromDbImageToObject(object);
 		});
 	}
 	
-	function loadFromDbImageToObject(dbImage, object) {
-		console.log("loadFromDbImageToObject" + dbImage.const.dbId);
+	function loadFromDbImageToObject(object) {
+		let dbImage = object.const.dbImage;
+		console.log("loadFromDbImageToObject: " + dbImage.const.dbId + "," + object.const.dbId);
+		// console.log(dbImage);
+		// console.log(object);
 		for (property in dbImage) {
-			console.log("-------");			
-			console.log(property);
+			console.log("-------");
+			console.log("loadFromDbImageToObject: " + dbImage.const.dbId + " property: " + property);
+			if (property === 'last' && dbImage.const.dbId === 0) 
+				object.foo.fie.fum;
 			let value = dbImage[property];
 			console.log("-------");
-			console.log(value);
+			// console.log(value);
 			// TODO: Do recursivley if there are plain javascript objects
 			if (imageCausality.isObject(value)) {
 				value = getObjectFromImage(dbImage);
@@ -417,13 +469,17 @@
 				let dbId = parseInt(dbValue.slice(dbIdPrefix.length));
 				return getImagePlaceholderFromDbId(dbId);
 			}
-		} else if (typeof(dbValue) === 'object') { // TODO: handle the array case
-			let javascriptObject = {};
-			for (property in dbValue) {
-				javascriptObject[property] = loadDbValue(dbValue[property]);
-			}
-			return javascriptObject;
-		} else {
+		} 
+		
+		// else if (typeof(dbValue) === 'object') { // TODO: handle the array case
+			// let javascriptObject = {};
+			// for (property in dbValue) {
+				// javascriptObject[property] = loadDbValue(dbValue[property]);
+			// }
+			// return javascriptObject;
+		// } 
+		
+		else {
 			return dbValue;
 		}
 	}

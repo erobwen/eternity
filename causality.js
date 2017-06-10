@@ -1282,13 +1282,20 @@
      **********************************/
 	 
 	function ensureInitialized(handler, target) {
-		if (handler.const.initializer !== null) {
+		if (handler.const.initializer !== null && blockingInitialize === 0) {
 			let initializer = handler.const.initializer;
 			handler.const.initializer = null;
 			initializer(handler.const.object);
 		}
 	}
-	 
+
+	let blockingInitialize = 0;
+	
+	function blockInitialize(action) {
+		blockingInitialize++;
+		action();
+		blockingInitialize--;
+	}
 	// function purge(object) {
 		// object.target.
 	// } 
@@ -2696,6 +2703,7 @@
         withoutNotifyChange : nullifyObserverNotification,
 		withoutEmittingEvents : withoutEmittingEvents,
 		disableIncomingRelations : disableIncomingRelations,
+		blockInitialize : blockInitialize,
 		
 		// Pulses and transactions
         pulse : pulse, // A sequence of transactions, end with cleanup.
