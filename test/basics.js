@@ -25,7 +25,7 @@ describe("basics", function () {
 		console.log(eternity.mockMongoDB.getAllRecordsParsed());
 		eternity.unloadAllAndClearMemory();
 		
-		console.log(eternity.persistent.A);
+		// console.log(eternity.persistent.A);
 		console.log("=========================================");
 		assert.equal("A", eternity.persistent.A.name);
 		// assert.notEqual(A, eternity.persistent.A); // Should now be a different eternity object... freshly loaded.

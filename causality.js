@@ -860,11 +860,27 @@
                         registerChangeObserver(getSpecifier(this.const, "_enumerateObservers"));
                     }
                 }
+				if (key === "A") {
+					console.log("");
+					console.log("return getter " + key + " dbId: " + this.const.dbId + " id:" + this.const.id);
+					console.log("mirrorRelations: " + mirrorRelations);
+					console.log("incomingRelationsDisabled: " + incomingRelationsDisabled);
+					console.log("keyInTarget: " + keyInTarget);
+					if (trace) {
+						key.foo.bar;
+						console.log("--------------------------------------------------------------------------------------------")
+					}
+					
+				}
 				if (mirrorRelations && incomingRelationsDisabled === 0 && keyInTarget && key !== 'incoming') {
-					// console.log("find referred object");
+					if (key === "A")
+						console.log("find referred object in mirror relation");
 					// console.log(key);
 					return findReferredObject(target[key]);
 				} else {
+					if (key === "A")
+						console.log("find normal");
+						// console.log("find normal " + key + " id: " + this.const.id);
 					return target[key];
 				}
             }
@@ -951,7 +967,7 @@
 			previousMirrorStructure = target[key];
 			previousValue = findReferredObject(target[key]);
 		} else {
-			console.log("basic assign: " + key);
+			// console.log("basic assign: " + key);
 			previousValue = target[key]; 
 		}
         
@@ -980,7 +996,7 @@
 			target[key] = mirrorStructureValue; 
 			incomingRelationsDisabled--;
 		} else {
-			console.log("basic assign...");
+			// console.log("basic assign...");
 			target[key] = value;
 		}
 		
@@ -2716,12 +2732,24 @@
 		createArrayIndex : createArrayIndex
 	}
 	
+	let trace = false;
+
+	function startTrace() {
+		trace = true;
+	}
+
+	function endTrace() {
+		trace = false;
+	}
+	
 	// Debugging and testing
 	let debuggingAndTesting = {
 		observeAll : observeAll,
         cachedCallCount : cachedCallCount,
         clearRepeaterLists : clearRepeaterLists,
-        resetObjectIds : resetObjectIds
+        resetObjectIds : resetObjectIds,
+		startTrace : startTrace,
+		endTrace : endTrace
 	}
 		
     /**
