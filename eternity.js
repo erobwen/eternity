@@ -112,7 +112,7 @@
 			_eternityParent : potentialParentImage,
 			_eternityParentProperty : potentialParentProperty
 		};
-		for (property in object) {
+		for (let property in object) {
 			let value = object[property];
 			if (!objectCausality.isObject(value)) {
 				imageContents[property] = value;
@@ -152,7 +152,7 @@
 			
 			if (typeof(object.const.dbImage) === 'undefined') {
 				let dbImage = createIsolatedDbImageFromLoadedObject(object, potentialParentImage, potentialParentProperty);
-				for (property in object) { 
+				for (let property in object) { 
 					let value = object[property];
 					if (objectCausality.isObject(value)) {
 						dbImage[property] = createDbImageRecursivley(value, dbImage, property);
@@ -171,7 +171,7 @@
 	function floodUnstable(potentiallyUnstableImage, parent, parentRelation) {
 		if (parent === null || (parent === unstableImage._eternityParent && parentRelation === unstableImage._eternityParentProperty)) {
 			unstableImages.push(potentiallyUnstableImage);
-			for (property in potentiallyUnstableImage) {
+			for (let property in potentiallyUnstableImage) {
 				floodUnstable(potentiallyUnstableImage[property], potentiallyUnstableImage, property);
 			}
 		}
@@ -252,7 +252,7 @@
 		// log(pendingImageCreations, 2);
 		// log(pendingImageUpdates, 2);
 		// This one could do a stepwise execution to not block the server. 
-		for (id in pendingImageCreations) {
+		for (let id in pendingImageCreations) {
 			writeImageToDatabase(pendingImageCreations[id]);
 		} 
 	}
@@ -262,7 +262,7 @@
 			// log(dbImage, 2);
 			// console.log(imageCausality.isObject(dbImage));
 			let serialized = (dbImage instanceof Array) ? [] : {};
-			for (property in dbImage) {
+			for (let property in dbImage) {
 				if (property !== 'const')
 					serialized[property] = convertReferencesToDbIds(dbImage[property]);
 			}
@@ -295,7 +295,7 @@
 			// entity.foo.bar;
 			
 			let converted = (entity instanceof Array) ? [] : {};
-			for (property in entity) {
+			for (let property in entity) {
 				if (property !== 'const')
 					converted[property] = convertReferencesToDbIds(entity[property]);
 			}
@@ -391,7 +391,7 @@
 			console.log("loadFromDbIdToImage: " + dbId);
 			let dbRecord = mockMongoDB.getRecord(dbId);
 			console.log(dbRecord);
-			for (property in dbRecord) {
+			for (let property in dbRecord) {
 				console.log("loadFromDbIdToImage: " + dbId + " property: " + property);
 				printKeys(dbImage);
 				if (property !== 'const' && property !== 'id') {
@@ -457,7 +457,7 @@
 		console.log("loadFromDbImageToObject: " + dbImage.const.dbId + "," + object.const.dbId);
 		// console.log(dbImage);
 		// console.log(object);
-		for (property in dbImage) {
+		for (let property in dbImage) {
 			console.log("-------");
 			console.log("loadFromDbImageToObject: " + dbImage.const.dbId + " property: " + property);
 			if (property === 'last' && dbImage.const.dbId === 0) 
@@ -486,7 +486,7 @@
 			return potentialDbImage.const.dbImage;
 		} else if (typeof(potentialDbImage) === 'object'){ // TODO: handle the array case
 			let javascriptObject = {};
-			for (property in dbValue) {
+			for (let property in dbValue) {
 				javascriptObject[property] = imageToObject(dbValue[property]);
 			}
 			return javascriptObject;
