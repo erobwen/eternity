@@ -231,7 +231,10 @@
 	 */
 	function findReferredObject(referredItem) {
 		if (typeof(referredItem) === 'object' && typeof(referredItem.referredObject) !== undefined) {
-			return referredItem.referredObject;
+			console.log("..>>> finding referred object....");
+			let referredObject = referredItem.referredObject;
+			console.log("..<<< finding referred object....");
+			return referredObject;
 		} else {
 			return referredItem;
 		}

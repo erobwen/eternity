@@ -440,18 +440,18 @@
 	
 	function loadFromDbImageToObject(object) {
 		let dbImage = object.const.dbImage;
-		// console.log("----------------------------------------");
+		console.log("----------------------------------------");
 		console.log("loadFromDbImageToObject: " + dbImage.const.dbId + "," + object.const.dbId);
 		// console.log(dbImage);
 		// console.log(object);
 		for (let property in dbImage) {
 			console.log("loadFromDbImageToObject: " + dbImage.const.dbId + " property: " + property);
-			// console.log("-------");
+			console.log("-------");
 			let value = dbImage[property];
 			console.log("value loaded to object:");
 			printKeys(value);
 			console.log(value);
-			// console.log("-------");
+			console.log("-------");
 			// console.log(value);
 			// TODO: Do recursivley if there are plain javascript objects
 			if (imageCausality.isObject(value)) {
