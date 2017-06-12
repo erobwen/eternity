@@ -230,17 +230,16 @@
 	 * Traverse the incoming relation structure foobar
 	 */
 	function findReferredObject(referredItem) {
-		if (typeof(referredItem) === 'function') {
+		// console.log("findReferredObject:");
+		// console.log(referredItem);
+		// Note, referred item can sometimes be a function???
+		if (referredItem instanceof Function || typeof(referredItem) === 'function') {
 			referredItem.foo.bar;
 		}
 		if (isObject(referredItem)) {
-			// console.log("findReferredObject:");
-			// console.log(referredItem);
 			if (typeof(referredItem.referredObject) !== 'undefined') {
-				// console.log("continue go one step!");
 				return referredItem.referredObject;
 			} else {
-				// console.log("keep this one!");
 				return referredItem;
 			}
 		}
@@ -835,10 +834,6 @@
     function getHandlerObject(target, key) {
 		if (configuration.objectActivityList) registerActivity(this);
         key = key.toString();
-		// if (key === "A") {
-			// console.log("start getting A");
-		// }
-		
 		// console.log("getHandlerObject: " + key);
 		// if (key instanceof 'Symbol') { incoming
 			// throw "foobar";
@@ -874,31 +869,11 @@
                         registerChangeObserver(getSpecifier(this.const, "_enumerateObservers"));
                     }
                 }
-				// console.log("here " + key);
-				if (key === "A") {
-					// if (typeof(this.const.dbId) === 'undefined') {
-						// key.foo.bar;
-					// }
-					console.log("");
-					console.log("return getter " + key + " dbId: " + this.const.dbId + " id:" + this.const.id);
-					console.log("mirrorRelations: " + mirrorRelations);
-					console.log("incomingRelationsDisabled: " + incomingRelationsDisabled);
-					console.log("keyInTarget: " + keyInTarget);
-					if (trace) {
-						key.foo.bar;
-						console.log("--------------------------------------------------------------------------------------------")
-					}
-					
-				}
 				if (mirrorRelations && incomingRelationsDisabled === 0 && keyInTarget && key !== 'incoming') {
-					if (key === "A")
-						console.log("find referred object in mirror relation");
+					// console.log("find referred object");
 					// console.log(key);
 					return findReferredObject(target[key]);
 				} else {
-					if (key === "A")
-						console.log("find normal");
-						// console.log("find normal " + key + " id: " + this.const.id);
 					return target[key];
 				}
             }
@@ -961,10 +936,15 @@
     }
 	*/
 
+	function isIndexParentOf(potentialParent, potentialIndex) {
+		if (!isObject(potentialParent) || !isObject(potentialIndex)) {
+			return false;
+		} else {
+			return (typeof(potentialIndex.const.indexParent) !== 'undefined') && potentialIndex.const.indexParent === potentialParent;
+		}
+	}
+	
     function setHandlerObject(target, key, value) {
-		// if (key === "A") {
-			// console.log("start setting A");
-		// }
 		if (configuration.objectActivityList) registerActivity(this);
 				
 		// Overlays
@@ -982,13 +962,12 @@
 		// Get previous value		// Get previous value
 		let previousValue;
 		let previousMirrorStructure;
-		if (mirrorRelations && incomingRelationsDisabled === 0) {
+		if (mirrorRelations && incomingRelationsDisabled === 0 && !isIndexParentOf(this.const.object, value)) {
 			// console.log("causality.getHandlerObject:");
 			// console.log(key);
 			previousMirrorStructure = target[key];
 			previousValue = findReferredObject(target[key]);
 		} else {
-			// console.log("basic assign: " + key);
 			previousValue = target[key]; 
 		}
         
@@ -1011,13 +990,12 @@
 		
 		// Perform assignment with regards to mirror structures.
 		let mirrorStructureValue;
-		if (mirrorRelations && incomingRelationsDisabled === 0) {
+		if (mirrorRelations && incomingRelationsDisabled === 0 && !isIndexParentOf(this.const.object, value)) {
 			incomingRelationsDisabled++;
 			mirrorStructureValue = createAndRemoveIncomingRelations(this['const'].object, key, value, previousValue);
 			target[key] = mirrorStructureValue; 
 			incomingRelationsDisabled--;
 		} else {
-			// console.log("basic assign...");
 			target[key] = value;
 		}
 		
@@ -1033,7 +1011,7 @@
 		}
 
 		// Emit event
-		if (mirrorRelations && incomingRelationsDisabled === 0) {
+		if (mirrorRelations && incomingRelationsDisabled === 0 && !isIndexParentOf(this.const.object, value)) {
 			// Emit extra event 
 			incomingRelationsDisabled++
 			emitSetEvent(this, key, mirrorStructureValue, previousMirrorStructure);
@@ -1041,10 +1019,6 @@
 		}
 		emitSetEvent(this, key, value, previousValue);
 		
-		// if (key === "A") {
-			// console.log("finish setting A");
-		// }
-
 		// End pulse 
 		observerNotificationPostponed--;
         proceedWithPostponedNotifications();
