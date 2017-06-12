@@ -234,13 +234,13 @@
 			referredItem.foo.bar;
 		}
 		if (isObject(referredItem)) {
-			console.log("findReferredObject:");
-			console.log(referredItem);
+			// console.log("findReferredObject:");
+			// console.log(referredItem);
 			if (typeof(referredItem.referredObject) !== 'undefined') {
-				console.log("continue go one step!");
+				// console.log("continue go one step!");
 				return referredItem.referredObject;
 			} else {
-				console.log("keep this one!");
+				// console.log("keep this one!");
 				return referredItem;
 			}
 		}

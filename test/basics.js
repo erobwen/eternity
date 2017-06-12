@@ -27,7 +27,7 @@ describe("basics", function () {
 		let A = eternity.create({name : 'A'});
 		console.log("=======");
 		eternity.persistent.A = A;
-		eternity.persistent.x = 42;
+		// eternity.persistent.x = 42;
 		
 		
 		
@@ -37,8 +37,8 @@ describe("basics", function () {
 		console.log(eternity.mockMongoDB.getAllRecordsParsed());
 		// console.log("=======");
 		eternity.unloadAllAndClearMemory();
-		console.log("=========================================");
-		console.log(eternity.persistent.x);
+		// console.log("=========================================");
+		// console.log(eternity.persistent.x);
 		console.log("=========================================");
 		console.log(eternity.persistent.A); // results in persistent!
 		assert.equal("A", eternity.persistent.A.name);
