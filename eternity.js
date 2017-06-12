@@ -9,7 +9,6 @@
     }
 }(this, function () {
 	// Require uncached, to support multipple causalities. 
-	const requireUncached = require('require-uncached');
 	const dbIdPrefix = "_causality_persistent_id_";
 	const dbIdExpressionPrefix = "_causality_persistent_id_expression";
 
@@ -21,8 +20,8 @@
 		
 	// Image causality
 	// let imageCausality = requireUncached("causalityjs_advanced");
-	let imageCausality = requireUncached("./causality.js");
-	imageCausality.setConfiguration({ 
+	let imageCausality = require("./causality.js")({ 
+		name : 'imageCausality',
 		recordPulseEvents : true, 
 		
 		mirrorRelations: true, 
@@ -550,10 +549,12 @@
 	 *           Setup object causality
 	 *-----------------------------------------------*/
 	
-	objectCausality = requireUncached("./causality.js");
+	objectCausality = require("./causality.js")({
+		name: 'objectCausality', 
+		recordPulseEvents : true
+	});
 	
 	// Additions 
-	objectCausality.setConfiguration({recordPulseEvents : true});
 	objectCausality.addPostPulseAction(postPulseAction);
 	objectCausality.mockMongoDB = mockMongoDB;
 	objectCausality.unloadAllAndClearMemory = unloadAllAndClearMemory;
