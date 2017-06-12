@@ -19,19 +19,29 @@ describe("basics", function () {
 	// });
 	
     it('should save refered objects, at once and later added', function () {
+		// let x = eternity.create({});
+		// let A = eternity.create({name: "A"});
+		// x.A = A;
+		// console.log(x.A);
+		
 		let A = eternity.create({name : 'A'});
 		console.log("=======");
 		eternity.persistent.A = A;
-		// console.log("=======");
-		// assert.equal("A", eternity.persistent.A.name);
-		// console.log("=======");
-		// console.log(eternity.mockMongoDB.getAllRecordsParsed());
-		// console.log("=======");
-		// eternity.unloadAllAndClearMemory();
+		eternity.persistent.x = 42;
 		
-		// // console.log(eternity.persistent.A);
-		// console.log("=========================================");
+		
+		
+		// console.log("=======");
 		// assert.equal("A", eternity.persistent.A.name);
+		// console.log("=======");
+		console.log(eternity.mockMongoDB.getAllRecordsParsed());
+		// console.log("=======");
+		eternity.unloadAllAndClearMemory();
+		console.log("=========================================");
+		console.log(eternity.persistent.x);
+		console.log("=========================================");
+		console.log(eternity.persistent.A); // results in persistent!
+		assert.equal("A", eternity.persistent.A.name);
 		// // assert.notEqual(A, eternity.persistent.A); // Should now be a different eternity object... freshly loaded.
 
 		// eternity.clearDatabaseAndClearMemory();

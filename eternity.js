@@ -159,6 +159,7 @@
 					}
 				}
 				object.const.dbImage = dbImage;
+				dbImage.const.correspondingObject = object;
 			}
 			
 			return object.const.dbImage;
@@ -238,14 +239,14 @@
 	
 	function hasAPlaceholder(dbImage) {
 		// console.log(dbImage);
-		return typeof(dbImage.const.mongoDbId) !== 'undefined';
+		return typeof(dbImage.const.dbId) !== 'undefined';
 	}
 
 	function writePlaceholderForImageToDatabase(dbImage) {
-		let mongoDbId = mockMongoDB.saveNewRecord({});
-		dbImage.const.mongoDbId = mongoDbId;
-		dbImage.const.serializedMongoDbId = dbIdPrefix + mongoDbId;
-		return mongoDbId;
+		let dbId = mockMongoDB.saveNewRecord({});
+		dbImage.const.dbId = dbId;
+		dbImage.const.serializedMongoDbId = dbIdPrefix + dbId;
+		return dbId;
 	}
 
 	function flushToDatabase() {
@@ -267,11 +268,11 @@
 					serialized[property] = convertReferencesToDbIds(dbImage[property]);
 			}
 			if (!hasAPlaceholder(dbImage)) {
-				let mongoDbId = mockMongoDB.saveNewRecord(serialized);
-				dbImage.const.mongoDbId = mongoDbId;
-				dbImage.const.serializedMongoDbId = dbIdPrefix + mongoDbId;
+				let dbId = mockMongoDB.saveNewRecord(serialized);
+				dbImage.const.dbId = dbId;
+				dbImage.const.serializedMongoDbId = dbIdPrefix + dbId;
 			} else {
-				mockMongoDB.updateRecord(dbImage.const.mongoDbId, serialized);
+				mockMongoDB.updateRecord(dbImage.const.dbId, serialized);
 			}			
 		});
 	}
@@ -333,7 +334,8 @@
 			console.log("");
 			console.log("> initialize image < ");
 			loadFromDbIdToImage(dbImage);
-			console.log("> finished initialize image < ");
+			console.log("> finished initialize image: < " + dbImage.const.dbId);
+			console.log(dbImage);
 		}
 		
 		return placeholder;
@@ -348,7 +350,7 @@
 			console.log("");
 			console.log("> initialize object < ");
 			loadFromDbImageToObject(object);
-			console.log("> finished initialize object < ");
+			console.log("> finished initialize object < " + object.const.dbImage.const.dbId);
 		};
 	}
 	
@@ -362,7 +364,7 @@
 			console.log("");
 			console.log("> initialize object from id < ");
 			loadFromDbIdToObject(object);
-			console.log("> finished initialize object from id < ");
+			console.log("> finished initialize object from id < "  + object.const.dbImage.const.dbId);
 		};
 		// }
 		return placeholder;
@@ -377,7 +379,7 @@
 			
 			let dbId = dbImage.const.dbId;
 			
-			console.log("loadFromDbIdToImage: " + dbId);
+			console.log("loadFromDbIdToImage, dbId: " + dbId);
 			let dbRecord = mockMongoDB.getRecord(dbId);
 			console.log(dbRecord);
 			for (let property in dbRecord) {
@@ -392,6 +394,8 @@
 					// console.log(dbRecord);
 					// console.log("loadFromDbIdToImage: " + dbId + " property: " + property + "...assigning");
 					// if (property !== 'A') imageCausality.startTrace();
+					console.log("value loaded to image:");
+					console.log(value);
 					dbImage[property] = value;
 					// if (property !== 'A') imageCausality.endTrace();
 					// console.log("loadFromDbIdToImage: " + dbId + " property: " + property + "...finished assigning");
@@ -489,16 +493,17 @@
 			if (dbValue.startsWith(dbIdPrefix)) {
 				let dbId = parseInt(dbValue.slice(dbIdPrefix.length));
 				return getImagePlaceholderFromDbId(dbId);
+			} else {
+				return dbValue;
 			}
+		} else if (typeof(dbValue) === 'object') { // TODO: handle the array case
+			if (dbValue === null) return null;
+			let javascriptObject = {};
+			for (let property in dbValue) {
+				javascriptObject[property] = loadDbValue(dbValue[property]);
+			}
+			return javascriptObject;
 		} 
-		
-		// else if (typeof(dbValue) === 'object') { // TODO: handle the array case
-			// let javascriptObject = {};
-			// for (property in dbValue) {
-				// javascriptObject[property] = loadDbValue(dbValue[property]);
-			// }
-			// return javascriptObject;
-		// } 
 		
 		else {
 			return dbValue;

@@ -227,17 +227,24 @@
 	
 	
 	/**
-	 * Traverse the incoming relation structure
+	 * Traverse the incoming relation structure foobar
 	 */
 	function findReferredObject(referredItem) {
-		if (typeof(referredItem) === 'object' && typeof(referredItem.referredObject) !== undefined) {
-			console.log("..>>> finding referred object....");
-			let referredObject = referredItem.referredObject;
-			console.log("..<<< finding referred object....");
-			return referredObject;
-		} else {
-			return referredItem;
+		if (typeof(referredItem) === 'function') {
+			referredItem.foo.bar;
 		}
+		if (isObject(referredItem)) {
+			console.log("findReferredObject:");
+			console.log(referredItem);
+			if (typeof(referredItem.referredObject) !== 'undefined') {
+				console.log("continue go one step!");
+				return referredItem.referredObject;
+			} else {
+				console.log("keep this one!");
+				return referredItem;
+			}
+		}
+		return referredItem;
 	}
 	
 	function createIncomingStructure(referingObject, referingObjectId, property, object) {
@@ -828,6 +835,10 @@
     function getHandlerObject(target, key) {
 		if (configuration.objectActivityList) registerActivity(this);
         key = key.toString();
+		// if (key === "A") {
+			// console.log("start getting A");
+		// }
+		
 		// console.log("getHandlerObject: " + key);
 		// if (key instanceof 'Symbol') { incoming
 			// throw "foobar";
@@ -863,7 +874,11 @@
                         registerChangeObserver(getSpecifier(this.const, "_enumerateObservers"));
                     }
                 }
+				// console.log("here " + key);
 				if (key === "A") {
+					// if (typeof(this.const.dbId) === 'undefined') {
+						// key.foo.bar;
+					// }
 					console.log("");
 					console.log("return getter " + key + " dbId: " + this.const.dbId + " id:" + this.const.id);
 					console.log("mirrorRelations: " + mirrorRelations);
@@ -947,6 +962,9 @@
 	*/
 
     function setHandlerObject(target, key, value) {
+		// if (key === "A") {
+			// console.log("start setting A");
+		// }
 		if (configuration.objectActivityList) registerActivity(this);
 				
 		// Overlays
@@ -1023,6 +1041,10 @@
 		}
 		emitSetEvent(this, key, value, previousValue);
 		
+		// if (key === "A") {
+			// console.log("finish setting A");
+		// }
+
 		// End pulse 
 		observerNotificationPostponed--;
         proceedWithPostponedNotifications();
