@@ -46,6 +46,33 @@ describe("basics", function () {
 
 		// eternity.clearDatabaseAndClearMemory();
 	});
+	
+	it('should save changes in properties', function () {
+	});
+
+	it('should save refered object structures', function () {
+	});
+	
+    it('should unload nodes as memory reaches limit, circluar path', function () {
+	});
+
+    it('should unload nodes as memory reaches limit, circluar infinite path', function () {
+	});
+
+    it('should handle zombie objects correctly', function () {
+	});	
+	
+    it('should be possible to iterate all incoming', function () {
+	});	
+	
+    it('should garbage collect persistent structures no longer reachable', function () {
+	});	  
+	
+	it('should be possible to have persistent repeaters', function () {
+	});	
+		
+	it('should be possible to have persistent cached calls', function () {
+	});	
 });
 
 
