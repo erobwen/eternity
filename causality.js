@@ -9,9 +9,8 @@
 	}
 }(this, function () {
 	function createCausalityInstance(configuration) {
-		
-		// Instance identity
-		let causalityInstanceIdentity = {};
+		// Causality instance
+		let causalityInstance;
 		
 		// Debugging
 		let objectlog = require('./objectlog.js');
@@ -1217,7 +1216,7 @@
 			
 			handler.const = {
 				initializer : initializer,
-				causalityInstanceIdentity : causalityInstanceIdentity,
+				causalityInstance : causalityInstance,
 				id: id,
 				cacheId : cacheId,
 				forwardsTo : null,
@@ -1291,7 +1290,7 @@
 			// }
 			// TODO: Fix the causality identity somehow. 
 			// return typeof(entity) === 'object' && entity !== null && typeof(entity.const) !== 'undefined' && entity.const.causalityInstanceIdentity === causalityInstanceIdentity;
-			return typeof(entity) === 'object' && entity !== null && typeof(entity.const) !== 'undefined' && typeof(entity.const.id) !== 'undefined';
+			return typeof(entity) === 'object' && entity !== null && typeof(entity.const) !== 'undefined' && entity.const.causalityInstance === causalityInstance;
 		}
 		
 		/**********************************
@@ -2744,7 +2743,7 @@
 			return target;
 		}
 
-		let module = {
+		causalityInstance = {
 			install : install,
 			
 			// Framework setup (usually not used by application code)
@@ -2762,9 +2761,9 @@
 			getActivityListFirst : getActivityListFirst,
 			removeFromActivityList : removeFromActivityList
 		}
-		Object.assign(module, languageExtensions);
-		Object.assign(module, debuggingAndTesting);
-		return module;
+		Object.assign(causalityInstance, languageExtensions);
+		Object.assign(causalityInstance, debuggingAndTesting);
+		return causalityInstance;
 	}
 	
 	

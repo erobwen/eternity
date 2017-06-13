@@ -559,6 +559,7 @@
 	objectCausality.mockMongoDB = mockMongoDB;
 	objectCausality.unloadAllAndClearMemory = unloadAllAndClearMemory;
 	objectCausality.clearDatabaseAndClearMemory = clearDatabaseAndClearMemory;
+	objectCausality.imageCausality = imageCausality;
 
 	imageCausality.addPostPulseAction(postImagePulseAction);
 	

@@ -41,6 +41,10 @@ describe("basics", function () {
 		// console.log(eternity.persistent.x);
 		// console.log("=========================================");
 		// console.log(eternity.persistent.A); // results in persistent!
+		console.log(eternity.imageCausality.isObject(eternity.persistent));
+		console.log(eternity.imageCausality.isObject(eternity.persistent.A));
+		console.log(eternity.isObject(eternity.persistent));
+		console.log(eternity.isObject(eternity.persistent.A));
 		assert.equal("A", eternity.persistent.A.name);
 		// // assert.notEqual(A, eternity.persistent.A); // Should now be a different eternity object... freshly loaded.
 
