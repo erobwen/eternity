@@ -35,6 +35,8 @@
 	// Neat logging
 	let objectlog = require('./objectlog.js');
 	let log = objectlog.log;
+	let logGroup = objectlog.enter;
+	let logUngroup = objectlog.exit;
 	// let log = console.log;
 
 
@@ -331,9 +333,12 @@
 			// if (dbImage.const.dbId === 1)
 				// dbImage.foo.bar;
 			// console.log("");
-			// console.log("> initialize image < ");
+			log("> initialize image < "); // + dbImage.const.dbId
+			logGroup();
 			loadFromDbIdToImage(dbImage);
-			// console.log("> finished initialize image: < " + dbImage.const.dbId);
+			log(dbImage);
+			logUngroup();
+			log("> finished initialize image: < " + dbImage.const.dbId);
 			// console.log(dbImage);
 		}
 		
@@ -347,9 +352,12 @@
 		connectObjectWithDbImage(placeholder, dbImage);
 		placeholder.const.initializer = function(object) {
 			// console.log("");
-			// console.log("> initialize object < ");
+			log("> initialize object < ");
+			logGroup();
 			loadFromDbImageToObject(object);
-			// console.log("> finished initialize object < " + object.const.dbImage.const.dbId);
+			log(object);
+			logUngroup();
+			log("> finished initialize object < " + object.const.dbImage.const.dbId);
 		};
 		return placeholder;
 	}
@@ -362,9 +370,12 @@
 		placeholder.const.dbId = dbId;
 		placeholder.const.initializer = function(object) {
 			// console.log("");
-			// console.log("> initialize object from id < ");
+			log("> initialize object from id < ");
+			logGroup();
 			loadFromDbIdToObject(object);
-			// console.log("> finished initialize object from id < "  + object.const.dbImage.const.dbId);
+			log(object);
+			logUngroup();
+			log("> finished initialize object from id < dbId:"  + object.const.dbImage.const.dbId);
 		};
 		// }
 		return placeholder;
@@ -445,14 +456,16 @@
 	function loadFromDbImageToObject(object) {
 		let dbImage = object.const.dbImage;
 		// console.log("----------------------------------------");
-		console.log("loadFromDbImageToObject dbId: " + dbImage.const.dbId);
+		log("loadFromDbImageToObject dbId: " + dbImage.const.dbId);
+		// logGroup();
 		// console.log(dbImage);
 		// console.log(object);
 		for (let property in dbImage) {
 			if (property !== 'incoming') {
-				// console.log("loadFromDbImageToObject: " + dbImage.const.dbId + " property: " + property);
+				// log("load property: " + property);
 				// console.log("-------");
 				let value = dbImage[property];
+				// log(value);
 				// console.log("value loaded to object:");
 				// printKeys(value);
 				// console.log(value.name)
@@ -463,15 +476,25 @@
 				if (imageCausality.isObject(value)) {
 					// console.log("found an object");
 					value = getObjectFromImage(value);
+					// log(value);
 					// console.log(value);
-					console.log("==============================");
-					let x = value.name; // Must be here? otherwise not initilized correctly?
-					console.log("==============================");
+					// value = "424242"
+					// log(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
+					// let x = value.name; // Must be here? otherwise not initilized correctly?   Because of pulses!!!!
+					// log("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<");
+					
 					// console.log(value.name);
 				}
-				object[property] = value;				
+				// log(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
+				// log(value);
+				object[property] = value;
+				// log(object[property]);
+				// log("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<");
 			}
+			// log(object);
 		}
+		// log(object);
+		logUngroup();
 	}
 	
 	function getObjectFromImage(dbImage) {

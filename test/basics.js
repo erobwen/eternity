@@ -1,6 +1,12 @@
 const assert = require('assert');
 let eternity = require('../eternity');
-const log = console.log.bind(console);
+// const log = console.log.bind(console);
+
+// Neat logging
+let objectlog = require('../objectlog.js');
+let log = objectlog.log;
+let logGroup = objectlog.enter;
+let logUngroup = objectlog.exit;
 
 // Tests based on mobx test/array.js
 describe("basics", function () {
@@ -34,17 +40,25 @@ describe("basics", function () {
 		// console.log("=======");
 		// assert.equal("A", eternity.persistent.A.name);
 		// console.log("=======");
-		console.log(eternity.mockMongoDB.getAllRecordsParsed());
+		log(eternity.mockMongoDB.getAllRecordsParsed());
 		// console.log("=======");
 		eternity.unloadAllAndClearMemory();
-		// console.log("=========================================");
+		log("==================== CLEAR MEMORY ==========================");
 		// console.log(eternity.persistent.x);
-		// console.log("=========================================");
 		// console.log(eternity.persistent.A); // results in persistent!
-		console.log(eternity.imageCausality.isObject(eternity.persistent));
-		console.log(eternity.imageCausality.isObject(eternity.persistent.A));
-		console.log(eternity.isObject(eternity.persistent));
-		console.log(eternity.isObject(eternity.persistent.A));
+		// console.log(eternity.imageCausality.isObject(eternity.persistent));
+		// console.log(eternity.imageCausality.isObject(eternity.persistent.A));
+		// console.log(eternity.isObject(eternity.persistent));
+		// console.log(eternity.isObject(eternity.persistent.A));
+		log(eternity.persistent);
+		log(eternity.persistent.A);
+		log(eternity.persistent.A.name);
+		A = eternity.persistent.A;
+		// log("dbId:" + A.const.dbId);
+		// log("id: " + A.const.id);
+		// log(eternity.persistent.A.const);
+		log(eternity.persistent.A.const.target);
+		console.log("=========================================");
 		assert.equal("A", eternity.persistent.A.name);
 		// // assert.notEqual(A, eternity.persistent.A); // Should now be a different eternity object... freshly loaded.
 
