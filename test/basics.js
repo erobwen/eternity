@@ -34,7 +34,7 @@ describe("basics", function () {
 		// console.log("=======");
 		// assert.equal("A", eternity.persistent.A.name);
 		// console.log("=======");
-		// console.log(eternity.mockMongoDB.getAllRecordsParsed());
+		console.log(eternity.mockMongoDB.getAllRecordsParsed());
 		// console.log("=======");
 		eternity.unloadAllAndClearMemory();
 		// console.log("=========================================");

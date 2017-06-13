@@ -445,27 +445,32 @@
 	function loadFromDbImageToObject(object) {
 		let dbImage = object.const.dbImage;
 		// console.log("----------------------------------------");
-		// console.log("loadFromDbImageToObject: " + dbImage.const.dbId + "," + object.const.dbId);
+		console.log("loadFromDbImageToObject dbId: " + dbImage.const.dbId);
 		// console.log(dbImage);
 		// console.log(object);
 		for (let property in dbImage) {
-			// console.log("loadFromDbImageToObject: " + dbImage.const.dbId + " property: " + property);
-			// console.log("-------");
-			let value = dbImage[property];
-			// console.log("value loaded to object:");
-			// printKeys(value);
-			// console.log(value.name)
-			// console.log(value);
-			// console.log("-------");
-			// console.log(value);
-			// TODO: Do recursivley if there are plain javascript objects
-			if (imageCausality.isObject(value)) {
-				// console.log("found an object");
-				value = getObjectFromImage(value);
+			if (property !== 'incoming') {
+				// console.log("loadFromDbImageToObject: " + dbImage.const.dbId + " property: " + property);
+				// console.log("-------");
+				let value = dbImage[property];
+				// console.log("value loaded to object:");
+				// printKeys(value);
+				// console.log(value.name)
 				// console.log(value);
-				// console.log(value.name);
+				// console.log("-------");
+				// console.log(value);
+				// TODO: Do recursivley if there are plain javascript objects
+				if (imageCausality.isObject(value)) {
+					// console.log("found an object");
+					value = getObjectFromImage(value);
+					// console.log(value);
+					console.log("==============================");
+					let x = value.name; // Must be here? otherwise not initilized correctly?
+					console.log("==============================");
+					// console.log(value.name);
+				}
+				object[property] = value;				
 			}
-			object[property] = value;
 		}
 	}
 	
@@ -475,7 +480,7 @@
 			dbImage.const.correspondingObject = createObjectPlaceholderFromDbImage(dbImage);
 		}
 		// console.log("return value:");
-		console.log(dbImage.const.correspondingObject); // This is needed???
+		// console.log(dbImage.const.correspondingObject); // This is needed???
 		
 		return dbImage.const.correspondingObject;
 	}

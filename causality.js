@@ -1301,6 +1301,7 @@
 		 
 		function ensureInitialized(handler, target) {
 			if (handler.const.initializer !== null && blockingInitialize === 0) {
+				console.log(configuration.name + ": initialize id:" + handler.const.id + " dbId: " + handler.const.dbId);
 				let initializer = handler.const.initializer;
 				handler.const.initializer = null;
 				initializer(handler.const.object);
