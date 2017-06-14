@@ -7,16 +7,26 @@
 	} else {
 		root.causality = factory(); // Support browser global
 	}
-}(this, function () {
+}(this, function () {	
+	// Debugging
+	let objectlog = require('./objectlog.js');
+	let log = objectlog.log;
+	let logGroup = objectlog.enter;
+	let logUngroup = objectlog.exit;
+
 	function createCausalityInstance(configuration) {
+		let inPulse = 0;
+		
+		let postPulseProcess = 0;
+	 
+		let pulseEvents = [];
+		
+		let recordPulseEvents = false;
+		
+
 		// Causality instance
 		let causalityInstance;
 		
-		// Debugging
-		let objectlog = require('./objectlog.js');
-		let log = objectlog.log;
-		let logGroup = objectlog.enter;
-		let logUngroup = objectlog.exit;
 		
 		/***************************************************************
 		 *
@@ -951,18 +961,18 @@
 		
 		function setHandlerObject(target, key, value) {
 
-			if (configuration.name === 'objectCausality') log("setHandlerObject " + key + " id: " + this.const.id);
-			if (typeof(value) === 'undefined') {
-				log("setting undefined!!!");
-			} else {
-				log("...");
-			}			// if (configuration.name === 'objectCausality') log("setHandlerObject " + key);
+			// if (configuration.name === 'objectCausality') log("setHandlerObject " + key + " id: " + this.const.id);
+			// if (typeof(value) === 'undefined') {
+				// log("setting undefined!!!");
+			// } else {
+				// log("...");
+			// }			// if (configuration.name === 'objectCausality') log("setHandlerObject " + key);
 			// if (configuration.name === 'objectCausality') log(value);
 			if (configuration.objectActivityList) registerActivity(this);
 					
 			// Overlays
 			if (this.const.forwardsTo !== null) {
-				if (configuration.name === 'objectCausality')  log("FORWARD!!!");
+				// if (configuration.name === 'objectCausality')  log("FORWARD!!!");
 				let overlayHandler = this.const.forwardsTo.const.handler;
 				return overlayHandler.set.apply(overlayHandler, [overlayHandler.target, key, value]);
 			}
@@ -972,7 +982,7 @@
 			
 			// Writeprotection
 			if (!canWrite(this.const.object)) {
-				if (configuration.name === 'objectCausality')  log("CANNOT WRITE");
+				// if (configuration.name === 'objectCausality')  log("CANNOT WRITE");
 				return;
 			} 
 			
@@ -990,14 +1000,14 @@
 			// If same value as already set, do nothing.
 			if (key in target) {
 				if (previousValue === value || (Number.isNaN(previousValue) && Number.isNaN(value)) ) {
-					if (configuration.name === 'objectCausality')  log("ALREAD SET");
+					// if (configuration.name === 'objectCausality')  log("ALREAD SET");
 					return true;
 				}
 			}
 			
 			// If cumulative assignment, inside recorder and value is undefined, no assignment.
 			if (configuration.cumulativeAssignment && inActiveRecording && (isNaN(value) || typeof(value) === 'undefined')) {
-				if (configuration.name === 'objectCausality')  log("CUMULATIVE");
+				// if (configuration.name === 'objectCausality')  log("CUMULATIVE");
 				return true;
 			}
 			
@@ -1009,13 +1019,13 @@
 			// Perform assignment with regards to mirror structures.
 			let mirrorStructureValue;
 			if (mirrorRelations && incomingRelationsDisabled === 0 && !isIndexParentOf(this.const.object, value)) {
-				if (configuration.name === 'objectCausality')  log("MIRROR");
+				// if (configuration.name === 'objectCausality')  log("MIRROR");
 				incomingRelationsDisabled++;
 				mirrorStructureValue = createAndRemoveIncomingRelations(this['const'].object, key, value, previousValue);
 				target[key] = mirrorStructureValue; 
 				incomingRelationsDisabled--;
 			} else {
-				if (configuration.name === 'objectCausality')  log("SETTING!");
+				// if (configuration.name === 'objectCausality')  log("SETTING!");
 				target[key] = value;
 			}
 			
@@ -1320,7 +1330,7 @@
 		 
 		function ensureInitialized(handler, target) {
 			if (handler.const.initializer !== null && blockingInitialize !== 0) {
-				log("BLOCKING");
+				log("blocking initializer");
 				log(configuration.name + ": initialize id:" + handler.const.id + " dbId: " + handler.const.dbId);
 			}
 			if (handler.const.initializer !== null && blockingInitialize === 0) {
@@ -1360,9 +1370,10 @@
 		}
 		 
 		function canWrite(object) {
-			// if (postPulseProcess) {
-				// return false;
-			// }
+			if (postPulseProcess > 0) {  // TODO: this annoys eternity somehow... why???
+				log("CANNOT WRITE IN POST PULSE");
+				return false;
+			}
 			if (writeRestriction !== null && typeof(writeRestriction[object.const.id]) === 'undefined') {
 				return false;
 			}
@@ -1536,18 +1547,14 @@
 		 *  Upon change do
 		 **********************************/
 
-		let inPulse = 0;
-		
-		let postPulseProcess = false;
-	 
-		let pulseEvents = [];
-		
-		let recordPulseEvents = false;
-		
 		function pulse(action) {
 			inPulse++;
+			// log(configuration.name + " explicit pulse: " + inPulse);
+			// logGroup();
 			action();
+			// log("pulse level: " + inPulse);
 			if (--inPulse === 0) postPulseCleanup();
+			// logUngroup();
 		}
 
 		let transaction = postponeObserverNotification;
@@ -1564,7 +1571,9 @@
 		let contextsScheduledForPossibleDestruction = [];
 
 		function postPulseCleanup() {
-			postPulseProcess = true; // Blocks any model writing during post pulse cleanup
+			log("postPulseCleanup: " + configuration.name);
+			postPulseProcess++; // Blocks any model writing during post pulse cleanup
+			logGroup();
 			contextsScheduledForPossibleDestruction.forEach(function(context) {
 				if (!context.directlyInvokedByApplication) {
 					if (emptyObserverSet(context.contextObservers)) {
@@ -1577,7 +1586,8 @@
 				callback(pulseEvents);
 			});
 			pulseEvents = [];
-			postPulseProcess = false;
+			logUngroup();
+			postPulseProcess--;
 		}
 
 		let postPulseHooks = [];
@@ -1595,9 +1605,17 @@
 		let emitEventPaused = 0;
 
 		function withoutEmittingEvents(action) {
+			inPulse++;
 			emitEventPaused++;
+			log(configuration.name + "pause emitting events");
+			logGroup();
+			log(configuration.name + " inPulse: " + inPulse);
 			action();
+			// log("inPulse: " + inPulse);
+			log(configuration.name + " inPulse: " + inPulse);
+			logUngroup();
 			emitEventPaused--;
+			if (--inPulse === 0) postPulseCleanup();
 		}
 
 		function emitImmutableCreationEvent(object) {
@@ -1641,6 +1659,7 @@
 
 		function emitEvent(handler, event) {
 			if (emitEventPaused === 0) {
+				// log("EMIT EVENT " + configuration.name + " " + event.type + " " + event.property + "=...");
 				if (mirrorRelations) {
 					event.incomingStructureEvent = incomingRelationsDisabled !== 0
 				}
@@ -2750,7 +2769,8 @@
 			clearRepeaterLists : clearRepeaterLists,
 			resetObjectIds : resetObjectIds,
 			startTrace : startTrace,
-			endTrace : endTrace
+			endTrace : endTrace,
+			getInPulse : getInPulse
 		}
 			
 		/**
@@ -2771,6 +2791,10 @@
 			return target;
 		}
 
+		
+		function getInPulse() {
+			return inPulse;
+		}
 		causalityInstance = {
 			install : install,
 			

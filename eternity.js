@@ -41,68 +41,72 @@
 
 
 	/*-----------------------------------------------
-	 *           Post pulse events
+	 *          Object post pulse events
 	 *-----------------------------------------------*/
 	 
 	let unstableImages = [];
 
 
 	function postPulseAction(events) {
-		// console.log("=== Model pulse complete, update image and flood create images & flood unstable === ");
-	
-		// log(events, 2);
-		imageCausality.pulse(function() {
-			
-			// Mark unstable and flood create new images into existance.
-			events.forEach(function(event) {
-				// log(event, 2);
+		if (events.length > 0) {
+			log("=== Model pulse complete, update image and flood create images & flood unstable === ");
+			log("events.length = " + events.length);
+			if (typeof(objectCausality.noCleanups) !== 'undefined')
+				events.foo.bar;
+			// log(events, 2);
+			imageCausality.pulse(function() {
 				
-				// Catch togging of independently persistent
-				if (event.type === 'set') {
-					// log("set event");
-					let object = event.object;
+				// Mark unstable and flood create new images into existance.
+				events.forEach(function(event) {
+					// log(event.type);
+					
+					// Catch togging of independently persistent
+					if (event.type === 'set') {
+						// log("set event");
+						let object = event.object;
 
-					if (event.property === '_independentlyPersistent') {
-						
-						// Setting of independently persistent
-						if (event.newValue && typeof(object.const.dbImage) === 'undefined') {
-							// Object had no image, flood-create new images.
-							object.const.dbImage = createDbImageRecursivley(object, null, null);
-						} else if (!event.newValue) {
-							// Had an image that becomes unstable
-							floodUnstable(event.object.const.dbImage, null, null);
-						}
-						
-					} else if (typeof(object.const.dbImage) !== 'undefined'){
-						let objectDbImage = object.const.dbImage;
-						
-						// Mark old value as unstable if another object with dbImage
-						let oldValue = event.oldValue;
-						if (objectCausality.isObject(oldValue)) {
-							if (typeof(oldValue.const.dbImage) !== 'undefined') {
-								let oldValueDbImage = oldValue.const.dbImage;
-								if (oldValueDbImage._eternityParent === objectDbImage 
-									&& oldValueDbImage._eternityParentProperty === event.property) {
-									
-									floodUnstable(oldValueDbImage, null, null);
+						if (event.property === '_independentlyPersistent') {
+							
+							// Setting of independently persistent
+							if (event.newValue && typeof(object.const.dbImage) === 'undefined') {
+								// Object had no image, flood-create new images.
+								object.const.dbImage = createDbImageRecursivley(object, null, null);
+							} else if (!event.newValue) {
+								// Had an image that becomes unstable
+								floodUnstable(event.object.const.dbImage, null, null);
+							}
+							
+						} else if (typeof(object.const.dbImage) !== 'undefined'){
+							let objectDbImage = object.const.dbImage;
+							
+							// Mark old value as unstable if another object with dbImage
+							let oldValue = event.oldValue;
+							if (objectCausality.isObject(oldValue)) {
+								if (typeof(oldValue.const.dbImage) !== 'undefined') {
+									let oldValueDbImage = oldValue.const.dbImage;
+									if (oldValueDbImage._eternityParent === objectDbImage 
+										&& oldValueDbImage._eternityParentProperty === event.property) {
+										
+										floodUnstable(oldValueDbImage, null, null);
+									}
 								}
 							}
+								
+							// Flood create new images
+							let newValue = event.newValue;
+							if (objectCausality.isObject(newValue)) {
+								newValue = createDbImageRecursivley(newValue, objectDbImage, event.property);
+							}
+							objectDbImage[event.property] = newValue;
 						}
-							
-						// Flood create new images
-						let newValue = event.newValue;
-						if (objectCausality.isObject(newValue)) {
-							newValue = createDbImageRecursivley(newValue, objectDbImage, event.property);
-						}
-						objectDbImage[event.property] = newValue;
 					}
-				}
-			});
+				});
 
-			// console.log("=== End model pulse post process === ");
-			// Process unstable ones. Initiate garbage collection
-		// console.log(events);
-		});
+				// console.log("=== End model pulse post process === ");
+				// Process unstable ones. Initiate garbage collection
+			// console.log(events);
+			});
+		}
 	} 
 	
 	
@@ -187,11 +191,15 @@
 	let pendingImageCreations = {};
 	let pendingImageUpdates = {};
 	
-	function postImagePulseAction(events) {			
-		// console.log("=== Image pulse complete, sort events according to object id and flush to database === ");
+	function postImagePulseAction(events) {	
+		if (typeof(objectCausality.noCleanups) !== 'undefined')
+			events.foo.bar;
+	
+		log("=== Image pulse complete, sort events according to object id and flush to database === ");
 		// log(events, 3);
 		// Extract updates and creations to be done.
 		imageCausality.disableIncomingRelations(function () {
+			log(events.length);
 			events.forEach(function(event) {
 				if (!isMacroEvent(event)) {
 					let dbImage = event.object;
@@ -256,7 +264,8 @@
 		// This one could do a stepwise execution to not block the server. 
 		for (let id in pendingImageCreations) {
 			writeImageToDatabase(pendingImageCreations[id]);
-		} 
+		}
+		// pendingImageCreations = {};
 	}
 
 	function writeImageToDatabase(dbImage) {
@@ -335,27 +344,35 @@
 			// console.log("");
 			log("> initialize image < "); // + dbImage.const.dbId
 			logGroup();
-			loadFromDbIdToImage(dbImage);
-			log(dbImage);
+			objectCausality.withoutEmittingEvents(function() {
+				imageCausality.withoutEmittingEvents(function() {
+					loadFromDbIdToImage(dbImage);
+				});
+			});
+			// log(dbImage);
 			logUngroup();
 			log("> finished initialize image: < " + dbImage.const.dbId);
 			// console.log(dbImage);
 		}
-		
 		return placeholder;
 	}
 	
 	function createObjectPlaceholderFromDbImage(dbImage) {
 		// console.log("createObjectPlaceholderFromDbImage");
-		let placeholder = objectCausality.create();
+		let placeholder;
+		placeholder = objectCausality.create();
 		placeholder.const.dbId = dbImage.const.dbId;
 		connectObjectWithDbImage(placeholder, dbImage);
 		placeholder.const.initializer = function(object) {
 			// console.log("");
 			log("> initialize object < ");
 			logGroup();
-			loadFromDbImageToObject(object);
-			log(object);
+			objectCausality.withoutEmittingEvents(function() {
+				imageCausality.withoutEmittingEvents(function() {
+					loadFromDbImageToObject(object);
+				});
+			});
+			// log(object);
 			logUngroup();
 			log("> finished initialize object < " + object.const.dbImage.const.dbId);
 		};
@@ -363,6 +380,7 @@
 	}
 	
 	function createObjectPlaceholderFromDbId(dbId) {
+		log("pulse level:" + imageCausality.getInPulse());
 		let placeholder;
 		// if (dbId < 1) {
 		// console.log("createObjectPlaceholderFromDbId");
@@ -372,12 +390,15 @@
 			// console.log("");
 			log("> initialize object from id < ");
 			logGroup();
-			loadFromDbIdToObject(object);
-			log(object);
+			objectCausality.withoutEmittingEvents(function() {
+				imageCausality.withoutEmittingEvents(function() {
+					loadFromDbIdToObject(object);
+				});
+			});
+			// log(object);
 			logUngroup();
 			log("> finished initialize object from id < dbId:"  + object.const.dbImage.const.dbId);
 		};
-		// }
 		return placeholder;
 	}
 	
@@ -419,7 +440,7 @@
 			dbImage.const.loaded = true;
 			// console.log("-- ");
 		});
-		
+				
 		// if (typeof(dbRecord.const) !== 'undefined') {
 			// for (property in dbRecord.const) {
 				// if (typeof(dbImage.const[property]) === 'undefined') {
@@ -436,17 +457,14 @@
 	function loadFromDbIdToObject(object) {
 		let dbId = object.const.dbId;
 		// console.log("loadFromDbIdToObject: " + dbId);
-		imageCausality.pulse(function() {
-			imageCausality.withoutEmittingEvents(function() {
-				// Ensure there is an image.
-				if (typeof(object.const.dbImage) === 'undefined') {
-					// console.log("create placeholder for image:" + dbId);
-					let placeholder = getImagePlaceholderFromDbId(dbId);
-					connectObjectWithDbImage(object, placeholder);
-				}
-				loadFromDbImageToObject(object);
-			});			
-		});
+
+		// Ensure there is an image.
+		if (typeof(object.const.dbImage) === 'undefined') {
+			// console.log("create placeholder for image:" + dbId);
+			let placeholder = getImagePlaceholderFromDbId(dbId);
+			connectObjectWithDbImage(object, placeholder);
+		}
+		loadFromDbImageToObject(object);
 	}
 	
 	function printKeys(object) {
@@ -494,7 +512,7 @@
 			// log(object);
 		}
 		// log(object);
-		logUngroup();
+		// logUngroup();
 	}
 	
 	function getObjectFromImage(dbImage) {
@@ -588,7 +606,7 @@
 	objectCausality.unloadAllAndClearMemory = unloadAllAndClearMemory;
 	objectCausality.clearDatabaseAndClearMemory = clearDatabaseAndClearMemory;
 	objectCausality.imageCausality = imageCausality;
-
+	objectCausality.instance = objectCausality;
 	imageCausality.addPostPulseAction(postImagePulseAction);
 	
 	

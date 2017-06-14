@@ -40,10 +40,11 @@ describe("basics", function () {
 		// console.log("=======");
 		// assert.equal("A", eternity.persistent.A.name);
 		// console.log("=======");
-		log(eternity.mockMongoDB.getAllRecordsParsed());
+		log(eternity.mockMongoDB.getAllRecordsParsed(), 3);
 		// console.log("=======");
 		eternity.unloadAllAndClearMemory();
 		log("==================== CLEAR MEMORY ==========================");
+		// eternity.instance.noCleanups = true;
 		// console.log(eternity.persistent.x);
 		// console.log(eternity.persistent.A); // results in persistent!
 		// console.log(eternity.imageCausality.isObject(eternity.persistent));
