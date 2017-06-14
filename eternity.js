@@ -421,6 +421,7 @@
 	}
 	
 	function loadFromDbIdToImage(dbImage) {
+		log("loadFromDbIdToImage dbId: " + dbImage.const.dbId + " dbImage:" + dbImage.const.id);
 		imageCausality.disableIncomingRelations(function() {			
 			let dbId = dbImage.const.dbId;
 			
