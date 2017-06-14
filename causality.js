@@ -1330,11 +1330,11 @@
 		 
 		function ensureInitialized(handler, target) {
 			if (handler.const.initializer !== null && blockingInitialize !== 0) {
-				log("blocking initializer");
-				log(configuration.name + ": initialize id:" + handler.const.id + " dbId: " + handler.const.dbId);
+				// log("blocking initializer");
+				// log(configuration.name + ": initialize id:" + handler.const.id + " dbId: " + handler.const.dbId);
 			}
 			if (handler.const.initializer !== null && blockingInitialize === 0) {
-				log("=================>>>>> " + configuration.name + ": initialize id:" + handler.const.id + " dbId: " + handler.const.dbId);
+				// log("=================>>>>> " + configuration.name + ": initialize id:" + handler.const.id + " dbId: " + handler.const.dbId);
 				let initializer = handler.const.initializer;
 				handler.const.initializer = null;
 				initializer(handler.const.object);
@@ -1607,13 +1607,13 @@
 		function withoutEmittingEvents(action) {
 			inPulse++;
 			emitEventPaused++;
-			log(configuration.name + "pause emitting events");
-			logGroup();
-			log(configuration.name + " inPulse: " + inPulse);
+			// log(configuration.name + "pause emitting events");
+			// logGroup();
+			// log(configuration.name + " inPulse: " + inPulse);
 			action();
 			// log("inPulse: " + inPulse);
-			log(configuration.name + " inPulse: " + inPulse);
-			logUngroup();
+			// log(configuration.name + " inPulse: " + inPulse);
+			// logUngroup();
 			emitEventPaused--;
 			if (--inPulse === 0) postPulseCleanup();
 		}

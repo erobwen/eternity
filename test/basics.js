@@ -13,27 +13,23 @@ let logUngroup = objectlog.exit;
 // Tests based on mobx test/array.js
 describe("basics", function () {
 	it('should create persistent globals', function() {
-		console.log("------------------------");
 		persistent.foo = 42;
-		log(eternity.mockMongoDB.getAllRecordsParsed(), 3);
-		console.log("------------------------");
+		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);
 		assert.equal(42, persistent.foo);
-		log(eternity.mockMongoDB.getAllRecordsParsed(), 3);
-		console.log("------------------------");
+		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);
 		assert.equal(1, eternity.mockMongoDB.getRecordsCount());
-		console.log("------------------------");
 		assert.equal(42, eternity.mockMongoDB.getRecord(0).foo);
 		
 		
 		eternity.unloadAllAndClearMemory();
-		log(persistent);
-		log("==================== CLEAR MEMORY ==========================");
+		// log(persistent);
+		// log("==================== CLEAR MEMORY ==========================");
 		
 		assert.equal(42, persistent.foo);		
-		log("------------------------");
+		// log("------------------------");
 		eternity.clearDatabaseAndClearMemory();
-		log("------------------------");
-		log(persistent);
+		// log("------------------------");
+		// log(persistent);
 		assert.equal(true, typeof(persistent.foo) === 'undefined');
 	});
 	
@@ -62,17 +58,17 @@ describe("basics", function () {
 		log(persistent.A.name);
 		A = persistent.A;
 		log(persistent.A.const.target);
-		console.log("=========================================");
+		// console.log("=========================================");
 		assert.equal("A", persistent.A.name);
 		
-		// let B = create();
-		// B.name = "B";
-		// B.bitsAndPieces = 256;
-		// A.B = B;
+		let B = create();
+		B.name = "B";
+		B.bitsAndPieces = 256;
+		A.B = B;
 		
-		// eternity.unloadAllAndClearMemory();
-		// log("==================== CLEAR MEMORY ==========================");
-		
+		assert.equal(256, persistent.A.B.bitsAndPieces);
+		eternity.unloadAllAndClearMemory();
+		log("==================== CLEAR MEMORY ==========================");
 		
 		// // assert.notEqual(A, persistent.A); // Should now be a different eternity object... freshly loaded.
 

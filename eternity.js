@@ -402,7 +402,7 @@
 	}
 	
 	function createObjectPlaceholderFromDbId(dbId) {
-		log("pulse level:" + imageCausality.getInPulse());
+		// log("pulse level:" + imageCausality.getInPulse());
 		let placeholder;
 		// if (dbId < 1) {
 		// console.log("createObjectPlaceholderFromDbId");
@@ -603,7 +603,6 @@
 			} else {
 				objectCausality.persistent = createObjectPlaceholderFromDbId(0);
 			}
-			log(mockMongoDB.getAllRecordsParsed(), 3);			
 		} else {
 			let target = objectCausality.persistent.const.target
 			for (let property in target) {
@@ -619,6 +618,7 @@
 			} 
 			dbIdToDbImageMap = {};
 		}
+		log(mockMongoDB.getAllRecordsParsed(), 3);		
 	}
 	
 	function unloadAllAndClearMemory() {
