@@ -191,48 +191,52 @@
 	let pendingImageCreations = {};
 	let pendingImageUpdates = {};
 	
-	function postImagePulseAction(events) {	
-		if (typeof(objectCausality.noCleanups) !== 'undefined')
-			events.foo.bar;
-	
-		log("=== Image pulse complete, sort events according to object id and flush to database === ");
-		// log(events, 3);
-		// Extract updates and creations to be done.
-		imageCausality.disableIncomingRelations(function () {
-			log(events.length);
-			events.forEach(function(event) {
-				if (!isMacroEvent(event)) {
-					let dbImage = event.object;
-					// log("Considering " + event.type + " event with object:");
-					// log(dbImage, 2);
-					let imageId = dbImage.const.id;
-						
-					if (event.type === 'creation') {
-						pendingImageCreations[imageId] = dbImage;
-						if (typeof(pendingImageUpdates[imageId]) !== 'undefined') {
-							// We will do a full write of this image, no need to update after.				
-							delete pendingImageUpdates[imageId]; 
-						}
-					} else if (event.type === 'set') {
-						if (typeof(pendingImageCreations[imageId]) === 'undefined') {
-							// Only update if we will not do a full write on this image. 
-							if (typeof(pendingImageUpdates[imageId]) === 'undefined') {
-								pendingImageUpdates[imageId] = {};
-							}
-							let imageUpdates = pendingImageUpdates[imageId];
-							imageUpdates[event.property] = event.value;				
-						}
-					}				
-				}
-			});			
-		});
+	function postImagePulseAction(events) {
+		if (events.length > 0) {
+			if (typeof(objectCausality.noCleanups) !== 'undefined')
+				events.foo.bar;
 		
-		// console.log("=== Flush to database ====");
-		flushToDatabase();
+			log("=== Image pulse complete, sort events according to object id and flush to database === ");
+			// log(events, 3);
+			// Extract updates and creations to be done.
+			imageCausality.disableIncomingRelations(function () {
+				log(events.length);
+				events.forEach(function(event) {
+					if (!isMacroEvent(event)) {
+						let dbImage = event.object;
+						// log("Considering " + event.type + " event with object:");
+						// log(dbImage, 2);
+						let imageId = dbImage.const.id;
+							
+						if (event.type === 'creation') {
+							pendingImageCreations[imageId] = dbImage;
+							if (typeof(pendingImageUpdates[imageId]) !== 'undefined') {
+								// We will do a full write of this image, no need to update after.				
+								delete pendingImageUpdates[imageId]; 
+							}
+						} else if (event.type === 'set') {
+							if (typeof(pendingImageCreations[imageId]) === 'undefined') {
+								// Only update if we will not do a full write on this image. 
+								if (typeof(pendingImageUpdates[imageId]) === 'undefined') {
+									pendingImageUpdates[imageId] = {};
+								}
+								let imageUpdates = pendingImageUpdates[imageId];
+								imageUpdates[event.property] = event.value;				
+							}
+						}				
+					}
+				});			
+			});
 			
-		// log(mockMongoDB.getAllRecordsParsed(), 4);
+			// console.log("=== Flush to database ====");
+			flushToDatabase();
+				
+			// log(mockMongoDB.getAllRecordsParsed(), 4);
 
-		// console.log("=== End image pulse ===");
+			// console.log("=== End image pulse ===");
+		}
+		// pendingImageUpdates = {};  // TODO: Make these work!!! it seems needed to keep old events?!?
+		// pendingImageCreations = {};
 	}
 
 	
