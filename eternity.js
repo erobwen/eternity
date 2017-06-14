@@ -193,6 +193,26 @@
 	
 	let pendingImageCreations = {};
 	let pendingImageUpdates = {};
+
+	function valueToString(value) {
+		if (objectCausality.isObject(value) || imageCausality.isObject(value)) {
+			return "{const.id: " + value.const.id + " const.dbId: " + value.const.dbId + "}";
+		} else {
+			return "" + value;
+		}
+	}
+	
+	function logEvent(event) {
+		objectCausality.blockInitialize(function() {
+			imageCausality.blockInitialize(function() {
+				// log(event, 1);
+				if (event.type === 'set') {
+					log(valueToString(event.object) + ".set " + event.property + " to " + valueToString(event.newValue));
+				}
+			});
+		});
+	}				
+
 	
 	function postImagePulseAction(events) {
 		if (events.length > 0) {
@@ -205,7 +225,7 @@
 			imageCausality.disableIncomingRelations(function () {
 				events.forEach(function(event) {
 					if (!isMacroEvent(event)) {
-						log("event: " + event.type + " " + event.property);
+						logEvent(event);
 					
 						let dbImage = event.object;
 						// log("Considering " + event.type + " event with object:");
@@ -230,15 +250,11 @@
 						}				
 					}
 				});			
-			});
-			
-			flushToDatabase();
 				
+				flushToDatabase();
+			});
 			// log(mockMongoDB.getAllRecordsParsed(), 4);
 			
-			// Cleanup
-			pendingImageUpdates = {};  // TODO: Make these work!!! it seems needed to keep old events?!?
-			pendingImageCreations = {};
 			logUngroup();
 		}
 	}
@@ -267,7 +283,8 @@
 	}
 
 	function flushToDatabase() {
-		// log("flushToDatabase");
+		log("flushToDatabase:");
+		logGroup();
 		// log(pendingImageCreations, 2);
 		// log(pendingImageUpdates, 2);
 		// This one could do a stepwise execution to not block the server. 
@@ -291,6 +308,7 @@
 			}
 		}
 		pendingImageUpdates = {};
+		logUngroup();
 	}
 
 	function writeImageToDatabase(dbImage) {
