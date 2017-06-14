@@ -52,7 +52,7 @@
 	}
 	
 	function getRecord(id) {
-		console.log(dataRecords[id])
+		// console.log(dataRecords[id])
 		return JSON.parse(dataRecords[id]);
 	}		
 	

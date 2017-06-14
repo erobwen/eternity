@@ -39,11 +39,14 @@ describe("basics", function () {
     // it('should save refered objects, at once and later added', function () {
 		// let A = create({name : 'A'});
 		// persistent.A = A;
-		
+		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
+		// log("------------------------");
 		// let B = create();
 		// B.name = "B";
 		// B.bitsAndPieces = 256;
 		// A.B = B;
+		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
+		// log("------------------------");
 		
 		// eternity.unloadAllAndClearMemory();
 		// log("==================== CLEAR MEMORY ==========================");
