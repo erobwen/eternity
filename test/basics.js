@@ -10,19 +10,26 @@ let logUngroup = objectlog.exit;
 
 // Tests based on mobx test/array.js
 describe("basics", function () {
-	// it('should create persistent globals', function() {
-		// eternity.persistent.foo = 42;
-		// assert.equal(42, eternity.persistent.foo);
-		// assert.equal(1, eternity.mockMongoDB.getRecordsCount());
-		// assert.equal(42, eternity.mockMongoDB.getRecord(0).foo);
+	it('should create persistent globals', function() {
+		console.log("------------------------");
+		eternity.persistent.foo = 42;
+		log(eternity.mockMongoDB.getAllRecordsParsed(), 3);
+		console.log("------------------------");
+		assert.equal(42, eternity.persistent.foo);
+		log(eternity.mockMongoDB.getAllRecordsParsed(), 3);
+		console.log("------------------------");
+		assert.equal(1, eternity.mockMongoDB.getRecordsCount());
+		console.log("------------------------");
+		assert.equal(42, eternity.mockMongoDB.getRecord(0).foo);
 		
-		// eternity.unloadAllAndClearMemory();
+		eternity.unloadAllAndClearMemory();
+		log("==================== CLEAR MEMORY ==========================");
 		
-		// assert.equal(42, eternity.persistent.foo);
-		
-		// eternity.clearDatabaseAndClearMemory();
-		// assert.equal(true, typeof(eternity.persistent.foo) === 'undefined');
-	// });
+		assert.equal(42, eternity.persistent.foo);		
+		console.log("------------------------");
+		eternity.clearDatabaseAndClearMemory();
+		assert.equal(true, typeof(eternity.persistent.foo) === 'undefined');
+	});
 	
     it('should save refered objects, at once and later added', function () {
 		// let x = eternity.create({});
@@ -44,20 +51,10 @@ describe("basics", function () {
 		// console.log("=======");
 		eternity.unloadAllAndClearMemory();
 		log("==================== CLEAR MEMORY ==========================");
-		// eternity.instance.noCleanups = true;
-		// console.log(eternity.persistent.x);
-		// console.log(eternity.persistent.A); // results in persistent!
-		// console.log(eternity.imageCausality.isObject(eternity.persistent));
-		// console.log(eternity.imageCausality.isObject(eternity.persistent.A));
-		// console.log(eternity.isObject(eternity.persistent));
-		// console.log(eternity.isObject(eternity.persistent.A));
 		log(eternity.persistent);
 		log(eternity.persistent.A);
 		log(eternity.persistent.A.name);
 		A = eternity.persistent.A;
-		// log("dbId:" + A.const.dbId);
-		// log("id: " + A.const.id);
-		// log(eternity.persistent.A.const);
 		log(eternity.persistent.A.const.target);
 		console.log("=========================================");
 		assert.equal("A", eternity.persistent.A.name);

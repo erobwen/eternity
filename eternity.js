@@ -47,9 +47,10 @@
 	let unstableImages = [];
 
 
-	function postPulseAction(events) {
+	function postObjectPulseAction(events) {
 		if (events.length > 0) {
-			log("=== Model pulse complete, update image and flood create images & flood unstable === ");
+			log("postObjectPulseAction: " + events.length + " events");
+			log("... Model pulse complete, update image and flood create images & flood unstable ");
 			log("events.length = " + events.length);
 			if (typeof(objectCausality.noCleanups) !== 'undefined')
 				events.foo.bar;
@@ -58,7 +59,7 @@
 				
 				// Mark unstable and flood create new images into existance.
 				events.forEach(function(event) {
-					// log(event.type);
+					log("Event: " + event.type + " " + event.property);
 					
 					// Catch togging of independently persistent
 					if (event.type === 'set') {
@@ -193,16 +194,16 @@
 	
 	function postImagePulseAction(events) {
 		if (events.length > 0) {
-			if (typeof(objectCausality.noCleanups) !== 'undefined')
-				events.foo.bar;
-		
-			log("=== Image pulse complete, sort events according to object id and flush to database === ");
+			log("postImagePulseAction: " + events.length + " events");
+			log(" ... Image pulse complete, sort events according to object id and flush to database");
+			
 			// log(events, 3);
 			// Extract updates and creations to be done.
 			imageCausality.disableIncomingRelations(function () {
-				log(events.length);
 				events.forEach(function(event) {
 					if (!isMacroEvent(event)) {
+						log("Event: " + event.type + " " + event.property);
+					
 						let dbImage = event.object;
 						// log("Considering " + event.type + " event with object:");
 						// log(dbImage, 2);
@@ -221,7 +222,7 @@
 									pendingImageUpdates[imageId] = {};
 								}
 								let imageUpdates = pendingImageUpdates[imageId];
-								imageUpdates[event.property] = event.value;				
+								imageUpdates[event.property] = event.newValue;				
 							}
 						}				
 					}
@@ -235,8 +236,8 @@
 
 			// console.log("=== End image pulse ===");
 		}
-		// pendingImageUpdates = {};  // TODO: Make these work!!! it seems needed to keep old events?!?
-		// pendingImageCreations = {};
+		pendingImageUpdates = {};  // TODO: Make these work!!! it seems needed to keep old events?!?
+		pendingImageCreations = {};
 	}
 
 	
@@ -263,13 +264,30 @@
 	}
 
 	function flushToDatabase() {
+		// log("flushToDatabase");
 		// log(pendingImageCreations, 2);
 		// log(pendingImageUpdates, 2);
 		// This one could do a stepwise execution to not block the server. 
+		// log("pendingImageCreations:" + Object.keys(pendingImageCreations).length);
 		for (let id in pendingImageCreations) {
+			log("create dbImage id:" + pendingImageCreations[id].const.id);
 			writeImageToDatabase(pendingImageCreations[id]);
 		}
-		// pendingImageCreations = {};
+		pendingImageCreations = {};
+		
+		// TODO: Update entire record if the number of updates are more than half of fields.
+		// log("pendingImageUpdates:" + Object.keys(pendingImageUpdates).length);
+		for (let id in pendingImageUpdates) {
+			// log("update dbImage id:" + id + " keys: " + Object.keys(pendingImageUpdates[id]));
+			let updates = pendingImageUpdates[id];
+			for (let property in updates) {
+				// log(updates[property]);
+				let newValue = convertReferencesToDbIds(updates[property]);
+				// log(newValue);
+				mockMongoDB.updateRecordPath(id, [property], newValue);
+			}
+		}
+		pendingImageUpdates = {};
 	}
 
 	function writeImageToDatabase(dbImage) {
@@ -574,13 +592,14 @@
 	
 	function setupDatabase() {
 		if (mockMongoDB.getRecordsCount() === 0) {
-			objectCausality.pulse(function() {
+			// objectCausality.pulse(function() {
 				objectCausality.persistent = objectCausality.create();
 				createIsolatedDbImageFromLoadedObject(objectCausality.persistent);			
-			});
+			// });
 		} else {
 			objectCausality.persistent = createObjectPlaceholderFromDbId(0);
-		}		
+		}
+		log(mockMongoDB.getAllRecordsParsed(), 3);
 	}
 	
 	function unloadAllAndClearMemory() {
@@ -605,7 +624,7 @@
 	});
 	
 	// Additions 
-	objectCausality.addPostPulseAction(postPulseAction);
+	objectCausality.addPostPulseAction(postObjectPulseAction);
 	objectCausality.mockMongoDB = mockMongoDB;
 	objectCausality.unloadAllAndClearMemory = unloadAllAndClearMemory;
 	objectCausality.clearDatabaseAndClearMemory = clearDatabaseAndClearMemory;
