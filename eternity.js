@@ -207,7 +207,7 @@
 			imageCausality.blockInitialize(function() {
 				// log(event, 1);
 				if (event.type === 'set') {
-					log(valueToString(event.object) + ".set " + event.property + " to " + valueToString(event.newValue));
+					log(valueToString(event.object) + ".set " + event.property + " to " + valueToString(event.newValue) + (event.incomingStructureEvent ? " [incoming]" : ""));
 				}
 			});
 		});
@@ -266,7 +266,7 @@
 	
 	
 	function imageEventHasObjectValue(event) {
-		return imageCausality.isObject(event.value) || imageCausality.isObject(event.oldValue);
+		return imageCausality.isObject(event.newValue) || imageCausality.isObject(event.oldValue);
 	}
 	
 	
