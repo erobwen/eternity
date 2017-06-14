@@ -14,66 +14,45 @@ let logUngroup = objectlog.exit;
 describe("basics", function () {
 	it('should create persistent globals', function() {
 		persistent.foo = 42;
-		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);
 		assert.equal(42, persistent.foo);
-		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);
 		assert.equal(1, eternity.mockMongoDB.getRecordsCount());
 		assert.equal(42, eternity.mockMongoDB.getRecord(0).foo);
-		
-		
+
 		eternity.unloadAllAndClearMemory();
-		// log(persistent);
-		// log("==================== CLEAR MEMORY ==========================");
 		
 		assert.equal(42, persistent.foo);		
-		// log("------------------------");
 		eternity.clearDatabaseAndClearMemory();
-		// log("------------------------");
-		// log(persistent);
 		assert.equal(true, typeof(persistent.foo) === 'undefined');
 	});
 	
     it('should save refered objects, at once and later added', function () {
-		// let x = eternity.create({});
-		// let A = eternity.create({name: "A"});
-		// x.A = A;
-		// console.log(x.A);
-		
-		let A = eternity.create({name : 'A'});
-		// console.log("=======");
+		let A = create({name : 'A'});
 		persistent.A = A;
-		// persistent.x = 42;
 		
-		
-		
-		// console.log("=======");
-		// assert.equal("A", persistent.A.name);
-		// console.log("=======");
-		log(eternity.mockMongoDB.getAllRecordsParsed(), 3);
-		// console.log("=======");
 		eternity.unloadAllAndClearMemory();
-		log("==================== CLEAR MEMORY ==========================");
-		log(persistent);
-		log(persistent.A);
-		log(persistent.A.name);
+
+		assert.notEqual(A, persistent.A); // Should now be a different eternity object... freshly loaded.
 		A = persistent.A;
-		log(persistent.A.const.target);
-		// console.log("=========================================");
 		assert.equal("A", persistent.A.name);
+	});
+
+    // it('should save refered objects, at once and later added', function () {
+		// let A = create({name : 'A'});
+		// persistent.A = A;
 		
-		let B = create();
-		B.name = "B";
-		B.bitsAndPieces = 256;
-		A.B = B;
+		// let B = create();
+		// B.name = "B";
+		// B.bitsAndPieces = 256;
+		// A.B = B;
 		
-		assert.equal(256, persistent.A.B.bitsAndPieces);
-		eternity.unloadAllAndClearMemory();
-		log("==================== CLEAR MEMORY ==========================");
+		// eternity.unloadAllAndClearMemory();
+		// log("==================== CLEAR MEMORY ==========================");
 		
-		// // assert.notEqual(A, persistent.A); // Should now be a different eternity object... freshly loaded.
+		// assert.equal(256, persistent.A.B.bitsAndPieces);
 
 		// eternity.clearDatabaseAndClearMemory();
-	});
+
+	// });
 	
 	// it('should save changes in properties', function () {
 	// });
