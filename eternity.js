@@ -408,20 +408,23 @@
 		// console.log("createObjectPlaceholderFromDbId");
 		placeholder = objectCausality.create();
 		placeholder.const.dbId = dbId;
-		placeholder.const.initializer = function(object) {
-			// console.log("");
-			log("> initialize object from id < ");
-			logGroup();
-			objectCausality.withoutEmittingEvents(function() {
-				imageCausality.withoutEmittingEvents(function() {
-					loadFromDbIdToObject(object);
-				});
-			});
-			// log(object);
-			logUngroup();
-			log("> finished initialize object from id < dbId:"  + object.const.dbImage.const.dbId);
-		};
+		placeholder.const.initializer = objectFromIdInitializer;
 		return placeholder;
+	}
+	
+	function objectFromIdInitializer(object) {
+		// console.log("");
+		log("> initialize object from id < ");
+		logGroup();
+		objectCausality.withoutEmittingEvents(function() {
+			imageCausality.withoutEmittingEvents(function() {
+				loadFromDbIdToObject(object);
+			});
+		});
+		// log(object);
+		logUngroup();
+		log("> finished initialize object from id < dbId:"  + object.const.dbImage.const.dbId);
+		
 	}
 	
 	function loadFromDbIdToImage(dbImage) {
@@ -591,15 +594,31 @@
 	 *-----------------------------------------------*/
 	
 	function setupDatabase() {
-		if (mockMongoDB.getRecordsCount() === 0) {
-			// objectCausality.pulse(function() {
-				objectCausality.persistent = objectCausality.create();
-				createIsolatedDbImageFromLoadedObject(objectCausality.persistent);			
-			// });
+		if (typeof(objectCausality.persistent) === 'undefined') {
+			if (mockMongoDB.getRecordsCount() === 0) {
+				// objectCausality.pulse(function() {
+					objectCausality.persistent = objectCausality.create();
+					createIsolatedDbImageFromLoadedObject(objectCausality.persistent);			
+				// });
+			} else {
+				objectCausality.persistent = createObjectPlaceholderFromDbId(0);
+			}
+			log(mockMongoDB.getAllRecordsParsed(), 3);			
 		} else {
-			objectCausality.persistent = createObjectPlaceholderFromDbId(0);
+			let target = objectCausality.persistent.const.target
+			for (let property in target) {
+				delete target[property];
+			}
+			if (mockMongoDB.getRecordsCount() === 0) {
+				createIsolatedDbImageFromLoadedObject(objectCausality.persistent);
+			} else {
+				objectCausality.persistent.const.dbId = 0;
+				delete objectCausality.persistent.const.dbImage;
+				
+				objectCausality.persistent.const.initializer = objectFromIdInitializer;
+			} 
+			dbIdToDbImageMap = {};
 		}
-		log(mockMongoDB.getAllRecordsParsed(), 3);
 	}
 	
 	function unloadAllAndClearMemory() {

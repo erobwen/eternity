@@ -1,5 +1,7 @@
 const assert = require('assert');
 let eternity = require('../eternity');
+let create = eternity.create;
+let persistent = eternity.persistent;
 // const log = console.log.bind(console);
 
 // Neat logging
@@ -12,23 +14,27 @@ let logUngroup = objectlog.exit;
 describe("basics", function () {
 	it('should create persistent globals', function() {
 		console.log("------------------------");
-		eternity.persistent.foo = 42;
+		persistent.foo = 42;
 		log(eternity.mockMongoDB.getAllRecordsParsed(), 3);
 		console.log("------------------------");
-		assert.equal(42, eternity.persistent.foo);
+		assert.equal(42, persistent.foo);
 		log(eternity.mockMongoDB.getAllRecordsParsed(), 3);
 		console.log("------------------------");
 		assert.equal(1, eternity.mockMongoDB.getRecordsCount());
 		console.log("------------------------");
 		assert.equal(42, eternity.mockMongoDB.getRecord(0).foo);
 		
+		
 		eternity.unloadAllAndClearMemory();
+		log(persistent);
 		log("==================== CLEAR MEMORY ==========================");
 		
-		assert.equal(42, eternity.persistent.foo);		
-		console.log("------------------------");
+		assert.equal(42, persistent.foo);		
+		log("------------------------");
 		eternity.clearDatabaseAndClearMemory();
-		assert.equal(true, typeof(eternity.persistent.foo) === 'undefined');
+		log("------------------------");
+		log(persistent);
+		assert.equal(true, typeof(persistent.foo) === 'undefined');
 	});
 	
     it('should save refered objects, at once and later added', function () {
@@ -39,26 +45,36 @@ describe("basics", function () {
 		
 		let A = eternity.create({name : 'A'});
 		// console.log("=======");
-		eternity.persistent.A = A;
-		// eternity.persistent.x = 42;
+		persistent.A = A;
+		// persistent.x = 42;
 		
 		
 		
 		// console.log("=======");
-		// assert.equal("A", eternity.persistent.A.name);
+		// assert.equal("A", persistent.A.name);
 		// console.log("=======");
 		log(eternity.mockMongoDB.getAllRecordsParsed(), 3);
 		// console.log("=======");
 		eternity.unloadAllAndClearMemory();
 		log("==================== CLEAR MEMORY ==========================");
-		log(eternity.persistent);
-		log(eternity.persistent.A);
-		log(eternity.persistent.A.name);
-		A = eternity.persistent.A;
-		log(eternity.persistent.A.const.target);
+		log(persistent);
+		log(persistent.A);
+		log(persistent.A.name);
+		A = persistent.A;
+		log(persistent.A.const.target);
 		console.log("=========================================");
-		assert.equal("A", eternity.persistent.A.name);
-		// // assert.notEqual(A, eternity.persistent.A); // Should now be a different eternity object... freshly loaded.
+		assert.equal("A", persistent.A.name);
+		
+		// let B = create();
+		// B.name = "B";
+		// B.bitsAndPieces = 256;
+		// A.B = B;
+		
+		// eternity.unloadAllAndClearMemory();
+		// log("==================== CLEAR MEMORY ==========================");
+		
+		
+		// // assert.notEqual(A, persistent.A); // Should now be a different eternity object... freshly loaded.
 
 		// eternity.clearDatabaseAndClearMemory();
 	});
