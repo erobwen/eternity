@@ -50,7 +50,8 @@
 	function postObjectPulseAction(events) {
 		if (events.length > 0) {
 			log("postObjectPulseAction: " + events.length + " events");
-			log("... Model pulse complete, update image and flood create images & flood unstable ");
+			logGroup();
+			// log("... Model pulse complete, update image and flood create images & flood unstable ");
 			log("events.length = " + events.length);
 			if (typeof(objectCausality.noCleanups) !== 'undefined')
 				events.foo.bar;
@@ -59,7 +60,7 @@
 				
 				// Mark unstable and flood create new images into existance.
 				events.forEach(function(event) {
-					log("Event: " + event.type + " " + event.property);
+					log("event: " + event.type + " " + event.property);
 					
 					// Catch togging of independently persistent
 					if (event.type === 'set') {
@@ -107,6 +108,7 @@
 				// Process unstable ones. Initiate garbage collection
 			// console.log(events);
 			});
+			logUngroup();
 		}
 	} 
 	
@@ -195,14 +197,15 @@
 	function postImagePulseAction(events) {
 		if (events.length > 0) {
 			log("postImagePulseAction: " + events.length + " events");
-			log(" ... Image pulse complete, sort events according to object id and flush to database");
+			logGroup();
+			//log(" ... Image pulse complete, sort events according to object id and flush to database");
 			
 			// log(events, 3);
 			// Extract updates and creations to be done.
 			imageCausality.disableIncomingRelations(function () {
 				events.forEach(function(event) {
 					if (!isMacroEvent(event)) {
-						log("Event: " + event.type + " " + event.property);
+						log("event: " + event.type + " " + event.property);
 					
 						let dbImage = event.object;
 						// log("Considering " + event.type + " event with object:");
@@ -229,15 +232,15 @@
 				});			
 			});
 			
-			// console.log("=== Flush to database ====");
 			flushToDatabase();
 				
 			// log(mockMongoDB.getAllRecordsParsed(), 4);
-
-			// console.log("=== End image pulse ===");
+			
+			// Cleanup
+			pendingImageUpdates = {};  // TODO: Make these work!!! it seems needed to keep old events?!?
+			pendingImageCreations = {};
+			logUngroup();
 		}
-		pendingImageUpdates = {};  // TODO: Make these work!!! it seems needed to keep old events?!?
-		pendingImageCreations = {};
 	}
 
 	
@@ -270,7 +273,7 @@
 		// This one could do a stepwise execution to not block the server. 
 		// log("pendingImageCreations:" + Object.keys(pendingImageCreations).length);
 		for (let id in pendingImageCreations) {
-			log("create dbImage id:" + pendingImageCreations[id].const.id);
+			// log("create dbImage id:" + pendingImageCreations[id].const.id);
 			writeImageToDatabase(pendingImageCreations[id]);
 		}
 		pendingImageCreations = {};
@@ -356,7 +359,7 @@
 	}
 	
 	function createImagePlaceholderFromDbId(dbId) {
-		// console.log("createImagePlaceholderFromDbId: " + dbId);
+		console.log("createImagePlaceholderFromDbId: " + dbId);
 		let placeholder;
 		placeholder = imageCausality.create({});
 		placeholder.const.dbId = dbId;
@@ -364,7 +367,7 @@
 			// if (dbImage.const.dbId === 1)
 				// dbImage.foo.bar;
 			// console.log("");
-			log("> initialize image < "); // + dbImage.const.dbId
+			log("initialize image " + dbImage.const.id + " from dbId: " + dbImage.const.dbId); 
 			logGroup();
 			objectCausality.withoutEmittingEvents(function() {
 				imageCausality.withoutEmittingEvents(function() {
@@ -373,39 +376,33 @@
 			});
 			// log(dbImage);
 			logUngroup();
-			log("> finished initialize image: < " + dbImage.const.dbId);
 			// console.log(dbImage);
 		}
 		return placeholder;
 	}
 	
 	function createObjectPlaceholderFromDbImage(dbImage) {
-		// console.log("createObjectPlaceholderFromDbImage");
+		console.log("createObjectPlaceholderFromDbImage " + dbImage.const.id);
 		let placeholder;
 		placeholder = objectCausality.create();
 		placeholder.const.dbId = dbImage.const.dbId;
 		connectObjectWithDbImage(placeholder, dbImage);
 		placeholder.const.initializer = function(object) {
-			// console.log("");
-			log("> initialize object < ");
+			log("initialize object " + object.const.id + " from dbImage " + object.const.dbImage.const.id + ", dbId:" + object.const.dbId);
 			logGroup();
 			objectCausality.withoutEmittingEvents(function() {
 				imageCausality.withoutEmittingEvents(function() {
 					loadFromDbImageToObject(object);
 				});
 			});
-			// log(object);
 			logUngroup();
-			log("> finished initialize object < " + object.const.dbImage.const.dbId);
 		};
 		return placeholder;
 	}
 	
 	function createObjectPlaceholderFromDbId(dbId) {
-		// log("pulse level:" + imageCausality.getInPulse());
+		console.log("createObjectPlaceholderFromDbId: " + dbId);
 		let placeholder;
-		// if (dbId < 1) {
-		// console.log("createObjectPlaceholderFromDbId");
 		placeholder = objectCausality.create();
 		placeholder.const.dbId = dbId;
 		placeholder.const.initializer = objectFromIdInitializer;
@@ -413,27 +410,18 @@
 	}
 	
 	function objectFromIdInitializer(object) {
-		// console.log("");
-		log("> initialize object from id < ");
+		log("initialize object " + object.const.id + " from dbId: " + object.const.dbId);
 		logGroup();
 		objectCausality.withoutEmittingEvents(function() {
 			imageCausality.withoutEmittingEvents(function() {
 				loadFromDbIdToObject(object);
 			});
 		});
-		// log(object);
 		logUngroup();
-		log("> finished initialize object from id < dbId:"  + object.const.dbImage.const.dbId);
-		
 	}
 	
 	function loadFromDbIdToImage(dbImage) {
 		imageCausality.disableIncomingRelations(function() {			
-			// if (typeof(dbImage.const.loaded) !== 'undefined') {
-				// console.log("dubble loading!");
-				// dbImage.foo.bar.fum;
-			// }
-			
 			let dbId = dbImage.const.dbId;
 			
 			// console.log("loadFromDbIdToImage, dbId: " + dbId);
@@ -617,8 +605,7 @@
 				objectCausality.persistent.const.initializer = objectFromIdInitializer;
 			} 
 			dbIdToDbImageMap = {};
-		}
-		log(mockMongoDB.getAllRecordsParsed(), 3);		
+		}	
 	}
 	
 	function unloadAllAndClearMemory() {

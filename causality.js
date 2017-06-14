@@ -158,14 +158,11 @@
 		let incomingRelationsDisabled = 0;
 
 		function disableIncomingRelations(action) {
-			// log(">>> disable incoming");
-			// logGroup();
 			incomingRelationsDisabled++;
 			action();
 			incomingRelationsDisabled--;
-			// logUngroup();
-			// log("<<< disable incoming release");
 		}
+		
 		
 		/*-----------------------------------------------
 		 *            Relation structures
@@ -960,37 +957,26 @@
 		}
 		
 		function setHandlerObject(target, key, value) {
-
-			// if (configuration.name === 'objectCausality') log("setHandlerObject " + key + " id: " + this.const.id);
-			// if (typeof(value) === 'undefined') {
-				// log("setting undefined!!!");
-			// } else {
-				// log("...");
-			// }			// if (configuration.name === 'objectCausality') log("setHandlerObject " + key);
-			// if (configuration.name === 'objectCausality') log(value);
 			if (configuration.objectActivityList) registerActivity(this);
 					
 			// Overlays
 			if (this.const.forwardsTo !== null) {
-				// if (configuration.name === 'objectCausality')  log("FORWARD!!!");
 				let overlayHandler = this.const.forwardsTo.const.handler;
 				return overlayHandler.set.apply(overlayHandler, [overlayHandler.target, key, value]);
 			}
 			
+			// Writeprotection
+			if (!canWrite(this.const.object)) return;
+			
 			// Ensure initialized
 			ensureInitialized(this, target);
-			
-			// Writeprotection
-			if (!canWrite(this.const.object)) {
-				// if (configuration.name === 'objectCausality')  log("CANNOT WRITE");
-				return;
-			} 
 			
 			// Get previous value		// Get previous value
 			let previousValue;
 			let previousMirrorStructure;
 			if (mirrorRelations && incomingRelationsDisabled === 0 && !isIndexParentOf(this.const.object, value)) {
 				// console.log("causality.getHandlerObject:");
+				// console.log(key);
 				previousMirrorStructure = target[key];
 				previousValue = findReferredObject(target[key]);
 			} else {
@@ -1019,13 +1005,11 @@
 			// Perform assignment with regards to mirror structures.
 			let mirrorStructureValue;
 			if (mirrorRelations && incomingRelationsDisabled === 0 && !isIndexParentOf(this.const.object, value)) {
-				// if (configuration.name === 'objectCausality')  log("MIRROR");
 				incomingRelationsDisabled++;
 				mirrorStructureValue = createAndRemoveIncomingRelations(this['const'].object, key, value, previousValue);
 				target[key] = mirrorStructureValue; 
 				incomingRelationsDisabled--;
 			} else {
-				// if (configuration.name === 'objectCausality')  log("SETTING!");
 				target[key] = value;
 			}
 			
@@ -1329,12 +1313,7 @@
 		 **********************************/
 		 
 		function ensureInitialized(handler, target) {
-			if (handler.const.initializer !== null && blockingInitialize !== 0) {
-				// log("blocking initializer");
-				// log(configuration.name + ": initialize id:" + handler.const.id + " dbId: " + handler.const.dbId);
-			}
 			if (handler.const.initializer !== null && blockingInitialize === 0) {
-				// log("=================>>>>> " + configuration.name + ": initialize id:" + handler.const.id + " dbId: " + handler.const.dbId);
 				let initializer = handler.const.initializer;
 				handler.const.initializer = null;
 				initializer(handler.const.object);
@@ -1344,13 +1323,9 @@
 		let blockingInitialize = 0;
 		
 		function blockInitialize(action) {
-			// log(">>> blockInitialize");
-			// logGroup();
 			blockingInitialize++;
 			action();
 			blockingInitialize--;
-			// logUngroup();
-			// log("<<< blockInitialize release");
 		}
 		// function purge(object) {
 			// object.target.
@@ -1549,12 +1524,8 @@
 
 		function pulse(action) {
 			inPulse++;
-			// log(configuration.name + " explicit pulse: " + inPulse);
-			// logGroup();
 			action();
-			// log("pulse level: " + inPulse);
 			if (--inPulse === 0) postPulseCleanup();
-			// logUngroup();
 		}
 
 		let transaction = postponeObserverNotification;
@@ -1571,9 +1542,7 @@
 		let contextsScheduledForPossibleDestruction = [];
 
 		function postPulseCleanup() {
-			log("postPulseCleanup: " + configuration.name);
 			postPulseProcess++; // Blocks any model writing during post pulse cleanup
-			logGroup();
 			contextsScheduledForPossibleDestruction.forEach(function(context) {
 				if (!context.directlyInvokedByApplication) {
 					if (emptyObserverSet(context.contextObservers)) {
@@ -1586,7 +1555,6 @@
 				callback(pulseEvents);
 			});
 			pulseEvents = [];
-			logUngroup();
 			postPulseProcess--;
 		}
 
