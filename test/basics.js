@@ -12,7 +12,7 @@ let logUngroup = objectlog.exit;
 
 // Tests based on mobx test/array.js
 describe("basics", function () {
-	it('should create persistent globals', function() {
+	it('should save persistent globals (non objects) + reset database', function() {
 		persistent.foo = 42;
 		assert.equal(42, persistent.foo);
 		assert.equal(1, eternity.mockMongoDB.getRecordsCount());
@@ -25,7 +25,7 @@ describe("basics", function () {
 		assert.equal(true, typeof(persistent.foo) === 'undefined');
 	});
 	
-    it('should save refered objects, at once and later added', function () {
+    it('should save persistent globals', function () {
 		let A = create({name : 'A'});
 		persistent.A = A;
 		
@@ -38,13 +38,13 @@ describe("basics", function () {
 		eternity.clearDatabaseAndClearMemory();
 	});
 	
-    it('should save refered objects, at once and later added', function () {
+    it('should save refered objects recursivley', function () {
 		let A = create({name : 'A'});
 		let B = create({name : 'B'});
 		B.bitsAndPieces = 256;
 		A.B = B;
 		persistent.A = A;		
-		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
+		log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
 		
 		eternity.unloadAllAndClearMemory();
 		
@@ -53,13 +53,13 @@ describe("basics", function () {
 		eternity.clearDatabaseAndClearMemory();
 	});
 	
-	it('should save refered objects, at once and later added', function () {
+	it('should save refered objects recursivley, continue after save', function () {
 		let A = create({name : 'A'});
 		persistent.A = A;
 		log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
 		
 		eternity.unloadAllAndClearMemory();
-		log("==================== CLEAR MEMORY ==========================");
+		// log("==================== CLEAR MEMORY ==========================");
 
 		A = persistent.A;
 		let B = create({name : 'B'});

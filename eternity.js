@@ -9,11 +9,13 @@
     }
 }(this, function () {
 	// Require uncached, to support multipple causalities. 
-	const dbIdPrefix = "_causality_persistent_id_";
-	const dbIdExpressionPrefix = "_causality_persistent_id_expression";
+	// const dbIdPrefix = "_causality_persistent_id_";
+	// const dbIdExpressionPrefix = "_causality_persistent_id_expression";
 
-	// const dbIdPrefix = "¤";
-	// const dbIdExpressionPrefix = "¤¤";
+	const dbIdPrefix = "¤(";
+	const dbIdSuffix = ")"
+	const dbIdExpressionPrefix = "¤¤(";
+	const dbIdExpressionSuffix = ")";
 	
 	// Primary causality object space
 	let objectCausality
@@ -257,7 +259,7 @@
 			
 			logUngroup();
 		}
-	}
+	} 
 
 	
 	function isMacroEvent(event) {
@@ -278,7 +280,7 @@
 	function writePlaceholderForImageToDatabase(dbImage) {
 		let dbId = mockMongoDB.saveNewRecord({});
 		dbImage.const.dbId = dbId;
-		dbImage.const.serializedMongoDbId = dbIdPrefix + dbId;
+		dbImage.const.serializedMongoDbId = dbIdPrefix + dbId + dbIdSuffix;
 		return dbId;
 	}
 
@@ -323,7 +325,7 @@
 			if (!hasAPlaceholder(dbImage)) {
 				let dbId = mockMongoDB.saveNewRecord(serialized);
 				dbImage.const.dbId = dbId;
-				dbImage.const.serializedMongoDbId = dbIdPrefix + dbId;
+				dbImage.const.serializedMongoDbId = dbIdPrefix + dbId + dbIdSuffix;
 			} else {
 				mockMongoDB.updateRecord(dbImage.const.dbId, serialized);
 			}			
@@ -575,7 +577,8 @@
 	function loadDbValue(dbValue) {
 		if (typeof(dbValue) === 'string') {
 			if (dbValue.startsWith(dbIdPrefix)) {
-				let dbId = parseInt(dbValue.slice(dbIdPrefix.length));
+				let withoutPrefix = dbValue.slice(dbIdPrefix.length);
+				let dbId = parseInt(withoutPrefix.substr(0, withoutPrefix.length - dbIdSuffix.length));
 				return getImagePlaceholderFromDbId(dbId);
 			} else {
 				return dbValue;
