@@ -12,9 +12,9 @@
 	// const dbIdPrefix = "_causality_persistent_id_";
 	// const dbIdExpressionPrefix = "_causality_persistent_id_expression";
 
-	const dbIdPrefix = "¤(";
+	const dbIdPrefix = "_id_(";
 	const dbIdSuffix = ")"
-	const dbIdExpressionPrefix = "¤¤(";
+	const dbIdExpressionPrefix = "_id_expr_(";
 	const dbIdExpressionSuffix = ")";
 	
 	// Primary causality object space
@@ -198,7 +198,7 @@
 
 	function valueToString(value) {
 		if (objectCausality.isObject(value) || imageCausality.isObject(value)) {
-			return "{const.id: " + value.const.id + " const.dbId: " + value.const.dbId + "}";
+			return "{id: " + value.const.id + " dbId: " + value.const.dbId + "}";
 		} else {
 			return "" + value;
 		}
@@ -233,20 +233,21 @@
 						// log("Considering " + event.type + " event with object:");
 						// log(dbImage, 2);
 						let imageId = dbImage.const.id;
+						let dbId = dbImage.const.dbId;
 							
 						if (event.type === 'creation') {
 							pendingImageCreations[imageId] = dbImage;
-							if (typeof(pendingImageUpdates[imageId]) !== 'undefined') {
-								// We will do a full write of this image, no need to update after.				
-								delete pendingImageUpdates[imageId]; 
-							}
+							// if (typeof(pendingImageUpdates[imageId]) !== 'undefined') {
+								// // We will do a full write of this image, no need to update after.				
+								// delete pendingImageUpdates[dbId];   // will never happen anymore?
+							// }
 						} else if (event.type === 'set') {
-							if (typeof(pendingImageCreations[imageId]) === 'undefined') {
+							if (typeof(dbId) !== 'undefined') { // && typeof(pendingImageCreations[imageId]) === 'undefined'
 								// Only update if we will not do a full write on this image. 
-								if (typeof(pendingImageUpdates[imageId]) === 'undefined') {
-									pendingImageUpdates[imageId] = {};
+								if (typeof(pendingImageUpdates[dbId]) === 'undefined') {
+									pendingImageUpdates[dbId] = {};
 								}
-								let imageUpdates = pendingImageUpdates[imageId];
+								let imageUpdates = pendingImageUpdates[dbId];
 								imageUpdates[event.property] = event.newValue;				
 							}
 						}				

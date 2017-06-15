@@ -8,6 +8,13 @@
         root.causality = factory(); // Support browser global
     }
 }(this, function () {
+	
+	// Neat logging
+	let objectlog = require('./objectlog.js');
+	let log = objectlog.log;
+	let logGroup = objectlog.enter;
+	let logUngroup = objectlog.exit;
+
 	/*-----------------------------------------------
 	 *       Emulated mongo-DB:ish database
 	 *-----------------------------------------------*/
@@ -39,6 +46,7 @@
 	}
 	
 	function updateRecordPath(id, path, value) {
+		// log("updateRecordPath: {id:" + id + "}." + path.join(".") + " = " + value);
 		let record = getRecord(id);
 		let property = path[path.length - 1];
 		let index = 0;

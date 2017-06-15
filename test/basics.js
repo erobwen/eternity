@@ -53,6 +53,23 @@ describe("basics", function () {
 		eternity.clearDatabaseAndClearMemory();
 	});
 	
+	
+	it('should save refered objects recursivley, in steps', function () {
+		persistent.A = create({name : 'A'});
+		// log(persistent.A, 2);
+		persistent.A.B = create({name : 'B'});
+		assert.equal("B", persistent.A.B.name);
+		
+		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
+		
+		eternity.unloadAllAndClearMemory();
+		
+		assert.equal("B", persistent.A.B.name);
+
+		eternity.clearDatabaseAndClearMemory();
+	});
+	
+	
 	it('should save refered objects recursivley, continue after save', function () {
 		let A = create({name : 'A'});
 		persistent.A = A;
@@ -70,6 +87,42 @@ describe("basics", function () {
 
 		eternity.clearDatabaseAndClearMemory(); // TODO: Cannot run in sequence with unloadAllAndClearMemory
 	});
+	
+	
+	// it('should save multiple incoming relations', function () {
+		// // persistent.A = create({name : 'A'});
+		// // persistent.B = create({name : 'B'});
+		// // // persistent.C = create({name : 'C'});
+
+		// // let D = create({name : 'D'});
+		// // persistent.A.D = D;
+		// // // persistent.B.D = D;
+		// // // persistent.A.D = D;
+		
+		// // log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
+		
+		// // eternity.unloadAllAndClearMemory();
+		
+		// // log(persistent.A.D);
+		// // // log("==================== CLEAR MEMORY ==========================");
+
+		// // D = persistent.B.D;
+		// // let referers = [];
+		// // eternity.forAllIncoming(D, "D", function(referer) {
+			// // referers.push(referer);
+		// // });
+		// // assert.equal(1, referers.length);
+		// // assert.equal(B, referers[0]);
+		
+		// // // referers = [];
+		// // // eternity.forAllPersistentIncomingNow(D, "D", function(referer) {
+			// // // referers.push(referer);
+		// // // });
+		// // // assert.equal(1, referers.length);
+		// // // assert.equal(A, referers[0]);		
+		// // // assert.equal(B, referers[1]);		
+		
+	// });
 	
 	// it('should save changes in properties', function () {
 	// });
