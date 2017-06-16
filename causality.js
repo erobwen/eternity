@@ -163,6 +163,11 @@
 			incomingRelationsDisabled--;
 		}
 		
+		function logIncomingRelationsDisabled() {
+			log("incomingRelationsDisabled: " + incomingRelationsDisabled);
+			log("mirrorRelations: " + mirrorRelations);
+		}
+		
 		
 		/*-----------------------------------------------
 		 *            Relation structures
@@ -248,13 +253,18 @@
 			// if (referredItem instanceof Function || typeof(referredItem) === 'function') {
 				// referredItem.foo.bar;
 			// }
+			log("findReferredObject");
 			if (isObject(referredItem)) {
+				log("isObject...");
 				if (typeof(referredItem.referredObject) !== 'undefined') {
+					log("there is a continuation...");
 					return referredItem.referredObject;
 				} else {
+					log("ends here...");
 					return referredItem;
 				}
 			}
+			log("not an object...");
 			return referredItem;
 		}
 		
@@ -2732,6 +2742,7 @@
 		
 		// Debugging and testing
 		let debuggingAndTesting = {
+			logIncomingRelationsDisabled : logIncomingRelationsDisabled,
 			observeAll : observeAll,
 			cachedCallCount : cachedCallCount,
 			clearRepeaterLists : clearRepeaterLists,

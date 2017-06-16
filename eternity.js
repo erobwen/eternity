@@ -320,7 +320,7 @@
 			// console.log(imageCausality.isObject(dbImage));
 			let serialized = (dbImage instanceof Array) ? [] : {};
 			for (let property in dbImage) {
-				if (property !== 'const')
+				if (property !== 'const' && property != 'incoming')
 					serialized[property] = convertReferencesToDbIds(dbImage[property]);
 			}
 			if (!hasAPlaceholder(dbImage)) {
@@ -649,7 +649,11 @@
 	
 	objectCausality = require("./causality.js")({
 		name: 'objectCausality', 
-		recordPulseEvents : true
+		recordPulseEvents : true,
+
+		// TODO: make it possible to run these in conjunction with eternity.... as of now it will totally confuse eternity.... 
+		// mirrorRelations : true, // this works only in conjunction with mirrorStructuresAsCausalityObjects, otherwise isObject fails.... 
+		// mirrorStructuresAsCausalityObjects : true
 	});
 	
 	// Additions 

@@ -89,40 +89,48 @@ describe("basics", function () {
 	});
 	
 	
-	// it('should save multiple incoming relations', function () {
-		// // persistent.A = create({name : 'A'});
-		// // persistent.B = create({name : 'B'});
-		// // // persistent.C = create({name : 'C'});
+	it('should save multiple incoming relations', function () {
+		persistent.A = create({name : 'A'});
+		persistent.B = create({name : 'B'});
+		// persistent.C = create({name : 'C'});
 
-		// // let D = create({name : 'D'});
-		// // persistent.A.D = D;
-		// // // persistent.B.D = D;
-		// // // persistent.A.D = D;
+		let D = create({name : 'D'});
+		persistent.A.D = D;
+		persistent.B.D = D;
+		// persistent.A.D = D;
 		
-		// // log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
 		
-		// // eternity.unloadAllAndClearMemory();
-		
-		// // log(persistent.A.D);
-		// // // log("==================== CLEAR MEMORY ==========================");
+		eternity.logIncomingRelationsDisabled()
+		log(persistent, 2);
+		// eternity.logIncomingRelationsDisabled()
+		// log(persistent.A, 2);
+		// eternity.logIncomingRelationsDisabled()
+		// log(persistent.A.D);
+		log("-------------- DB Contents before clear -----------------");
+		log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
+		log("==================== CLEAR MEMORY ==========================");
+		eternity.unloadAllAndClearMemory();
 
-		// // D = persistent.B.D;
-		// // let referers = [];
-		// // eternity.forAllIncoming(D, "D", function(referer) {
-			// // referers.push(referer);
-		// // });
-		// // assert.equal(1, referers.length);
-		// // assert.equal(B, referers[0]);
+		// D = persistent.B.D;
+		// let referers = [];
+		// log(D);
+		// eternity.forAllIncoming(D, "D", function(referer) {
+			// console.log("--------------------------------------------------");
+			// referers.push(referer);
+		// });
+		// // log(D);
+		// assert.equal(referers.length, 1);
+		// assert.equal(referers[0], B);
 		
-		// // // referers = [];
-		// // // eternity.forAllPersistentIncomingNow(D, "D", function(referer) {
-			// // // referers.push(referer);
-		// // // });
-		// // // assert.equal(1, referers.length);
-		// // // assert.equal(A, referers[0]);		
-		// // // assert.equal(B, referers[1]);		
+		// referers = [];
+		// eternity.forAllPersistentIncomingNow(D, "D", function(referer) {
+			// referers.push(referer);
+		// });
+		// assert.equal(1, referers.length);
+		// assert.equal(A, referers[0]);		
+		// assert.equal(B, referers[1]);		
 		
-	// });
+	});
 	
 	// it('should save changes in properties', function () {
 	// });
