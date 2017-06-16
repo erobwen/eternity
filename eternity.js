@@ -320,7 +320,7 @@
 			// console.log(imageCausality.isObject(dbImage));
 			let serialized = (dbImage instanceof Array) ? [] : {};
 			for (let property in dbImage) {
-				if (property !== 'const' && property != 'incoming')
+				if (property !== 'const') //  && property != 'incoming'
 					serialized[property] = convertReferencesToDbIds(dbImage[property]);
 			}
 			if (!hasAPlaceholder(dbImage)) {
@@ -644,6 +644,48 @@
 	}
 	
 	/*-----------------------------------------------
+	 *           Incoming relations
+	 *-----------------------------------------------*/
+	 
+	function forAllPersistentIncomingNow(object, property, callback) {
+		// No observation, cannot observe on asynchronous functions. The "Now" version is mostly for debugging/development
+		// registerAnyChangeObserver(getSpecifier(getSpecifier(object.const, "incomingObservers"), property));
+
+		objectCausality.withoutRecording(function() { // This is needed for setups where incoming structures are made out of causality objects. 
+			imageCausality.withoutRecording(function() { // This is needed for setups where incoming structures are made out of causality objects. 
+				imageCausality.disableIncomingRelations(function() {						
+					if (typeof(object.const.dbImage) !== 'undefined') {
+						let dbImage = object.const.dbImage;
+						if (typeof(dbImage.incoming) !== 'undefined') {
+							let relations = dbImage.incoming;
+							log(relations);
+							log("here");
+							if (typeof(relations[property]) !== 'undefined') {
+								let relation = relations[property];
+								let contents = relation.contents;
+								for (id in contents) {
+									let referer = getObjectFromImage(contents[id]);
+									callback(referer);
+								}
+								log(relation);
+								let currentChunk = relation.first
+								while (currentChunk !== null) {
+									let contents = currentChunk.contents;
+									for (id in contents) {
+										let referer = getObjectFromImage(contents[id]);
+										callback(referer);
+									}
+									currentChunk = currentChunk.next;
+								}
+							}
+						}
+					}
+				});
+			});
+		});
+	}
+	 
+	/*-----------------------------------------------
 	 *           Setup object causality
 	 *-----------------------------------------------*/
 	
@@ -661,6 +703,7 @@
 	objectCausality.mockMongoDB = mockMongoDB;
 	objectCausality.unloadAllAndClearMemory = unloadAllAndClearMemory;
 	objectCausality.clearDatabaseAndClearMemory = clearDatabaseAndClearMemory;
+	objectCausality.forAllPersistentIncomingNow = forAllPersistentIncomingNow;
 	objectCausality.imageCausality = imageCausality;
 	objectCausality.instance = objectCausality;
 	imageCausality.addPostPulseAction(postImagePulseAction);
