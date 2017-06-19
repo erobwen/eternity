@@ -12,127 +12,136 @@ let logUngroup = objectlog.exit;
 
 // Tests based on mobx test/array.js
 describe("basics", function () {
-	// it('should save persistent globals (non objects) + reset database', function() {
-		// persistent.foo = 42;
-		// assert.equal(42, persistent.foo);
-		// assert.equal(1, eternity.mockMongoDB.getRecordsCount());
-		// assert.equal(42, eternity.mockMongoDB.getRecord(0).foo);
+	it('should save persistent globals (non objects) + reset database', function() {
+		persistent.foo = 42;
+		assert.equal(42, persistent.foo);
+		assert.equal(1, eternity.mockMongoDB.getRecordsCount());
+		assert.equal(42, eternity.mockMongoDB.getRecord(0).foo);
 
-		// eternity.unloadAllAndClearMemory();
+		eternity.unloadAllAndClearMemory();
 		
-		// assert.equal(42, persistent.foo);		
-		// eternity.clearDatabaseAndClearMemory();
-		// assert.equal(true, typeof(persistent.foo) === 'undefined');
-	// });
+		assert.equal(42, persistent.foo);		
+		eternity.clearDatabaseAndClearMemory();
+		assert.equal(true, typeof(persistent.foo) === 'undefined');
+	});
 	
-    // it('should save persistent globals', function () {
-		// let A = create({name : 'A'});
-		// persistent.A = A;
+    it('should save persistent globals', function () {
+		let A = create({name : 'A'});
+		persistent.A = A;
 		
-		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
-		// eternity.unloadAllAndClearMemory();
-
-		// assert.notEqual(A, persistent.A); // Should now be a different eternity object... freshly loaded.
-		// A = persistent.A;
-		// assert.equal("A", persistent.A.name);
-		// eternity.clearDatabaseAndClearMemory();
-	// });
-	
-    // it('should save refered objects recursivley', function () {
-		// let A = create({name : 'A'});
-		// let B = create({name : 'B'});
-		// B.bitsAndPieces = 256;
-		// A.B = B;
-		// persistent.A = A;		
-		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
-		
-		// eternity.unloadAllAndClearMemory();
-		
-		// assert.equal(256, persistent.A.B.bitsAndPieces);
-
-		// eternity.clearDatabaseAndClearMemory();
-	// });
-	
-	
-	// it('should save refered objects recursivley, in steps', function () {
-		// persistent.A = create({name : 'A'});
-		// // log(persistent.A, 2);
-		// persistent.A.B = create({name : 'B'});
-		// assert.equal("B", persistent.A.B.name);
-		
-		// // log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
-		
-		// eternity.unloadAllAndClearMemory();
-		
-		// assert.equal("B", persistent.A.B.name);
-
-		// eternity.clearDatabaseAndClearMemory();
-	// });
-	
-	
-	// it('should save refered objects recursivley, continue after save', function () {
-		// let A = create({name : 'A'});
-		// persistent.A = A;
-		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
-		
-		// eternity.unloadAllAndClearMemory();
-		// // log("==================== CLEAR MEMORY ==========================");
-
-		// A = persistent.A;
-		// let B = create({name : 'B'});
-		// B.bitsAndPieces = 256;
-		// A.B = B;	
-		
-		// assert.equal(256, persistent.A.B.bitsAndPieces);
-
-		// eternity.clearDatabaseAndClearMemory(); // TODO: Cannot run in sequence with unloadAllAndClearMemory
-	// });
-	
-	
-	it('should save multiple incoming relations', function () {
-		persistent.A = create({name : 'A'});
-		persistent.B = create({name : 'B'});
-		// persistent.C = create({name : 'C'});
-
-		let D = create({name : 'D'});
-		persistent.A.D = D;
-		persistent.B.D = D;
-		// persistent.A.D = D;
-		
-		
-		eternity.logIncomingRelationsDisabled();
-		log(persistent, 2);
-		// eternity.logIncomingRelationsDisabled()
-		// log(persistent.A, 2);
-		// eternity.logIncomingRelationsDisabled()
-		// log(persistent.A.D);
-		log("-------------- DB Contents before clear -----------------");
 		log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
-		log("==================== CLEAR MEMORY ==========================");
 		eternity.unloadAllAndClearMemory();
 
-		// D = persistent.B.D;
-		// let referers = [];
-		// log(D);
-		// eternity.forAllIncoming(D, "D", function(referer) {
-			// console.log("--------------------------------------------------");
+		assert.notEqual(A, persistent.A); // Should now be a different eternity object... freshly loaded.
+		A = persistent.A;
+		assert.equal("A", persistent.A.name);
+		eternity.clearDatabaseAndClearMemory();
+	});
+	
+    it('should save refered objects recursivley', function () {
+		let A = create({name : 'A'});
+		let B = create({name : 'B'});
+		B.bitsAndPieces = 256;
+		A.B = B;
+		persistent.A = A;		
+		log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
+		
+		eternity.unloadAllAndClearMemory();
+		
+		assert.equal(256, persistent.A.B.bitsAndPieces);
+
+		eternity.clearDatabaseAndClearMemory();
+	});
+	
+	
+	it('should save refered objects recursivley, in steps', function () {
+		persistent.A = create({name : 'A'});
+		// log(persistent.A, 2);
+		persistent.A.B = create({name : 'B'});
+		assert.equal("B", persistent.A.B.name);
+		
+		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
+		
+		eternity.unloadAllAndClearMemory();
+		
+		assert.equal("B", persistent.A.B.name);
+
+		eternity.clearDatabaseAndClearMemory();
+	});
+	
+	
+	it('should save refered objects recursivley, continue after save', function () {
+		let A = create({name : 'A'});
+		persistent.A = A;
+		log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
+		
+		eternity.unloadAllAndClearMemory();
+		// log("==================== CLEAR MEMORY ==========================");
+
+		A = persistent.A;
+		let B = create({name : 'B'});
+		B.bitsAndPieces = 256;
+		A.B = B;	
+		
+		assert.equal(256, persistent.A.B.bitsAndPieces);
+
+		eternity.clearDatabaseAndClearMemory(); // TODO: Cannot run in sequence with unloadAllAndClearMemory
+	});
+	
+	
+	// it('should save multiple incoming relations', function () {
+		// persistent.A = create({name : 'A'});
+		// persistent.B = create({name : 'B'});
+		// // persistent.C = create({name : 'C'});
+
+		// let D = create({name : 'D'});
+		// persistent.A.D = D;
+		// persistent.B.D = D;
+		// // persistent.A.D = D;
+		
+		
+		// eternity.logIncomingRelationsDisabled();
+		// log(persistent, 2);
+		// // eternity.logIncomingRelationsDisabled()
+		// // log(persistent.A, 2);
+		// // eternity.logIncomingRelationsDisabled()
+		// // log(persistent.A.D);
+		// log("-------------- DB Contents before clear -----------------");
+		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
+		// log("==================== CLEAR MEMORY ==========================");
+		// eternity.unloadAllAndClearMemory();
+
+		// // D = persistent.B.D;
+		// // let referers = [];
+		// // log(D);
+		// // eternity.forAllIncoming(D, "D", function(referer) {
+			// // console.log("--------------------------------------------------");
+			// // referers.push(referer);
+		// // });
+		// // // log(D);
+		// // assert.equal(referers.length, 1);
+		// // assert.equal(referers[0], B);
+		// log(persistent.A);
+		
+		
+		// referers = [];
+		// eternity.forAllPersistentIncomingNow(persistent.A.D, "D", function(referer) {
 			// referers.push(referer);
 		// });
-		// // log(D);
-		// assert.equal(referers.length, 1);
-		// assert.equal(referers[0], B);
+		// assert.equal(2, referers.length);
+		// let incomingA = referers[0];
+		// log(incomingA ,2);
+		// log(eternity.isObject(incomingA));
+		// log(eternity.imageCausality.isObject(incomingA));
+		// log(persistent.A);
+		// log(eternity.isObject(persistent.A));
+		// log(eternity.imageCausality.isObject(persistent.A));
+		// log("equal?");
+		// log(incomingA === persistent.A);
+		// // assert.equal(persistent.A, referers[0]);		
+		// // assert.equal(persistent.B, referers[1]);		
 		
-		referers = [];
-		eternity.forAllPersistentIncomingNow(D, "D", function(referer) {
-			referers.push(referer);
-		});
-		assert.equal(2, referers.length);
-		log(referers,3);
-		log(persistent.A);
-		// assert.equal(persistent.A, referers[0]);		
-		// assert.equal(persistent.B, referers[1]);		
-		
-	});
+	// });
 	
 	// it('should save changes in properties', function () {
 	// });

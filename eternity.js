@@ -41,6 +41,12 @@
 	let logUngroup = objectlog.exit;
 	// let log = console.log;
 
+	/*-----------------------------------------------
+	 *     persistentObjectIdToObjectMap... Important, needs to 
+	 *-----------------------------------------------*/
+	
+	// let persistentObjectIdToObjectMap = {}
+	
 
 	/*-----------------------------------------------
 	 *          Object post pulse events
@@ -124,6 +130,7 @@
 		};
 		for (let property in object) {
 			let value = object[property];
+			// TODO: translate property
 			if (!objectCausality.isObject(value)) {
 				imageContents[property] = value;
 			}
@@ -136,6 +143,7 @@
 			contents = {};
 		}
 		let dbImage = imageCausality.create(contents);
+		imageIdToImageMap[dbImage.const.id] = dbImage;
 		connectObjectWithDbImage(object, dbImage);
 		return dbImage;		
 	}
@@ -165,6 +173,7 @@
 				for (let property in object) { 
 					let value = object[property];
 					if (objectCausality.isObject(value)) {
+						// TODO: translate property idExpressions
 						dbImage[property] = createDbImageRecursivley(value, dbImage, property);
 					}
 				}
@@ -192,6 +201,8 @@
 	/*-----------------------------------------------
 	 *           Post DB image pulse events
 	 *-----------------------------------------------*/
+	 
+	let imageIdToImageMap = {};
 	
 	let pendingImageCreations = {};
 	let pendingImageUpdates = {};
@@ -304,14 +315,27 @@
 			// log("update dbImage id:" + id + " keys: " + Object.keys(pendingImageUpdates[id]));
 			let updates = pendingImageUpdates[id];
 			for (let property in updates) {
+				
+				// TODO: convert idExpressions
 				// log(updates[property]);
 				let newValue = convertReferencesToDbIds(updates[property]);
 				// log(newValue);
+				//property = imageCausality.transformPossibleIdExpression(property, imageIdToDbId);
 				mockMongoDB.updateRecordPath(id, [property], newValue);
 			}
 		}
 		pendingImageUpdates = {};
 		logUngroup();
+	}
+	
+	function imageIdToDbId(imageId) {
+		if (typeof(imageIdToImageMap[imageId]) !== 'undefined') {
+			let dbImage = imageIdToImageMap[imageId];
+			if (typeof(dbImage.const.dbId) !== 'undefined') {
+				return dbImage.const.dbId;
+			}
+		}
+		return "";
 	}
 
 	function writeImageToDatabase(dbImage) {
@@ -320,8 +344,13 @@
 			// console.log(imageCausality.isObject(dbImage));
 			let serialized = (dbImage instanceof Array) ? [] : {};
 			for (let property in dbImage) {
-				if (property !== 'const') //  && property != 'incoming'
-					serialized[property] = convertReferencesToDbIds(dbImage[property]);
+				// TODO: convert idExpressions
+				if (property !== 'const') {
+					//  && property != 'incoming'
+					let value = convertReferencesToDbIds(dbImage[property]);
+					//property = imageCausality.transformPossibleIdExpression(property, imageIdToDbId);
+					serialized[property] = value;
+				}
 			}
 			if (!hasAPlaceholder(dbImage)) {
 				let dbId = mockMongoDB.saveNewRecord(serialized);
@@ -353,8 +382,10 @@
 			
 			let converted = (entity instanceof Array) ? [] : {};
 			for (let property in entity) {
-				if (property !== 'const')
+				if (property !== 'const') {
+					// TODO: convert idExpressions here? 
 					converted[property] = convertReferencesToDbIds(entity[property]);
+				}
 			}
 			return converted;
 		} else {
@@ -384,6 +415,7 @@
 		let placeholder;
 		placeholder = imageCausality.create({});
 		placeholder.const.dbId = dbId;
+		imageIdToImageMap[placeholder.const.id] = placeholder;
 		placeholder.const.initializer = function(dbImage) {
 			// if (dbImage.const.dbId === 1)
 				// dbImage.foo.bar;
@@ -424,7 +456,6 @@
 	function createObjectPlaceholderFromDbId(dbId) {
 		console.log("createObjectPlaceholderFromDbId: " + dbId);
 		let placeholder;
-		placeholder = objectCausality.create();
 		placeholder.const.dbId = dbId;
 		placeholder.const.initializer = objectFromIdInitializer;
 		return placeholder;
@@ -439,6 +470,15 @@
 			});
 		});
 		logUngroup();
+	}
+	
+	function dbIdToImageId(dbId) {
+		if (typeof(dbIdToDbImageMap[dbId]) !== 'undefined') {
+			return dbIdToDbImageMap[dbId].const.id;
+		} else {
+			// TODO: create a placeholder anyways here...?
+			return "";
+		}
 	}
 	
 	function loadFromDbIdToImage(dbImage) {
@@ -463,6 +503,7 @@
 					// if (property !== 'A') imageCausality.startTrace();
 					// console.log("value loaded to image:");
 					// console.log(value);
+					//property = imageCausality.transformPossibleIdExpression(property, dbIdToImageId);
 					dbImage[property] = value;
 					// if (property !== 'A') imageCausality.endTrace();
 					// console.log("loadFromDbIdToImage: " + dbId + " property: " + property + "...finished assigning");
