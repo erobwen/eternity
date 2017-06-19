@@ -30,6 +30,68 @@
 		
 		/***************************************************************
 		 *
+		 *  Id format
+		 *
+		 ***************************************************************/
+					
+
+		const idExpressionPrefix = "_id_(";
+		const idExpressionSuffix = ")";
+
+		function idExpression(id) {
+			// log("idExpression: " + id);
+			return idExpressionPrefix + id + idExpressionSuffix;
+		}
+
+		function transformPossibleIdExpression(string, idMapper) {
+			if (isIdExpression(string)) {
+				return transformIdExpression(string, idMapper);
+			}
+			return string;
+		}
+		
+		function isIdExpression(string) {
+			return string.startsWith(idExpressionPrefix);
+		}
+
+
+		function extractIdFromExpression(idExpression) {
+			let withoutPrefix = idExpression.slice(idExpressionPrefix.length);
+			let withoutOuter = withoutPrefix.substr(0, withoutPrefix.length - idExpressionSuffix.length);
+			if (!isNaN(withoutOuter)) 
+				return parseInt(withoutOuter);
+			else 
+				return null;
+		}
+
+		function transformIdExpression(idExpression, idMapper) {
+			let withoutPrefix = idExpression.slice(idExpressionPrefix.length);
+			let withoutOuter = withoutPrefix.substr(0, withoutPrefix.length - idExpressionSuffix.length);
+			let splitOnPrefix = withoutOuter.split(idExpressionPrefix);
+			if (splitOnPrefix.length === 1) {
+				// A single id
+				return idExpressionPrefix + idMapper(parseInt(splitOnPrefix[0])) + idExpressionSuffix;
+			} else {
+				let stringBuffer = [];
+				// A multi id expression
+				for (let i = 0; i < splitOnPrefix.length; i++) {
+					let splitOnSuffix = splitOnPrefix[i].split(idExpressionSuffix);
+					if (splitOnSuffix.length === 1) {
+						// Just a starting blank, do nothing...
+					} else if (splitOnSuffix.length === 2) {
+						stringBuffer.push(idExpressionPrefix + idMapper(parseInt(splitOnSuffix[0])) + idExpressionSuffix + splitOnSuffix[1]);
+					} else {
+						// Id expression syntax error
+						throw new Exception("Id expression syntax error");
+					}
+				}
+				return idExpressionPrefix + stringBuffer.join("") + idExpressionSuffix;
+			}
+		}
+
+		
+		/***************************************************************
+		 *
 		 *  Helpers
 		 *
 		 ***************************************************************/
@@ -163,11 +225,6 @@
 			incomingRelationsDisabled--;
 		}
 		
-		function logIncomingRelationsDisabled() {
-			log("incomingRelationsDisabled: " + incomingRelationsDisabled);
-			log("mirrorRelations: " + mirrorRelations);
-		}
-		
 		
 		/*-----------------------------------------------
 		 *            Relation structures
@@ -253,18 +310,13 @@
 			// if (referredItem instanceof Function || typeof(referredItem) === 'function') {
 				// referredItem.foo.bar;
 			// }
-			// log("findReferredObject");
 			if (isObject(referredItem)) {
-				// log("isObject...");
 				if (typeof(referredItem.referredObject) !== 'undefined') {
-					// log("there is a continuation...");
 					return referredItem.referredObject;
 				} else {
-					// log("ends here...");
 					return referredItem;
 				}
 			}
-			// log("not an object...");
 			return referredItem;
 		}
 		
@@ -312,7 +364,7 @@
 			if (typeof(referedEntity.isIncomingRelationStructure) !== 'undefined') {
 				let incomingRelation = referedEntity;
 				let incomingRelationContents = incomingRelation['contents'];
-				delete incomingRelationContents[refererId];
+				delete incomingRelationContents[idExpression(refererId)];
 				let noMoreObservers = false;
 				incomingRelation.contentsCounter--;
 				if (incomingRelation.contentsCounter == 0) {
@@ -353,7 +405,7 @@
 		}
 		
 		function intitializeAndConstructMirrorStructure(mirrorIncomingRelation, referingObject, referingObjectId) {
-			let refererId = referingObjectId;
+			let refererId = idExpression(referingObjectId);
 			// console.log("intitializeAndConstructMirrorStructure:");
 			// console.log(referingObject);
 			
@@ -2747,7 +2799,6 @@
 		
 		// Debugging and testing
 		let debuggingAndTesting = {
-			logIncomingRelationsDisabled : logIncomingRelationsDisabled,
 			observeAll : observeAll,
 			cachedCallCount : cachedCallCount,
 			clearRepeaterLists : clearRepeaterLists,
@@ -2791,7 +2842,12 @@
 			addPostPulseAction : addPostPulseAction,
 			setCustomCanRead : setCustomCanRead,
 			setCustomCanWrite : setCustomCanWrite,
-
+			
+			// Id expressions
+			isIdExpression : isIdExpression, 
+			extractIdFromExpression : extractIdFromExpression,
+			transformPossibleIdExpression : transformPossibleIdExpression,
+			
 			// Framework interface
 			getActivityListLast : getActivityListLast,
 			getActivityListFirst : getActivityListFirst,
