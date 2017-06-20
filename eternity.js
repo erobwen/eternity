@@ -316,7 +316,7 @@
 				// log(updates[property]);
 				let newValue = convertReferencesToDbIds(updates[property]);
 				// log(newValue);
-				//property = imageCausality.transformPossibleIdExpression(property, imageIdToDbId);
+				property = imageCausality.transformPossibleIdExpression(property, imageIdToDbId);
 				mockMongoDB.updateRecordPath(id, [property], newValue);
 			}
 		}
@@ -344,7 +344,7 @@
 				if (property !== 'const') {
 					//  && property != 'incoming'
 					let value = convertReferencesToDbIds(dbImage[property]);
-					//property = imageCausality.transformPossibleIdExpression(property, imageIdToDbId);
+					property = imageCausality.transformPossibleIdExpression(property, imageIdToDbId);
 					serialized[property] = value;
 				}
 			}
@@ -499,7 +499,7 @@
 					// if (property !== 'A') imageCausality.startTrace();
 					// console.log("value loaded to image:");
 					// console.log(value);
-					//property = imageCausality.transformPossibleIdExpression(property, dbIdToImageId);
+					property = imageCausality.transformPossibleIdExpression(property, dbIdToImageId);
 					dbImage[property] = value;
 					// if (property !== 'A') imageCausality.endTrace();
 					// console.log("loadFromDbIdToImage: " + dbId + " property: " + property + "...finished assigning");

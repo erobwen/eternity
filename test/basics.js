@@ -98,7 +98,9 @@ describe("basics", function () {
 		let D = create({name : 'D'});
 		persistent.A.D = D;
 		persistent.B.D = D;
-		
+	
+		log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
+
 		eternity.unloadAllAndClearMemory();
 		// log("==================== CLEAR MEMORY ==========================");
 		
