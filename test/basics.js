@@ -34,6 +34,8 @@ describe("basics", function () {
 
 		assert.notEqual(A, persistent.A); // Should now be a different eternity object... freshly loaded.
 		A = persistent.A;
+		log(persistent);
+		log(persistent.A);
 		assert.equal("A", persistent.A.name);
 		eternity.clearDatabaseAndClearMemory();
 	});
@@ -92,52 +94,19 @@ describe("basics", function () {
 	it('should save multiple incoming relations', function () {
 		persistent.A = create({name : 'A'});
 		persistent.B = create({name : 'B'});
-		// persistent.C = create({name : 'C'});
-
+		
 		let D = create({name : 'D'});
 		persistent.A.D = D;
 		persistent.B.D = D;
-		// persistent.A.D = D;
 		
-		
-		// eternity.logIncomingRelationsDisabled();
-		// log(persistent, 2);
-		// eternity.logIncomingRelationsDisabled()
-		// log(persistent.A, 2);
-		// eternity.logIncomingRelationsDisabled()
-		// log(persistent.A.D);
-		// log("-------------- DB Contents before clear -----------------");
-		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
-		// log("==================== CLEAR MEMORY ==========================");
 		eternity.unloadAllAndClearMemory();
-
-		// D = persistent.B.D;
-		// let referers = [];
-		// log(D);
-		// eternity.forAllIncoming(D, "D", function(referer) {
-			// console.log("--------------------------------------------------");
-			// referers.push(referer);
-		// });
-		// // log(D);
-		// assert.equal(referers.length, 1);
-		// assert.equal(referers[0], B);
-		// log(persistent.A);
-		
+		// log("==================== CLEAR MEMORY ==========================");
 		
 		referers = [];
 		eternity.forAllPersistentIncomingNow(persistent.A.D, "D", function(referer) {
 			referers.push(referer);
 		});
 		assert.equal(2, referers.length);
-		let incomingA = referers[0];
-		// log(incomingA ,2);
-		// log(eternity.isObject(incomingA));
-		// log(eternity.imageCausality.isObject(incomingA));
-		// log(persistent.A);
-		// log(eternity.isObject(persistent.A));
-		// log(eternity.imageCausality.isObject(persistent.A));
-		// log("equal?");
-		// log(incomingA === persistent.A);
 		assert.equal(persistent.A, referers[0]);		
 		assert.equal(persistent.B, referers[1]);		
 	});

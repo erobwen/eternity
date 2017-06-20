@@ -35,8 +35,8 @@
 		 ***************************************************************/
 					
 
-		const idExpressionPrefix = "_id_(";
-		const idExpressionSuffix = ")";
+		const idExpressionPrefix = "_id_";
+		const idExpressionSuffix = "_di_";
 
 		function idExpression(id) {
 			// log("idExpression: " + id);
@@ -2845,9 +2845,10 @@
 			
 			// Id expressions
 			isIdExpression : isIdExpression, 
+			idExpression : idExpression, 
 			extractIdFromExpression : extractIdFromExpression,
 			transformPossibleIdExpression : transformPossibleIdExpression,
-			
+					
 			// Framework interface
 			getActivityListLast : getActivityListLast,
 			getActivityListFirst : getActivityListFirst,
