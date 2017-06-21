@@ -35,8 +35,8 @@
 		 ***************************************************************/
 					
 
-		const idExpressionPrefix = "_id_";
-		const idExpressionSuffix = "_di_";
+		const idExpressionPrefix = "_id_(";
+		const idExpressionSuffix = ")";
 
 		function idExpression(id) {
 			// log("idExpression: " + id);
@@ -225,6 +225,17 @@
 			incomingRelationsDisabled--;
 		}
 		
+		let removedLastIncomingRelationCallback = null;
+		function removedLastIncomingRelation(object) {
+			if (removedLastIncomingRelationCallback !== null) {
+				removedLastIncomingRelationCallback(object);
+			}
+		}
+		
+		function addRemovedLastIncomingRelationCallback(callback) {
+			removedLastIncomingRelationCallback = callback;
+		}
+		
 		
 		/*-----------------------------------------------
 		 *            Relation structures
@@ -242,7 +253,9 @@
 			}
 			
 			// Tear down structure to old value
+			
 			if (isObject(previousValue)) {
+				if ((previousValue.const.incomingReferences -= 1) === 0) removedLastIncomingRelation(previousValue);
 				removeMirrorStructure(objectProxy.const.id, previousValue); // TODO: Fix BUG. This really works?
 				if (typeof(previousValue.const.incomingObservers) !== 'undefined') {
 					notifyChangeObservers(previousValue.const.incomingObservers[referringRelation]);
@@ -251,6 +264,7 @@
 
 			// Setup structure to new value
 			if (isObject(value)) {
+				value.const.incomingReferences++;
 				let referencedValue = createIncomingStructure(objectProxy, objectProxy.const.id, referringRelation, value);
 				if (typeof(value.const.incomingObservers) !== 'undefined') {
 					notifyChangeObservers(value.const.incomingObservers[referringRelation]);
@@ -274,6 +288,7 @@
 			let addedAdjusted = [];
 			added.forEach(function(addedElement) {
 				if (isObject(addedElement)) {
+					addedElement.const.incomingReferences++;
 					// console.log("and here");
 					let referencedValue = createIncomingStructure(arrayProxy, arrayProxy.const.id, referringRelation, addedElement);
 					if (typeof(addedElement.const.incomingObservers) !== 'undefined') {
@@ -289,6 +304,7 @@
 			if (removed !== null) {
 				removed.forEach(function(removedElement) {
 					if (isObject(removedElement)) {
+						if ((previousValue.const.incomingReferences -= 1) === 0)  removedLastIncomingRelation(removedElement);
 						removeMirrorStructure(proxy.const.id, removedElement);
 						if (typeof(removedElement.const.incomingObservers) !== 'undefined') {
 							notifyChangeObservers(removedElement.const.incomingObservers[referringRelation]);
@@ -310,13 +326,19 @@
 			// if (referredItem instanceof Function || typeof(referredItem) === 'function') {
 				// referredItem.foo.bar;
 			// }
-			if (isObject(referredItem)) {
+			// log("findReferredObject");
+			// logGroup();
+			if (typeof(referredItem) === 'object') {
+				// log("is object");
 				if (typeof(referredItem.referredObject) !== 'undefined') {
+					// logUngroup();		
 					return referredItem.referredObject;
 				} else {
+					// logUngroup();
 					return referredItem;
 				}
 			}
+			// logUngroup();
 			return referredItem;
 		}
 		
@@ -1023,6 +1045,7 @@
 		}
 		
 		function setHandlerObject(target, key, value) {
+			// logGroup();
 			if (configuration.objectActivityList) registerActivity(this);
 					
 			// Overlays
@@ -1072,7 +1095,7 @@
 			let mirrorStructureValue;
 			if (mirrorRelations && incomingRelationsDisabled === 0 && !isIndexParentOf(this.const.object, value)) {
 				incomingRelationsDisabled++;
-				mirrorStructureValue = createAndRemoveIncomingRelations(this['const'].object, key, value, previousValue);
+				mirrorStructureValue = createAndRemoveIncomingRelations(this.const.object, key, value, previousValue);
 				target[key] = mirrorStructureValue; 
 				incomingRelationsDisabled--;
 			} else {
@@ -1294,6 +1317,7 @@
 			let proxy = new Proxy(createdTarget, handler);
 			
 			handler.const = {
+				incomingReferences : 0, 
 				initializer : initializer,
 				causalityInstance : causalityInstance,
 				id: id,
@@ -2848,7 +2872,9 @@
 			idExpression : idExpression, 
 			extractIdFromExpression : extractIdFromExpression,
 			transformPossibleIdExpression : transformPossibleIdExpression,
-					
+			
+			addRemovedLastIncomingRelationCallback : addRemovedLastIncomingRelationCallback,
+			
 			// Framework interface
 			getActivityListLast : getActivityListLast,
 			getActivityListFirst : getActivityListFirst,
