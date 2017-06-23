@@ -52,6 +52,12 @@
 
 
 	function postObjectPulseAction(events) {
+		transferChangesToImage(events);
+		// unloadAndKillObjects();
+	} 
+	
+	
+	function transferChangesToImage(events) {
 		if (events.length > 0) {
 			log("postObjectPulseAction: " + events.length + " events");
 			logGroup();
@@ -114,8 +120,7 @@
 			});
 			logUngroup();
 		}
-	} 
-	
+	}
 	
 	function createIsolatedDbImageFromLoadedObject(object, potentialParentImage, potentialParentProperty) {
 		// log(object, 3);
@@ -412,23 +417,25 @@
 		placeholder = imageCausality.create({});
 		placeholder.const.dbId = dbId;
 		imageIdToImageMap[placeholder.const.id] = placeholder;
-		placeholder.const.initializer = function(dbImage) {
-			// if (dbImage.const.dbId === 1)
-				// dbImage.foo.bar;
-			// console.log("");
-			log("initialize image " + dbImage.const.id + " from dbId: " + dbImage.const.dbId); 
-			logGroup();
-			objectCausality.withoutEmittingEvents(function() {
-				imageCausality.withoutEmittingEvents(function() {
-					loadFromDbIdToImage(dbImage);
-				});
-			});
-			// log(dbImage);
-			logUngroup();
-			// console.log(dbImage);
-		}
+		placeholder.const.initializer = imageFromDbIdInitializer;
 		return placeholder;
 	}
+	
+	function imageFromDbIdInitializer(dbImage) {
+		// if (dbImage.const.dbId === 1)
+			// dbImage.foo.bar;
+		// console.log("");
+		log("initialize image " + dbImage.const.id + " from dbId: " + dbImage.const.dbId); 
+		logGroup();
+		objectCausality.withoutEmittingEvents(function() {
+			imageCausality.withoutEmittingEvents(function() {
+				loadFromDbIdToImage(dbImage);
+			});
+		});
+		// log(dbImage);
+		logUngroup();
+		// console.log(dbImage);
+	}	
 	
 	function createObjectPlaceholderFromDbImage(dbImage) {
 		console.log("createObjectPlaceholderFromDbImage " + dbImage.const.id);
@@ -436,17 +443,19 @@
 		placeholder = objectCausality.create();
 		placeholder.const.dbId = dbImage.const.dbId;
 		connectObjectWithDbImage(placeholder, dbImage);
-		placeholder.const.initializer = function(object) {
-			log("initialize object " + object.const.id + " from dbImage " + object.const.dbImage.const.id + ", dbId:" + object.const.dbId);
-			logGroup();
-			objectCausality.withoutEmittingEvents(function() {
-				imageCausality.withoutEmittingEvents(function() {
-					loadFromDbImageToObject(object);
-				});
-			});
-			logUngroup();
-		};
+		placeholder.const.initializer = objectFromImageInitializer;
 		return placeholder;
+	}
+	
+	function objectFromImageInitializer(object) {
+		log("initialize object " + object.const.id + " from dbImage " + object.const.dbImage.const.id + ", dbId:" + object.const.dbId);
+		logGroup();
+		objectCausality.withoutEmittingEvents(function() {
+			imageCausality.withoutEmittingEvents(function() {
+				loadFromDbImageToObject(object);
+			});
+		});
+		logUngroup();
 	}
 	
 	function createObjectPlaceholderFromDbId(dbId) {
@@ -635,6 +644,68 @@
 	}
 	
 	
+	/*-----------------------------------------------
+	 *           Unloading and killing
+	 *-----------------------------------------------*/
+	
+	let maxNumberOfAliveObjects = 10000;
+	let unloadedObjects = 0;
+	
+	
+	function unloadAndKillObjects() {
+		let leastActiveObject = objectCausality.getActivityListLast();
+		while (createdObjects - unloadedObjects > maxNumberOfAliveObjects) {
+			while(typeof(leastActiveObject.const.dbId) === 'undefined') {
+				objectCausality.removeFromActivityList(leastActiveObject); // Just remove them and make GC possible. Consider pre-filter for activity list.... 
+				leastActiveObject = objectCausality.getActivityListLast();
+			}
+			objectCausality.removeFromActivityList(leastActiveObject);
+			unloadObject(leastActiveObject);
+		}
+	}
+	
+	function unloadObject(object) {
+		// without emitting events.
+		for (property in object) {
+			delete object[property];
+		}
+		unloadImage(object.const.dbImage);
+		object.const.initializer = objectFromImageInitializer;
+
+		if (object.const.incomingReferences === 0) {
+			killObject(object);
+		}
+	}
+	
+	function killObject(object) {
+		object.const.dbImage.const.correspondingObject = null;
+		object.const.initializer = zombieObjectInitializer;
+	}
+	
+	function zombieObjectInitializer(object) {
+		object.const.forwardsTo = createObjectPlaceholderFromDbImage(object.const.dbImage); // note: the dbImage might become a zombie as well...
+	}
+	
+	function unloadImage(dbImage) {
+		// without emitting events.
+		for (property in object) {
+			delete object[property];
+		}
+		dbImage.const.initializer = imageFromDbIdInitializer;
+		
+		if (dbImage.const.incomingReferences === 0) {
+			killDbImage(dbImage);
+		}
+	}
+	
+	function killDbImage(dbImage) {
+		delete dbIdToDbImageMap[dbImage.const.dbId];
+		dbImage.const.initializer = zombieImageInitializer;
+	}
+	
+	function zombieImageInitializer(dbImage) {
+		dbImage.const.forwardsTo = createImagePlaceholderFromDbId(dbImage.const.dbId);
+	}
 	
 	/*-----------------------------------------------
 	 *           Setup database
@@ -733,6 +804,19 @@
 		// mirrorRelations : true, // this works only in conjunction with mirrorStructuresAsCausalityObjects, otherwise isObject fails.... 
 		// mirrorStructuresAsCausalityObjects : true
 	});
+	
+	let argumentsToArray = function(arguments) {
+		return Array.prototype.slice.call(arguments);
+	};
+
+	let originalCreate = objectCausality.create;
+	let createdObjects = 0;
+	// objectCausality.create = function() {  
+		// createdObjects++;
+		// let argumentsList = argumentsToArray(arguments);
+		// originalCreate.apply(null, argumentsList);
+		// // Consider kill here instead of at pulse end?
+	// }
 	
 	// Additions 
 	objectCausality.addPostPulseAction(postObjectPulseAction);
