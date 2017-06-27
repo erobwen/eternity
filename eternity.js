@@ -109,7 +109,13 @@
 							if (objectCausality.isObject(newValue)) {
 								newValue = createDbImageRecursivley(newValue, objectDbImage, event.property);
 							}
-							objectDbImage[event.property] = newValue;
+							if (typeof(newValue) === 'object' && newValue.indexParent === objectDbImage) {
+								disableIncomingRelations(function() {
+									objectDbImage[event.property] = newValue;
+								});
+							} else {
+								objectDbImage[event.property] = newValue;
+							}
 						}
 					}
 				});
@@ -175,7 +181,14 @@
 					let value = object[property];
 					if (objectCausality.isObject(value)) {
 						// TODO: translate property idExpressions
-						dbImage[property] = createDbImageRecursivley(value, dbImage, property);
+						value = createDbImageRecursivley(value, dbImage, property);
+					}
+					if (imageCausality.isObject(value) && value.indexParent === dbImage) {
+						disableIncomingRelations(function() {
+							dbImage[property] = value;
+						});
+					} else {
+						dbImage[property] = value;
 					}
 				}
 				object.const.dbImage = dbImage;
