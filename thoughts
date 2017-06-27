@@ -14,25 +14,7 @@ The concept of LOUI
 
 limited outgoing / unlimited incoming
  
-
-forAllCurrentlyIncoming
-forAllIncoming
-
-forAllCurrentlyLoadedIncoming
-forAllLoadedIncoming
-
-observeIncoming
-
-foobar.c_id();
-
-
-x = causality.create();
-x.c_id;
-x.foobar = function(this) {
-	this.foo = this.fie * 2;
-};
-x.c_repeat('foobar');
-
+Indicies cannot have weak links, this is because removal from an index usually requires more than just removing the outgoing link. There needs to be rebalancing, updating of tree properties etc. 
 
 
 
