@@ -1,5 +1,5 @@
 const assert = require('assert');
-let eternity = require('../eternity');
+let eternity = require('../eternity')();
 let create = eternity.create;
 let persistent = eternity.persistent;
 // const log = console.log.bind(console);
@@ -91,7 +91,7 @@ describe("basics", function () {
 	});
 	
 	
-	it('should save multiple incoming relations', function () {
+	it('should save multiple incoming relations, iterate persistent incoming', function () {
 		persistent.A = create({name : 'A'});
 		persistent.B = create({name : 'B'});
 		
@@ -113,23 +113,6 @@ describe("basics", function () {
 		assert.equal(persistent.B, referers[1]);		
 	});
 	
-	// it('should save changes in properties', function () {
-	// });
-
-	// it('should save refered object structures', function () {
-	// });
-	
-    // it('should unload nodes as memory reaches limit, circluar path', function () {
-	// });
-
-    // it('should unload nodes as memory reaches limit, circluar infinite path', function () {
-	// });
-
-    // it('should handle zombie objects correctly', function () {
-	// });	
-	
-    // it('should be possible to iterate all incoming', function () {
-	// });	
 	
     // it('should garbage collect persistent structures no longer reachable', function () {
 	// });	  
