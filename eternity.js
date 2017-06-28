@@ -52,7 +52,7 @@
 
 		function postObjectPulseAction(events) {
 			transferChangesToImage(events);
-			// unloadAndKillObjects();
+			unloadAndKillObjects();
 		} 
 		
 		
@@ -81,7 +81,7 @@
 								// Setting of independently persistent
 								if (event.newValue && typeof(object.const.dbImage) === 'undefined') {
 									// Object had no image, flood-create new images.
-									object.const.dbImage = createDbImageRecursivley(object, null, null);
+									createDbImageForObject(object, null, null);
 								} else if (!event.newValue) {
 									// Had an image that becomes unstable
 									floodUnstable(event.object.const.dbImage, null, null);
@@ -106,7 +106,8 @@
 								// Flood create new images
 								let newValue = event.newValue;
 								if (objectCausality.isObject(newValue)) {
-									newValue = createDbImageRecursivley(newValue, objectDbImage, event.property);
+									createDbImageForObject(newValue, objectDbImage, event.property);
+									newValue = newValue.const.dbImage;
 								}
 								if (typeof(newValue) === 'object' && newValue.indexParent === objectDbImage) {
 									disableIncomingRelations(function() {
@@ -127,7 +128,7 @@
 			}
 		}
 		
-		function createIsolatedDbImageFromLoadedObject(object, potentialParentImage, potentialParentProperty) {
+		function createDbImageWithPropertiesFromLoadedObject(object, potentialParentImage, potentialParentProperty) {
 			// log(object, 3);
 			// console.log(object);
 			let imageContents = {
@@ -164,37 +165,39 @@
 			});
 		}
 		
-				
+		function createDbImageForObject(object, potentialParentImage, potentialParentProperty) {
+			// let object = entity;
+			// console.log("foo");
+			// console.log(object);
+			// console.log(object.const);
+			// console.log("foo");
+			
+			if (typeof(object.const.dbImage) === 'undefined') {
+				let dbImage = createDbImageWithPropertiesFromLoadedObject(object, potentialParentImage, potentialParentProperty);
+				for (let property in object) { 
+					let value = object[property];
+					if (objectCausality.isObject(value)) {
+						// TODO: translate property idExpressions
+						value = createDbImageRecursivley(value, dbImage, property);
+					}
+					if (imageCausality.isObject(value) && value.indexParent === dbImage) {
+						disableIncomingRelations(function() {
+							dbImage[property] = value;
+						});
+					} else {
+						dbImage[property] = value;
+					}
+				}
+				object.const.dbImage = dbImage;
+				dbImage.const.correspondingObject = object;
+			}	
+		}
+		
 		function createDbImageRecursivley(entity, potentialParentImage, potentialParentProperty) {
 			// console.log("createDbImageRecursivley");
 			if (objectCausality.isObject(entity)) {
-				let object = entity;
-				// console.log("foo");
-				// console.log(object);
-				// console.log(object.const);
-				// console.log("foo");
-				
-				if (typeof(object.const.dbImage) === 'undefined') {
-					let dbImage = createIsolatedDbImageFromLoadedObject(object, potentialParentImage, potentialParentProperty);
-					for (let property in object) { 
-						let value = object[property];
-						if (objectCausality.isObject(value)) {
-							// TODO: translate property idExpressions
-							value = createDbImageRecursivley(value, dbImage, property);
-						}
-						if (imageCausality.isObject(value) && value.indexParent === dbImage) {
-							disableIncomingRelations(function() {
-								dbImage[property] = value;
-							});
-						} else {
-							dbImage[property] = value;
-						}
-					}
-					object.const.dbImage = dbImage;
-					dbImage.const.correspondingObject = object;
-				}
-				
-				return object.const.dbImage;
+				createDbImageForObject(entity, potentialParentImage, potentialParentProperty);		
+				return entity.const.dbImage;
 			} else {
 				return entity;
 			}
@@ -660,13 +663,13 @@
 		 *           Unloading and killing
 		 *-----------------------------------------------*/
 		
-		let maxNumberOfAliveObjects = configuration.maxNumberOfAliveObjects; //10000;
+		let maxNumberOfLoadedObjects = configuration.maxNumberOfLoadedObjects; //10000;
 		let unloadedObjects = 0;
 		
 		
 		function unloadAndKillObjects() {
 			let leastActiveObject = objectCausality.getActivityListLast();
-			while (createdObjects - unloadedObjects > maxNumberOfAliveObjects) {
+			while (createdObjects - unloadedObjects > maxNumberOfLoadedObjects) {
 				while(typeof(leastActiveObject.const.dbId) === 'undefined') {
 					objectCausality.removeFromActivityList(leastActiveObject); // Just remove them and make GC possible. Consider pre-filter for activity list.... 
 					leastActiveObject = objectCausality.getActivityListLast();
@@ -728,7 +731,7 @@
 				if (mockMongoDB.getRecordsCount() === 0) {
 					// objectCausality.pulse(function() {
 						objectCausality.persistent = objectCausality.create();
-						createIsolatedDbImageFromLoadedObject(objectCausality.persistent);			
+						createDbImageWithPropertiesFromLoadedObject(objectCausality.persistent);			
 					// });
 				} else {
 					objectCausality.persistent = createObjectPlaceholderFromDbId(0);
@@ -739,7 +742,7 @@
 					delete target[property];
 				}
 				if (mockMongoDB.getRecordsCount() === 0) {
-					createIsolatedDbImageFromLoadedObject(objectCausality.persistent);
+					createDbImageWithPropertiesFromLoadedObject(objectCausality.persistent);
 				} else {
 					objectCausality.persistent.const.dbId = 0;
 					delete objectCausality.persistent.const.dbImage;
@@ -867,7 +870,7 @@
 
 	function getDefaultConfiguration() {
 		return {
-			maxNumberOfAliveObjects : 10000,
+			maxNumberOfLoadedObjects : 10000,
 			causalityConfiguration : {}
 		}
 	}
