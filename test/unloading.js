@@ -1,7 +1,4 @@
 const assert = require('assert');
-let eternity = require('../eternity');
-let create = eternity.create;
-let persistent = eternity.persistent;
 // const log = console.log.bind(console);
 
 // Neat logging
@@ -14,6 +11,9 @@ let logUngroup = objectlog.exit;
 describe("basics", function () {
 
     it('should unload nodes as memory reaches limit, circluar path', function () {
+		let eternity = require('../eternity')({maxNumberOfAliveObjects : 3});
+		let create = eternity.create;
+		let persistent = eternity.persistent;
 	});
 
     // it('should unload nodes as memory reaches limit, circluar infinite path', function () {

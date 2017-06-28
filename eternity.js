@@ -660,7 +660,7 @@
 		 *           Unloading and killing
 		 *-----------------------------------------------*/
 		
-		let maxNumberOfAliveObjects = 10000;
+		let maxNumberOfAliveObjects = configuration.maxNumberOfAliveObjects; //10000;
 		let unloadedObjects = 0;
 		
 		
@@ -807,8 +807,9 @@
 		/*-----------------------------------------------
 		 *           Setup object causality
 		 *-----------------------------------------------*/
+		 
 		let objectCausalityConfiguration = {};
-		Object.assign(objectCausalityConfiguration, configuration);
+		Object.assign(objectCausalityConfiguration, configuration.causalityConfiguration);
 		Object.assign(objectCausalityConfiguration, {
 			name: 'objectCausality', 
 			recordPulseEvents : true,
@@ -857,25 +858,17 @@
 		});
 		let sortedObject = {};
 		keys.forEach(function(key) {
-			sortedObject[key] = object[key];
+			let value = object[key];
+			if (typeof(value) === 'object') value = sortedKeys(value);
+			sortedObject[key] = value;
 		});
 		return sortedObject;
 	}
-	
+
 	function getDefaultConfiguration() {
 		return {
-			// Main feature switch, turn off for performance! This property will be set automatically depending on the other settings.
-			activateSpecialFeatures : false, 
-			
-			// Special features
-			mirrorRelations : false,
-			exposeMirrorRelationIntermediary : false,
-			mirrorStructuresAsCausalityObjects: false,
-			
-			cumulativeAssignment : false,
-			directStaticAccess : false,
-			objectActivityList : false,
-			recordPulseEvents : false
+			maxNumberOfAliveObjects : 10000,
+			causalityConfiguration : {}
 		}
 	}
 	
