@@ -404,6 +404,11 @@
 		
 		
 		function getIncomingRelationStructure(referencedObject, relationName) {
+			// Sanity test TODO: remove 
+			if (incomingRelationsDisabled === 0) {
+				referencedObject.foo.bar;
+			}
+			
 			// Create incoming structure
 			let incomingRelations;
 			if (typeof(referencedObject.incoming) === 'undefined') {
@@ -418,8 +423,9 @@
 			
 			// Create incoming for this particular property
 			if (typeof(incomingRelations[relationName]) === 'undefined') {
-				let mirrorIncomingRelation = { isIncomingRelationStructure : true, referredObject: referencedObject };
+				let mirrorIncomingRelation = { isIncomingRelationStructure : true, referredObject: referencedObject, incomingRelationStructures : incomingRelations };
 				if (mirrorStructuresAsCausalityObjects) {
+					// Disable incoming relations here? otherwise we might end up with incoming structures between 
 					mirrorIncomingRelation = create(mirrorIncomingRelation);
 				}
 				incomingRelations[relationName] = mirrorIncomingRelation;
@@ -1411,9 +1417,18 @@
 					handler.const[property] = createdTarget.const[property]; 
 				}
 			}
-			// TODO: consider what we should do when we have reverse references. Should we loop through createdTarget and form proper reverse structures?
+			
 			handler.const.const = handler.const;
 			handler.const.nonForwardStatic = handler.const;
+			
+			// TODO: consider what we should do when we have reverse references. Should we loop through createdTarget and form proper reverse structures?
+			// Experiments: 
+			// withoutEmittingEvents(function() {
+				// for (property in createdTarget) {
+					// proxy[property] = createdTarget[property];
+				// }
+			// });
+			// However, will witout emitting events work for eternity? What does it want really?
 
 			if (inReCache()) {
 				if (cacheId !== null &&  typeof(context.cacheIdObjectMap[cacheId]) !== 'undefined') {
