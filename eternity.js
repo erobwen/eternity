@@ -34,7 +34,7 @@
 		let log = objectlog.log;
 		let logGroup = objectlog.enter;
 		let logUngroup = objectlog.exit;
-		// let log = console.log;
+		// let log = log;
 
 		/*-----------------------------------------------
 		 *     persistentObjectIdToObjectMap... Important, needs to 
@@ -49,17 +49,24 @@
 		 
 		let unstableImages = [];
 
-
+		// let inPostObjectPulse = 0;
 		function postObjectPulseAction(events) {
+			// if (inPostObjectPulse > 0) return events.foo.bar;
+			// inPostObjectPulse++;
+			log("postObjectPulseAction: " + events.length + " events");
+			logGroup();
+			log(events, 3);
+			
 			transferChangesToImage(events);
 			unloadAndKillObjects();
+			
+			logUngroup();
+			// inPostObjectPulse--;
 		} 
 		
 		
 		function transferChangesToImage(events) {
 			if (events.length > 0) {
-				log("postObjectPulseAction: " + events.length + " events");
-				logGroup();
 				// log("... Model pulse complete, update image and flood create images & flood unstable ");
 				log("events.length = " + events.length);
 				if (typeof(objectCausality.noCleanups) !== 'undefined')
@@ -120,17 +127,16 @@
 						}
 					});
 
-					// console.log("=== End model pulse post process === ");
+					// log("=== End model pulse post process === ");
 					// Process unstable ones. Initiate garbage collection
-				// console.log(events);
+				// log(events);
 				});
-				logUngroup();
 			}
 		}
 		
 		function createDbImageWithPropertiesFromLoadedObject(object, potentialParentImage, potentialParentProperty) {
 			// log(object, 3);
-			// console.log(object);
+			// log(object);
 			let imageContents = {
 				_eternityParent : potentialParentImage,
 				_eternityParentProperty : potentialParentProperty
@@ -157,7 +163,7 @@
 		
 		function connectObjectWithDbImage(object, dbImage) {
 			imageCausality.blockInitialize(function() {
-				// console.log("connectObjectWithDbImage: " + dbImage.const.dbId);
+				// log("connectObjectWithDbImage: " + dbImage.const.dbId);
 				dbImage.const.correspondingObject = object;					
 			});
 			objectCausality.blockInitialize(function() {
@@ -167,10 +173,10 @@
 		
 		function createDbImageForObject(object, potentialParentImage, potentialParentProperty) {
 			// let object = entity;
-			// console.log("foo");
-			// console.log(object);
-			// console.log(object.const);
-			// console.log("foo");
+			// log("foo");
+			// log(object);
+			// log(object.const);
+			// log("foo");
 			
 			if (typeof(object.const.dbImage) === 'undefined') {
 				let dbImage = createDbImageWithPropertiesFromLoadedObject(object, potentialParentImage, potentialParentProperty);
@@ -186,6 +192,15 @@
 						});
 					} else {
 						dbImage[property] = value;
+						// disableIncomingRelations(function() {
+							// let incomingRelationStructure = dbImage[property];
+							// if (incomingRelationStructure.incomingRelationStructure) {
+								// if (typeof(incomingRelationStructure.const.incomingRelationStructureCount) === 'undefined') {
+									// incomingRelationStructure.const.incomingRelationStructureCount = 0;
+								// }
+								// incomingRelationStructure.const.incomingRelationStructureCount++;
+							// }
+						// });
 					}
 				}
 				object.const.dbImage = dbImage;
@@ -195,7 +210,7 @@
 		}
 		
 		function createDbImageRecursivley(entity, potentialParentImage, potentialParentProperty) {
-			// console.log("createDbImageRecursivley");
+			// log("createDbImageRecursivley");
 			if (objectCausality.isObject(entity)) {
 				createDbImageForObject(entity, potentialParentImage, potentialParentProperty);		
 				return entity.const.dbImage;
@@ -302,7 +317,7 @@
 		
 		
 		function hasAPlaceholder(dbImage) {
-			// console.log(dbImage);
+			// log(dbImage);
 			return typeof(dbImage.const.dbId) !== 'undefined';
 		}
 
@@ -358,7 +373,7 @@
 		function writeImageToDatabase(dbImage) {
 			imageCausality.disableIncomingRelations(function() {
 				// log(dbImage, 2);
-				// console.log(imageCausality.isObject(dbImage));
+				// log(imageCausality.isObject(dbImage));
 				let serialized = (dbImage instanceof Array) ? [] : {};
 				for (let property in dbImage) {
 					// TODO: convert idExpressions
@@ -380,10 +395,10 @@
 		}
 		
 		function convertReferencesToDbIds(entity) {
-			// console.log();
-			// console.log("convertReferencesToDbIds: ");
+			// log();
+			// log("convertReferencesToDbIds: ");
 			// log(entity, 2);
-			// console.log(imageCausality.isObject(entity));
+			// log(imageCausality.isObject(entity));
 			if (imageCausality.isObject(entity)) {
 				let dbImage = entity;
 				if (!hasAPlaceholder(entity)) {
@@ -391,9 +406,9 @@
 				}
 				return dbImage.const.serializedMongoDbId;
 			} else if (entity !== null && typeof(entity) === 'object') {
-				// console.log("===========");
+				// log("===========");
 				// log(entity, 3);
-				// console.log("===========");
+				// log("===========");
 				
 				// entity.foo.bar;
 				
@@ -418,17 +433,17 @@
 		let dbIdToDbImageMap = {};
 		
 		function getImagePlaceholderFromDbId(dbId) {
-			// console.log("getImagePlaceholderFromDbId: " + dbId);
+			// log("getImagePlaceholderFromDbId: " + dbId);
 			if (typeof(dbIdToDbImageMap[dbId]) === 'undefined') {
 				dbIdToDbImageMap[dbId] = createImagePlaceholderFromDbId(dbId);
 			}
-			// console.log("placeholder keys:");
+			// log("placeholder keys:");
 			// printKeys(dbIdToDbImageMap);
 			return dbIdToDbImageMap[dbId];
 		}
 		
 		function createImagePlaceholderFromDbId(dbId) {
-			console.log("createImagePlaceholderFromDbId: " + dbId);
+			log("createImagePlaceholderFromDbId: " + dbId);
 			let placeholder;
 			placeholder = imageCausality.create({});
 			placeholder.const.dbId = dbId;
@@ -440,7 +455,7 @@
 		function imageFromDbIdInitializer(dbImage) {
 			// if (dbImage.const.dbId === 1)
 				// dbImage.foo.bar;
-			// console.log("");
+			// log("");
 			log("initialize image " + dbImage.const.id + " from dbId: " + dbImage.const.dbId); 
 			logGroup();
 			objectCausality.withoutEmittingEvents(function() {
@@ -450,11 +465,11 @@
 			});
 			// log(dbImage);
 			logUngroup();
-			// console.log(dbImage);
+			// log(dbImage);
 		}	
 		
 		function createObjectPlaceholderFromDbImage(dbImage) {
-			console.log("createObjectPlaceholderFromDbImage " + dbImage.const.id);
+			log("createObjectPlaceholderFromDbImage " + dbImage.const.id);
 			let placeholder;
 			placeholder = objectCausality.create();
 			placeholder.const.dbId = dbImage.const.dbId;
@@ -475,7 +490,7 @@
 		}
 		
 		function createObjectPlaceholderFromDbId(dbId) {
-			console.log("createObjectPlaceholderFromDbId: " + dbId);
+			log("createObjectPlaceholderFromDbId: " + dbId);
 			let placeholder;
 			placeholder.const.dbId = dbId;
 			placeholder.const.initializer = objectFromIdInitializer;
@@ -507,35 +522,35 @@
 			imageCausality.disableIncomingRelations(function() {			
 				let dbId = dbImage.const.dbId;
 				
-				// console.log("loadFromDbIdToImage, dbId: " + dbId);
+				// log("loadFromDbIdToImage, dbId: " + dbId);
 				let dbRecord = mockMongoDB.getRecord(dbId);
-				// console.log(dbRecord);
+				// log(dbRecord);
 				for (let property in dbRecord) {
 					// printKeys(dbImage);
 					if (property !== 'const' && property !== 'id') {
-						// console.log("loadFromDbIdToImage: " + dbId + " property: " + property);
-						// console.log(dbRecord);
+						// log("loadFromDbIdToImage: " + dbId + " property: " + property);
+						// log(dbRecord);
 						let recordValue = dbRecord[property];
-						// console.log(dbRecord);
+						// log(dbRecord);
 						let value = loadDbValue(recordValue);
 						
-						// console.log(dbRecord);
-						// console.log("loadFromDbIdToImage: " + dbId + " property: " + property + "...assigning");
+						// log(dbRecord);
+						// log("loadFromDbIdToImage: " + dbId + " property: " + property + "...assigning");
 						// if (property !== 'A') imageCausality.startTrace();
-						// console.log("value loaded to image:");
-						// console.log(value);
+						// log("value loaded to image:");
+						// log(value);
 						property = imageCausality.transformPossibleIdExpression(property, dbIdToImageId);
 						dbImage[property] = value;
 						// if (property !== 'A') imageCausality.endTrace();
-						// console.log("loadFromDbIdToImage: " + dbId + " property: " + property + "...finished assigning");
+						// log("loadFromDbIdToImage: " + dbId + " property: " + property + "...finished assigning");
 						// printKeys(dbImage);
 					}				
 				}
-				// console.log("finished loadFromDbIdToImage: ");
-				// console.log(dbImage.const.dbId);
+				// log("finished loadFromDbIdToImage: ");
+				// log(dbImage.const.dbId);
 				// printKeys(dbImage);
 				dbImage.const.loaded = true;
-				// console.log("-- ");
+				// log("-- ");
 			});
 					
 			// if (typeof(dbRecord.const) !== 'undefined') {
@@ -553,11 +568,11 @@
 		
 		function loadFromDbIdToObject(object) {
 			let dbId = object.const.dbId;
-			// console.log("loadFromDbIdToObject: " + dbId);
+			// log("loadFromDbIdToObject: " + dbId);
 
 			// Ensure there is an image.
 			if (typeof(object.const.dbImage) === 'undefined') {
-				// console.log("create placeholder for image:" + dbId);
+				// log("create placeholder for image:" + dbId);
 				let placeholder = getImagePlaceholderFromDbId(dbId);
 				connectObjectWithDbImage(object, placeholder);
 			}
@@ -565,40 +580,40 @@
 		}
 		
 		function printKeys(object) {
-			if (typeof(object) === 'object') console.log(Object.keys(object));
+			if (typeof(object) === 'object') log(Object.keys(object));
 		}
 		
 		function loadFromDbImageToObject(object) {
 			let dbImage = object.const.dbImage;
-			// console.log("----------------------------------------");
+			// log("----------------------------------------");
 			log("loadFromDbImageToObject dbId: " + dbImage.const.dbId);
 			// logGroup();
-			// console.log(dbImage);
-			// console.log(object);
+			// log(dbImage);
+			// log(object);
 			for (let property in dbImage) {
 				if (property !== 'incoming') {
 					// log("load property: " + property);
-					// console.log("-------");
+					// log("-------");
 					let value = dbImage[property];
 					// log(value);
-					// console.log("value loaded to object:");
+					// log("value loaded to object:");
 					// printKeys(value);
-					// console.log(value.name)
-					// console.log(value);
-					// console.log("-------");
-					// console.log(value);
+					// log(value.name)
+					// log(value);
+					// log("-------");
+					// log(value);
 					// TODO: Do recursivley if there are plain javascript objects
 					if (imageCausality.isObject(value)) {
-						// console.log("found an object");
+						// log("found an object");
 						value = getObjectFromImage(value);
 						// log(value);
-						// console.log(value);
+						// log(value);
 						// value = "424242"
 						// log(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
 						// let x = value.name; // Must be here? otherwise not initilized correctly?   Because of pulses!!!!
 						// log("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<");
 						
-						// console.log(value.name);
+						// log(value.name);
 					}
 					// log(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
 					// log(value);
@@ -613,12 +628,12 @@
 		}
 		
 		function getObjectFromImage(dbImage) {
-			// console.log("getObjectFromImage");
+			// log("getObjectFromImage");
 			if (typeof(dbImage.const.correspondingObject) === 'undefined') {
 				dbImage.const.correspondingObject = createObjectPlaceholderFromDbImage(dbImage);
 			}
-			// console.log("return value:");
-			// console.log(dbImage.const.correspondingObject); // This is needed???
+			// log("return value:");
+			// log(dbImage.const.correspondingObject); // This is needed???
 			
 			return dbImage.const.correspondingObject;
 		}
@@ -670,29 +685,38 @@
 		
 		
 		function unloadAndKillObjects() {
-			log("unloadAndKillObjects");
-			logGroup();
-			let leastActiveObject = objectCausality.getActivityListLast();
-			while (leastActiveObject !== null && loadedObjects > maxNumberOfLoadedObjects) {
-				log("considering object for unload...");
-				while(leastActiveObject !== null && typeof(leastActiveObject.const.dbImage) === 'undefined') { // Warning! can this wake a killed object to life? ... no should not be here!
-					log("skipping unsaved object (cannot unload something not saved)...");
-					objectCausality.removeFromActivityList(leastActiveObject); // Just remove them and make GC possible. Consider pre-filter for activity list.... 
-					leastActiveObject = objectCausality.getActivityListLast();
-				}
-				log(leastActiveObject === null);
-				if (leastActiveObject !== null) {
-					log("remove it!!");
-					objectCausality.removeFromActivityList(leastActiveObject);
-					unloadObject(leastActiveObject);
-				}
+			if (loadedObjects > maxNumberOfLoadedObjects) {
+				log("unloadAndKillObjects");
+				logGroup();
+				objectCausality.withoutEmittingEvents(function() {
+					imageCausality.withoutEmittingEvents(function() {
+						let leastActiveObject = objectCausality.getActivityListLast();
+						while (leastActiveObject !== null && loadedObjects > maxNumberOfLoadedObjects) {
+							log("considering object for unload...");
+							while(leastActiveObject !== null && typeof(leastActiveObject.const.dbImage) === 'undefined') { // Warning! can this wake a killed object to life? ... no should not be here!
+								log("skipping unsaved object (cannot unload something not saved)...");
+								objectCausality.removeFromActivityList(leastActiveObject); // Just remove them and make GC possible. Consider pre-filter for activity list.... 
+								leastActiveObject = objectCausality.getActivityListLast();
+							}
+							if (leastActiveObject !== null) {
+								log("remove it!!");
+								objectCausality.removeFromActivityList(leastActiveObject);
+								unloadObject(leastActiveObject);
+							}
+						}
+					});
+				});				
+				logUngroup();
+			} else {
+				log("... still room for all loaded... ");
 			}
-			logUngroup();
 		}
 		
 		function unloadObject(object) {
 			log("unloadObject");
+			log(object);
 			// without emitting events.
+			
 			for (property in object) {
 				delete object[property];
 			}
@@ -700,14 +724,15 @@
 			loadedObjects--;
 
 			object.const.initializer = objectFromImageInitializer;
-			objectCausality.blockInitialize(function() {			
-				if (object.const.incomingReferences === 0) {
-					killObject(object);
-				}
-			});
+			// objectCausality.blockInitialize(function() {			
+				// if (object.const.incomingReferences === 0) {
+					// killObject(object);
+				// }
+			// });
 		}
 		
 		function killObject(object) {
+			log("killObject");
 			object.const.dbImage.const.correspondingObject = null;
 			object.const.initializer = zombieObjectInitializer;
 		}
@@ -717,24 +742,36 @@
 		}
 		
 		function unloadImage(dbImage) {
+			log("unloadImage");
 			// without emitting events.
 			for (property in dbImage) {
-				delete dbImage[property];
+				imageCausality.disableIncomingRelations(function() {						
+					let value = dbImage[property];
+					if (typeof(value.incomingRelationStructure) !== 'undefined') {
+						value.const.incomingRelationStructureCount--;
+						if (value.const.incomingRelationStructureCount === 0) {
+							unloadImage(value);
+						}
+					}
+					delete dbImage[property]; // This cannot be right... it has to unload incoming structures gradually...
+				});
 			}
 			dbImage.const.initializer = imageFromDbIdInitializer;
-			imageCausality.blockInitialize(function() {
-				if (dbImage.const.incomingReferences === 0) {
-					killDbImage(dbImage);
-				}				
-			});
+			// imageCausality.blockInitialize(function() {
+				// if (dbImage.const.incomingReferences === 0) {
+					// killDbImage(dbImage);
+				// }				
+			// });
 		}
 		
 		function killDbImage(dbImage) {
+			log("killDbImage");
 			delete dbIdToDbImageMap[dbImage.const.dbId];
 			dbImage.const.initializer = zombieImageInitializer;
 		}
 		
 		function zombieImageInitializer(dbImage) {
+			log("zombieImageInitializer");
 			dbImage.const.forwardsTo = createImagePlaceholderFromDbId(dbImage.const.dbId);
 		}
 		
@@ -902,8 +939,8 @@
 		Object.assign(defaultConfiguration, requestedConfiguration);
 		let configuration = sortedKeys(defaultConfiguration);
 		let signature = JSON.stringify(configuration);
-		// console.log("================= REQUEST: ==========");
-		// console.log(signature);
+		// log("================= REQUEST: ==========");
+		// log(signature);
 		
 		if (typeof(configurationToSystemMap[signature]) === 'undefined') {
 			configurationToSystemMap[signature] = createEternityInstance(configuration);

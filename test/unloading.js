@@ -26,24 +26,33 @@ describe("basics", function () {
 			return result;
 		}
 
+		log("--------------------------------------------------------------");
 		// persistent
 		let A = create({name: "A"});
 		let B = create({name: "B"});
 		let C = create({name: "C"});
 		
+		log("--------------------------------------------------------------");
+		persistent.name = "persistent"
 		persistent.A = A;
+		A.persistent = persistent;
+		log("--------------------------------------------------------------");
 		A.B = B;
-		B.C = C;
-		C.A = A;
-		
 		log("==================== SETUP COMPLETE ==========================");
 		log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
+		log("--------------------------------------------------------------");
+		B.C = C;
+		log("--------------------- after unload ---------------------------");
+		log(persistent.name);
+		// C.A = A;
 		
-		// Persistent should be unloaded
-		assert.equal(isLoaded(persistent), false);
-		assert.equal(isLoaded(A), false);
-		assert.equal(isLoaded(B), true);
-		assert.equal(isLoaded(C), true);
+
+		
+		// // Persistent should be unloaded
+		// assert.equal(isLoaded(persistent), false);
+		// assert.equal(isLoaded(A), false);
+		// assert.equal(isLoaded(B), true);
+		// assert.equal(isLoaded(C), true);
 		
 		// // Touch A
 		// let dummy = A.name;

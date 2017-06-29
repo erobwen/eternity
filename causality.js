@@ -1493,10 +1493,12 @@
 		}
 		 
 		function canWrite(object) {
-			if (postPulseProcess > 0) {  // TODO: this annoys eternity somehow... why???
-				log("CANNOT WRITE IN POST PULSE");
-				return false;
+			if (postPulseProcess > 0) {
+				return true;
 			}
+			// log("CANNOT WRITE IN POST PULSE");
+				// return false;
+			// }
 			if (writeRestriction !== null && typeof(writeRestriction[object.const.id]) === 'undefined') {
 				return false;
 			}
@@ -1690,6 +1692,7 @@
 		let contextsScheduledForPossibleDestruction = [];
 
 		function postPulseCleanup() {
+			inPulse++; // block new pulses!
 			postPulseProcess++; // Blocks any model writing during post pulse cleanup
 			contextsScheduledForPossibleDestruction.forEach(function(context) {
 				if (!context.directlyInvokedByApplication) {
@@ -1704,6 +1707,7 @@
 			});
 			pulseEvents = [];
 			postPulseProcess--;
+			inPulse--;
 		}
 
 		let postPulseHooks = [];
