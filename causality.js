@@ -114,9 +114,9 @@
 				let specifier = { 
 					specifierParent : javascriptObject, 
 					specifierProperty : specifierName, 
-					isIncomingRelationStructure : true   // This is a reuse of this object as incoming node as well.
+					isIncomingStructure : true   // This is a reuse of this object as incoming node as well.
 				}
-				if (mirrorStructuresAsCausalityObjects) {
+				if (incomingStructuresAsCausalityObjects) {
 					javascriptObject[specifierName] = createImmutable(specifier);
 				} else {
 					javascriptObject[specifierName] = specifier;				
@@ -133,7 +133,7 @@
 		 ***************************************************************/
 		 
 		function setIndex(object, property, index) {
-			incomingRelationsDisabled++;
+			incomingStructuresDisabled++;
 			
 			let previousValue = object[property];
 			if (typeof(previousValue) === 'object') {
@@ -145,7 +145,7 @@
 			index.indexParentRelation = property;
 			object[property] = index;
 			
-			incomingRelationsDisabled--;
+			incomingStructuresDisabled--;
 			return index;
 		}
 		 
@@ -161,27 +161,27 @@
 		
 		
 		function createArrayIndex(object, property) {
-			incomingRelationsDisabled++;
+			incomingStructuresDisabled++;
 			
 			let index = create([]);
 			index.indexParent = object;
 			index.indexParentRelation = property;
 			object[property] = index;
 			
-			incomingRelationsDisabled--;
+			incomingStructuresDisabled--;
 			return index;
 		}
 		
 
 		function createObjectIndex(object, property) {
-			incomingRelationsDisabled++;
+			incomingStructuresDisabled++;
 			
 			let index = create({});
 			index.indexParent = object;
 			index.indexParentRelation = property;
 			object[property] = index;
 
-			incomingRelationsDisabled--;
+			incomingStructuresDisabled--;
 			return index;
 		}
 
@@ -239,36 +239,36 @@
 		
 
 		// function hasIncomingRelationArray(array, index) { // Maybe not needed???
-			// incomingRelationsDisabled++;
+			// incomingStructuresDisabled++;
 			// let result = array[index];
-			// if (typeof(result.isIncomingRelationStructure)) {
+			// if (typeof(result.isIncomingStructure)) {
 				// return true;
 			// } else {
 				// // Check if there is an internal incoming relation.
 			// }
 			// return false;
-			// incomingRelationsDisabled--;			
+			// incomingStructuresDisabled--;			
 		// }
 
 		
 		function hasIncomingRelation(object, property) {
-			incomingRelationsDisabled++;
+			incomingStructuresDisabled++;
 			let result = object[property];
-			if (typeof(result.isIncomingRelationStructure)) {
+			if (typeof(result.isIncomingStructure)) {
 				return true;
 			} else {
 				// Check if there is an internal incoming relation.
 			}
 			return false;
-			incomingRelationsDisabled--;			
+			incomingStructuresDisabled--;			
 		}
 
-		let incomingRelationsDisabled = 0;
+		let incomingStructuresDisabled = 0;
 
 		function disableIncomingRelations(action) {
-			incomingRelationsDisabled++;
+			incomingStructuresDisabled++;
 			action();
-			incomingRelationsDisabled--;
+			incomingStructuresDisabled--;
 		}
 		
 		let removedLastIncomingRelationCallback = null;
@@ -289,7 +289,7 @@
 		
 		
 		function createAndRemoveIncomingRelations(objectProxy, key, value, previousValue) {
-			// console.log("setup mirror relation");
+			// console.log("setup incoming relation");
 			
 			// Get refering object 
 			let referringRelation = key;
@@ -302,7 +302,7 @@
 			
 			if (isObject(previousValue)) {
 				if ((previousValue.const.incomingReferences -= 1) === 0) removedLastIncomingRelation(previousValue);
-				removeMirrorStructure(objectProxy.const.id, previousValue); // TODO: Fix BUG. This really works?
+				removeIncomingStructure(objectProxy.const.id, previousValue); // TODO: Fix BUG. This really works?
 				if (typeof(previousValue.const.incomingObservers) !== 'undefined') {
 					notifyChangeObservers(previousValue.const.incomingObservers[referringRelation]);
 				}
@@ -332,7 +332,7 @@
 				arrayProxy = arrayProxy.indexParent;
 			}
 			
-			// Create mirror relations for added
+			// Create incoming relations for added
 			let addedAdjusted = [];
 			added.forEach(function(addedElement) {
 				if (isObject(addedElement)) {
@@ -348,12 +348,12 @@
 				}						
 			});
 			
-			// Remove mirror relations for removed
+			// Remove incoming relations for removed
 			if (removed !== null) {
 				removed.forEach(function(removedElement) {
 					if (isObject(removedElement)) {
 						if ((previousValue.const.incomingReferences -= 1) === 0)  removedLastIncomingRelation(removedElement);
-						removeMirrorStructure(proxy.const.id, removedElement);
+						removeIncomingStructure(proxy.const.id, removedElement);
 						if (typeof(removedElement.const.incomingObservers) !== 'undefined') {
 							notifyChangeObservers(removedElement.const.incomingObservers[referringRelation]);
 						}
@@ -393,8 +393,8 @@
 		
 		function createIncomingStructure(referingObject, referingObjectId, property, object) {
 			// log("createIncomingStructure");
-			let mirrorIncomingRelation = getIncomingRelationStructure(object, property);
-			let incomingRelationChunk = intitializeAndConstructMirrorStructure(mirrorIncomingRelation, referingObject, referingObjectId);
+			let incomingIncomingRelation = getIncomingRelationStructure(object, property);
+			let incomingRelationChunk = intitializeAndConstructIncomingStructure(incomingIncomingRelation, referingObject, referingObjectId);
 			if (incomingRelationChunk !== null) {
 				return incomingRelationChunk;
 			} else {
@@ -405,41 +405,41 @@
 		
 		function getIncomingRelationStructure(referencedObject, relationName) {
 			// Sanity test TODO: remove 
-			if (incomingRelationsDisabled === 0) {
+			if (incomingStructuresDisabled === 0) {
 				referencedObject.foo.bar;
 			}
 			
 			// Create incoming structure
-			let incomingRelations;
+			let incomingStructures;
 			if (typeof(referencedObject.incoming) === 'undefined') {
-				incomingRelations = { isIncomingRelationStructures : true, referredObject: referencedObject };
-				if (mirrorStructuresAsCausalityObjects) {
-					incomingRelations = create(incomingRelations);
+				incomingStructures = { isIncomingStructures : true, referredObject: referencedObject };
+				if (incomingStructuresAsCausalityObjects) {
+					incomingStructures = create(incomingStructures);
 				}
-				referencedObject.incoming = incomingRelations;
+				referencedObject.incoming = incomingStructures;
 			} else {
-				incomingRelations = referencedObject.incoming;
+				incomingStructures = referencedObject.incoming;
 			}
 			
 			// Create incoming for this particular property
-			if (typeof(incomingRelations[relationName]) === 'undefined') {
-				let mirrorIncomingRelation = { isIncomingRelationStructure : true, referredObject: referencedObject, incomingRelationStructures : incomingRelations };
-				if (mirrorStructuresAsCausalityObjects) {
+			if (typeof(incomingStructures[relationName]) === 'undefined') {
+				let incomingIncomingRelation = { isIncomingStructure : true, referredObject: referencedObject, incomingStructures : incomingStructures };
+				if (incomingStructuresAsCausalityObjects) {
 					// Disable incoming relations here? otherwise we might end up with incoming structures between 
-					mirrorIncomingRelation = create(mirrorIncomingRelation);
+					incomingIncomingRelation = create(incomingIncomingRelation);
 				}
-				incomingRelations[relationName] = mirrorIncomingRelation;
+				incomingStructures[relationName] = incomingIncomingRelation;
 			}
 			
-			return incomingRelations[relationName];
+			return incomingStructures[relationName];
 		}
 		
 		
 		/**
 		* Structure helpers
 		*/				
-		function removeMirrorStructure(refererId, referedEntity) {
-			if (typeof(referedEntity.isIncomingRelationStructure) !== 'undefined') {
+		function removeIncomingStructure(refererId, referedEntity) {
+			if (typeof(referedEntity.isIncomingStructure) !== 'undefined') {
 				let incomingRelation = referedEntity;
 				let incomingRelationContents = incomingRelation['contents'];
 				delete incomingRelationContents[idExpression(refererId)];
@@ -482,34 +482,34 @@
 			}
 		}
 		
-		function intitializeAndConstructMirrorStructure(mirrorIncomingRelation, referingObject, referingObjectId) {
+		function intitializeAndConstructIncomingStructure(incomingIncomingRelation, referingObject, referingObjectId) {
 			let refererId = idExpression(referingObjectId);
-			// console.log("intitializeAndConstructMirrorStructure:");
+			// console.log("intitializeAndConstructIncomingStructure:");
 			// console.log(referingObject);
 			
 			
 			// console.log(activeRecorder);
-			if (typeof(mirrorIncomingRelation.initialized) === 'undefined') {
-				mirrorIncomingRelation.isRoot = true;
-				mirrorIncomingRelation.contents = {};
-				if (mirrorStructuresAsCausalityObjects) {
-					mirrorIncomingRelation.contents = create(mirrorIncomingRelation.contents);
+			if (typeof(incomingIncomingRelation.initialized) === 'undefined') {
+				incomingIncomingRelation.isRoot = true;
+				incomingIncomingRelation.contents = {};
+				if (incomingStructuresAsCausalityObjects) {
+					incomingIncomingRelation.contents = create(incomingIncomingRelation.contents);
 				}
-				mirrorIncomingRelation.contentsCounter = 0;
-				mirrorIncomingRelation.initialized = true;
-				mirrorIncomingRelation.first = null;
-				mirrorIncomingRelation.last = null;
+				incomingIncomingRelation.contentsCounter = 0;
+				incomingIncomingRelation.initialized = true;
+				incomingIncomingRelation.first = null;
+				incomingIncomingRelation.last = null;
 			}
 
 			// Already added as relation
-			if (typeof(mirrorIncomingRelation.contents[refererId]) !== 'undefined') {
+			if (typeof(incomingIncomingRelation.contents[refererId]) !== 'undefined') {
 				return null;
 			}
 
 			// Move on to new chunk?
-			if (mirrorIncomingRelation.contentsCounter === incomingStructureChunkSize) {
+			if (incomingIncomingRelation.contentsCounter === incomingStructureChunkSize) {
 				let newChunk = {
-					referredObject : mirrorIncomingRelation.referredObject,
+					referredObject : incomingIncomingRelation.referredObject,
 					isRoot : false,
 					contents: {},
 					contentsCounter: 0,
@@ -517,33 +517,33 @@
 					previous: null,
 					parent: null
 				};
-				if (mirrorStructuresAsCausalityObjects) {
+				if (incomingStructuresAsCausalityObjects) {
 					newChunk.contents = create(newChunk.contents);
 					newChunk = create(newChunk);
 				}
 
-				if (mirrorIncomingRelation.isRoot) {
-					newChunk.parent = mirrorIncomingRelation;
-					mirrorIncomingRelation.first = newChunk;
-					mirrorIncomingRelation.last = newChunk;
+				if (incomingIncomingRelation.isRoot) {
+					newChunk.parent = incomingIncomingRelation;
+					incomingIncomingRelation.first = newChunk;
+					incomingIncomingRelation.last = newChunk;
 				} else {
-					mirrorIncomingRelation.next = newChunk;
-					newChunk.previous = mirrorIncomingRelation;
-					newChunk.parent = mirrorIncomingRelation.parent;
-					mirrorIncomingRelation.parent.last = newChunk;
+					incomingIncomingRelation.next = newChunk;
+					newChunk.previous = incomingIncomingRelation;
+					newChunk.parent = incomingIncomingRelation.parent;
+					incomingIncomingRelation.parent.last = newChunk;
 				}
-				mirrorIncomingRelation = newChunk;
+				incomingIncomingRelation = newChunk;
 			}
 
 			// Add repeater on object beeing observed, if not already added before
-			let mirrorIncomingRelationContents = mirrorIncomingRelation.contents;
-			if (typeof(mirrorIncomingRelationContents[refererId]) === 'undefined') {
-				mirrorIncomingRelation.contentsCounter = mirrorIncomingRelation.contentsCounter + 1;
-				mirrorIncomingRelationContents[refererId] = referingObject;
+			let incomingIncomingRelationContents = incomingIncomingRelation.contents;
+			if (typeof(incomingIncomingRelationContents[refererId]) === 'undefined') {
+				incomingIncomingRelation.contentsCounter = incomingIncomingRelation.contentsCounter + 1;
+				incomingIncomingRelationContents[refererId] = referingObject;
 
 				// Note dependency in repeater itself (for cleaning up)
-				// activeRecorder.sources.push(mirrorIncomingRelation);
-				return mirrorIncomingRelation;
+				// activeRecorder.sources.push(incomingIncomingRelation);
+				return incomingIncomingRelation;
 			} else {
 				return null;
 			}
@@ -579,8 +579,8 @@
 			push : function() {
 				// log("push");
 				// logGroup();
-				// log(mirrorRelations);
-				// log(incomingRelationsDisabled);
+				// log(incomingRelations);
+				// log(incomingStructuresDisabled);
 				if (!canWrite(this.const.object)) return;
 				inPulse++;
 
@@ -590,11 +590,11 @@
 				let removed = null;
 				let added = argumentsArray;
 				
-				if (mirrorRelations && incomingRelationsDisabled === 0) {
-					incomingRelationsDisabled++
+				if (incomingRelations && incomingStructuresDisabled === 0) {
+					incomingStructuresDisabled++
 					added = createAndRemoveArrayIncomingRelations(this.const.object, index, removed, added); // TODO: implement for other array manipulators as well. 
 					// TODO: What about removed adjusted?
-					incomingRelationsDisabled--
+					incomingStructuresDisabled--
 				}
 				
 				observerNotificationNullified++;
@@ -1031,7 +1031,7 @@
 							registerChangeObserver(getSpecifier(this.const, "_enumerateObservers"));
 						}
 					}
-					if (mirrorRelations && incomingRelationsDisabled === 0 && keyInTarget && key !== 'incoming') {
+					if (incomingRelations && incomingStructuresDisabled === 0 && keyInTarget && key !== 'incoming') {
 						// console.log("find referred object");
 						// console.log(key);
 						return findReferredObject(target[key]);
@@ -1072,7 +1072,7 @@
 			// observerNotificationPostponed++;
 			let undefinedKey = !(key in target);
 			
-			// Perform assignment with regards to mirror structures.
+			// Perform assignment with regards to incoming structures.
 			target[key] = value;
 
 			
@@ -1125,11 +1125,11 @@
 			
 			// Get previous value		// Get previous value
 			let previousValue;
-			let previousMirrorStructure;
-			if (mirrorRelations && incomingRelationsDisabled === 0) {  // && !isIndexParentOf(this.const.object, value) (not needed... )
+			let previousIncomingStructure;
+			if (incomingRelations && incomingStructuresDisabled === 0) {  // && !isIndexParentOf(this.const.object, value) (not needed... )
 				// console.log("causality.getHandlerObject:");
 				// console.log(key);
-				previousMirrorStructure = target[key];
+				previousIncomingStructure = target[key];
 				previousValue = findReferredObject(target[key]);
 			} else {
 				previousValue = target[key]; 
@@ -1154,13 +1154,13 @@
 			observerNotificationPostponed++;
 			let undefinedKey = !(key in target);
 			
-			// Perform assignment with regards to mirror structures.
-			let mirrorStructureValue;
-			if (mirrorRelations && incomingRelationsDisabled === 0 && !isIndexParentOf(this.const.object, value)) {
-				incomingRelationsDisabled++;
-				mirrorStructureValue = createAndRemoveIncomingRelations(this.const.object, key, value, previousValue);
-				target[key] = mirrorStructureValue; 
-				incomingRelationsDisabled--;
+			// Perform assignment with regards to incoming structures.
+			let incomingStructureValue;
+			if (incomingRelations && incomingStructuresDisabled === 0 && !isIndexParentOf(this.const.object, value)) {
+				incomingStructuresDisabled++;
+				incomingStructureValue = createAndRemoveIncomingRelations(this.const.object, key, value, previousValue);
+				target[key] = incomingStructureValue; 
+				incomingStructuresDisabled--;
 			} else {
 				target[key] = value;
 			}
@@ -1177,11 +1177,11 @@
 			}
 
 			// Emit event
-			if (mirrorRelations && incomingRelationsDisabled === 0 && !isIndexParentOf(this.const.object, value)) {
+			if (incomingRelations && incomingStructuresDisabled === 0 && !isIndexParentOf(this.const.object, value)) {
 				// Emit extra event 
-				incomingRelationsDisabled++
-				emitSetEvent(this, key, mirrorStructureValue, previousMirrorStructure);
-				incomingRelationsDisabled--
+				incomingStructuresDisabled++
+				emitSetEvent(this, key, incomingStructureValue, previousIncomingStructure);
+				incomingStructuresDisabled--
 			}
 			emitSetEvent(this, key, value, previousValue);
 			
@@ -1795,8 +1795,8 @@
 		function emitEvent(handler, event) {
 			if (emitEventPaused === 0) {
 				// log("EMIT EVENT " + configuration.name + " " + event.type + " " + event.property + "=...");
-				if (mirrorRelations) {
-					event.incomingStructureEvent = incomingRelationsDisabled !== 0
+				if (incomingRelations) {
+					event.incomingStructureEvent = incomingStructuresDisabled !== 0
 				}
 				// console.log(event);
 				// event.objectId = handler.const.id;
@@ -1925,7 +1925,7 @@
 				uponChangeAction: doAfterChange,
 				remove : function() {
 					this.sources.forEach(function(observerSet) {
-						removeMirrorStructure(context.const.id, observerSet);
+						removeIncomingStructure(context.const.id, observerSet);
 					});
 					this.sources.lenght = 0;  // From repeater itself.
 				}
@@ -1961,7 +1961,7 @@
 		
 		function registerChangeObserver(observerSet) {
 			// Find right place in the incoming structure.
-			let incomingRelationChunk = intitializeAndConstructMirrorStructure(observerSet, activeRecording, activeRecording.const.id);
+			let incomingRelationChunk = intitializeAndConstructIncomingStructure(observerSet, activeRecording, activeRecording.const.id);
 			if (incomingRelationChunk !== null) {
 				activeRecording.sources.push(incomingRelationChunk);
 			}
@@ -2846,10 +2846,10 @@
 		 ************************************************************************/
 
 		
-		let mirrorRelations = false;
+		let incomingRelations = false;
 		
-		let exposeMirrorRelationIntermediary;
-		let mirrorStructuresAsCausalityObjects;
+		let exposeIncomingRelationIntermediary;
+		let incomingStructuresAsCausalityObjects;
 		
 		function getConfiguration() {
 			return configuration;
@@ -2867,9 +2867,9 @@
 		
 		// Assign optimized variables (reduce one object indexing)
 		recordPulseEvents = configuration.recordPulseEvents;
-		mirrorRelations = configuration.mirrorRelations;
-		exposeMirrorRelationIntermediary = configuration.exposeMirrorRelationIntermediary;
-		mirrorStructuresAsCausalityObjects = configuration.mirrorStructuresAsCausalityObjects;
+		incomingRelations = configuration.incomingRelations;
+		exposeIncomingRelationIntermediary = configuration.exposeIncomingRelationIntermediary;
+		incomingStructuresAsCausalityObjects = configuration.incomingStructuresAsCausalityObjects;
 		
 		function setCumulativeAssignment(value) {
 			console.log("DO NOT USE!!!!");
@@ -2901,7 +2901,7 @@
 			pulse : pulse, // A sequence of transactions, end with cleanup.
 			transaction: transaction, // Single transaction, end with cleanup. 	
 			
-			// Mirror images
+			// Incoming images
 			forAllIncoming : forAllIncoming,
 			createArrayIndex : createArrayIndex,
 			setIndex : setIndex
@@ -3006,9 +3006,9 @@
 			activateSpecialFeatures : false, 
 			
 			// Special features
-			mirrorRelations : false,
-			exposeMirrorRelationIntermediary : false,
-			mirrorStructuresAsCausalityObjects: false,
+			incomingRelations : false,
+			exposeIncomingRelationIntermediary : false,
+			incomingStructuresAsCausalityObjects: false,
 			
 			cumulativeAssignment : false,
 			directStaticAccess : false,

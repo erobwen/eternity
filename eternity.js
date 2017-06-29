@@ -21,9 +21,9 @@
 			name : 'imageCausality',
 			recordPulseEvents : true, 
 			
-			mirrorRelations: true, 
-			exposeMirrorRelationIntermediary : true,
-			mirrorStructuresAsCausalityObjects : true
+			incomingRelations: true, 
+			exposeIncomingRelationIntermediary : true,
+			incomingStructuresAsCausalityObjects : true
 		});
 
 		// MongoDB
@@ -49,10 +49,7 @@
 		 
 		let unstableImages = [];
 
-		// let inPostObjectPulse = 0;
 		function postObjectPulseAction(events) {
-			// if (inPostObjectPulse > 0) return events.foo.bar;
-			// inPostObjectPulse++;
 			log("postObjectPulseAction: " + events.length + " events");
 			logGroup();
 			log(events, 3);
@@ -61,7 +58,6 @@
 			unloadAndKillObjects();
 			
 			logUngroup();
-			// inPostObjectPulse--;
 		} 
 		
 		
@@ -112,25 +108,9 @@
 									
 								// Flood create new images
 								setPropertyOfImage(objectDbImage, event.property, event.newValue);
-								// let newValue = event.newValue;
-								// if (objectCausality.isObject(newValue)) {
-									// createDbImageForObject(newValue, objectDbImage, event.property);
-									// newValue = newValue.const.dbImage;
-								// }
-								// if (typeof(newValue) === 'object' && newValue.indexParent === objectDbImage) {
-									// disableIncomingRelations(function() {
-										// objectDbImage[event.property] = newValue;
-									// });
-								// } else {
-									// objectDbImage[event.property] = newValue;
-								// }
 							}
 						}
 					});
-
-					// log("=== End model pulse post process === ");
-					// Process unstable ones. Initiate garbage collection
-				// log(events);
 				});
 			}
 		}
@@ -154,21 +134,28 @@
 				} else {
 					dbImage[property] = newValue;
 					// Update incoming structure counters. 
-					// // disableIncomingRelations(function() {
-						// // let incomingRelationStructure = dbImage[property];
-						// // if (incomingRelationStructure.incomingRelationStructure) {
-							// // if (typeof(incomingRelationStructure.const.incomingRelationStructureCount) === 'undefined') {
-								// // incomingRelationStructure.const.incomingRelationStructureCount = 0;
-							// // }
-							// // incomingRelationStructure.const.incomingRelationStructureCount++;
-						// // }
-					// // });
+					increaseLoadedCountersInIncomingStructure(dbImage, property);
 				}
 			} else {
 				dbImage[property] = objectValue;
 			}
 		}
 
+		function increaseLoadedCountersInIncomingStructure(dbImage, property) {
+			imageCausality.disableIncomingRelations(function() {
+				let incomingRelationStructure = dbImage[property];
+				if (incomingRelationStructure.incomingRelationStructure) {
+					if (typeof(incomingRelationStructure.const.incomingRelationStructureCount) === 'undefined') {
+						incomingRelationStructure.const.incomingRelationStructureCount = 0;
+					}
+					incomingRelationStructure.const.incomingRelationStructureCount++;
+					
+					if (typeof(incomingRelationStructure.parent) !== 'undefined') {
+						
+					}
+				}
+			});
+		}
 		
 		function createEmptyDbImage(object, potentialParentImage, potentialParentProperty) {
 			// log(object, 3);
@@ -888,8 +875,8 @@
 			objectActivityList : true
 			
 			// TODO: make it possible to run these following in conjunction with eternity.... as of now it will totally confuse eternity.... 
-			// mirrorRelations : true, // this works only in conjunction with mirrorStructuresAsCausalityObjects, otherwise isObject fails.... 
-			// mirrorStructuresAsCausalityObjects : true
+			// incomingRelations : true, // this works only in conjunction with incomingStructuresAsCausalityObjects, otherwise isObject fails.... 
+			// incomingStructuresAsCausalityObjects : true
 		});
 		objectCausality = require("./causality.js")(objectCausalityConfiguration);
 		
