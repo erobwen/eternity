@@ -111,18 +111,19 @@
 								}
 									
 								// Flood create new images
-								let newValue = event.newValue;
-								if (objectCausality.isObject(newValue)) {
-									createDbImageForObject(newValue, objectDbImage, event.property);
-									newValue = newValue.const.dbImage;
-								}
-								if (typeof(newValue) === 'object' && newValue.indexParent === objectDbImage) {
-									disableIncomingRelations(function() {
-										objectDbImage[event.property] = newValue;
-									});
-								} else {
-									objectDbImage[event.property] = newValue;
-								}
+								setPropertyOfImage(objectDbImage, event.property, event.newValue);
+								// let newValue = event.newValue;
+								// if (objectCausality.isObject(newValue)) {
+									// createDbImageForObject(newValue, objectDbImage, event.property);
+									// newValue = newValue.const.dbImage;
+								// }
+								// if (typeof(newValue) === 'object' && newValue.indexParent === objectDbImage) {
+									// disableIncomingRelations(function() {
+										// objectDbImage[event.property] = newValue;
+									// });
+								// } else {
+									// objectDbImage[event.property] = newValue;
+								// }
 							}
 						}
 					});
@@ -133,6 +134,41 @@
 				});
 			}
 		}
+		
+		function setPropertyOfImage(dbImage, property, objectValue) {
+			if (objectCausality.isObject(objectValue)) {
+				let newValue = objectValue;
+				// Get existing or create new image. 
+				if (typeof(newValue.const.dbImage) === 'object') {
+					newValue = newValue.const.dbImage;
+				} else {
+					createDbImageForObject(newValue, dbImage, property);					
+					newValue = newValue.const.dbImage;
+				}
+				
+				// Check if this is an index assignment. 
+				if (newValue.indexParent === dbImage) {
+					disableIncomingRelations(function() {
+						dbImage[property] = newValue;
+					});
+				} else {
+					dbImage[property] = newValue;
+					// Update incoming structure counters. 
+					// // disableIncomingRelations(function() {
+						// // let incomingRelationStructure = dbImage[property];
+						// // if (incomingRelationStructure.incomingRelationStructure) {
+							// // if (typeof(incomingRelationStructure.const.incomingRelationStructureCount) === 'undefined') {
+								// // incomingRelationStructure.const.incomingRelationStructureCount = 0;
+							// // }
+							// // incomingRelationStructure.const.incomingRelationStructureCount++;
+						// // }
+					// // });
+				}
+			} else {
+				dbImage[property] = objectValue;
+			}
+		}
+
 		
 		function createDbImageWithPropertiesFromLoadedObject(object, potentialParentImage, potentialParentProperty) {
 			// log(object, 3);
@@ -181,27 +217,7 @@
 			if (typeof(object.const.dbImage) === 'undefined') {
 				let dbImage = createDbImageWithPropertiesFromLoadedObject(object, potentialParentImage, potentialParentProperty);
 				for (let property in object) { 
-					let value = object[property];
-					if (objectCausality.isObject(value)) {
-						// TODO: translate property idExpressions
-						value = createDbImageRecursivley(value, dbImage, property);
-					}
-					if (imageCausality.isObject(value) && value.indexParent === dbImage) {
-						disableIncomingRelations(function() {
-							dbImage[property] = value;
-						});
-					} else {
-						dbImage[property] = value;
-						// disableIncomingRelations(function() {
-							// let incomingRelationStructure = dbImage[property];
-							// if (incomingRelationStructure.incomingRelationStructure) {
-								// if (typeof(incomingRelationStructure.const.incomingRelationStructureCount) === 'undefined') {
-									// incomingRelationStructure.const.incomingRelationStructureCount = 0;
-								// }
-								// incomingRelationStructure.const.incomingRelationStructureCount++;
-							// }
-						// });
-					}
+					setPropertyOfImage(dbImage, property, object[property]);
 				}
 				object.const.dbImage = dbImage;
 				dbImage.const.correspondingObject = object;
