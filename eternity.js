@@ -170,20 +170,20 @@
 		}
 
 		
-		function createDbImageWithPropertiesFromLoadedObject(object, potentialParentImage, potentialParentProperty) {
+		function createEmptyDbImage(object, potentialParentImage, potentialParentProperty) {
 			// log(object, 3);
 			// log(object);
 			let imageContents = {
 				_eternityParent : potentialParentImage,
 				_eternityParentProperty : potentialParentProperty
 			};
-			for (let property in object) {
-				let value = object[property];
-				// TODO: translate property
-				if (!objectCausality.isObject(value)) {
-					imageContents[property] = value;
-				}
-			}
+			// for (let property in object) {
+				// let value = object[property];
+				// // TODO: translate property
+				// if (!objectCausality.isObject(value)) {
+					// imageContents[property] = value;
+				// }
+			// }
 			return createDbImageConnectedWithObject(object, imageContents);
 		}
 		
@@ -215,7 +215,7 @@
 			// log("foo");
 			
 			if (typeof(object.const.dbImage) === 'undefined') {
-				let dbImage = createDbImageWithPropertiesFromLoadedObject(object, potentialParentImage, potentialParentProperty);
+				let dbImage = createEmptyDbImage(object, potentialParentImage, potentialParentProperty);
 				for (let property in object) { 
 					setPropertyOfImage(dbImage, property, object[property]);
 				}
@@ -800,7 +800,7 @@
 				if (mockMongoDB.getRecordsCount() === 0) {
 					// objectCausality.pulse(function() {
 						objectCausality.persistent = objectCausality.create();
-						createDbImageWithPropertiesFromLoadedObject(objectCausality.persistent);			
+						createEmptyDbImage(objectCausality.persistent);			
 					// });
 				} else {
 					objectCausality.persistent = createObjectPlaceholderFromDbId(0);
@@ -811,7 +811,7 @@
 					delete target[property];
 				}
 				if (mockMongoDB.getRecordsCount() === 0) {
-					createDbImageWithPropertiesFromLoadedObject(objectCausality.persistent);
+					createEmptyDbImage(objectCausality.persistent);
 				} else {
 					objectCausality.persistent.const.dbId = 0;
 					delete objectCausality.persistent.const.dbImage;
