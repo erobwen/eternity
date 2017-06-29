@@ -35,8 +35,8 @@
 		 ***************************************************************/
 					
 
-		const idExpressionPrefix = "_id_(";
-		const idExpressionSuffix = ")";
+		const idExpressionPrefix = "_id_";
+		const idExpressionSuffix = "_di_";
 
 		function idExpression(id) {
 			// log("idExpression: " + id);

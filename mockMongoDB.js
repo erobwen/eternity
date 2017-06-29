@@ -31,7 +31,12 @@
 	
 	function saveNewRecord(dataRecord) {
 		let id = dataRecords.length;
-		dataRecord.id = id;
+		// dataRecord.id = "_id_" + id + "_di_"; // debug
+		
+		let copy = { id : "_id_" + id + "_di_" };
+		Object.assign(copy, dataRecord);
+		dataRecord = copy;
+		
 		// console.log("saveNewRecord");
 		// console.log(dataRecord);
 		dataRecords.push(JSON.stringify(dataRecord));
@@ -39,7 +44,12 @@
 	}
 
 	function updateRecord(id, contents) {
-		contents.id = id;
+		// contents.id = "_id_" + id + "_di_";
+
+		let copy = { id : "_id_" + id + "_di_" };
+		Object.assign(copy, contents);
+		contents = copy;
+
 		// console.log("updateRecord");
 		dataRecords[id] = JSON.stringify(contents);
 		return id;

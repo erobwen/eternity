@@ -190,6 +190,7 @@
 				}
 				object.const.dbImage = dbImage;
 				dbImage.const.correspondingObject = object;
+				loadedObjects++;
 			}	
 		}
 		
@@ -664,32 +665,46 @@
 		 *-----------------------------------------------*/
 		
 		let maxNumberOfLoadedObjects = configuration.maxNumberOfLoadedObjects; //10000;
-		let unloadedObjects = 0;
+		// let unloadedObjects = 0;
+		let loadedObjects = 0;
 		
 		
 		function unloadAndKillObjects() {
+			log("unloadAndKillObjects");
+			logGroup();
 			let leastActiveObject = objectCausality.getActivityListLast();
-			while (createdObjects - unloadedObjects > maxNumberOfLoadedObjects) {
-				while(typeof(leastActiveObject.const.dbId) === 'undefined') {
+			while (leastActiveObject !== null && loadedObjects > maxNumberOfLoadedObjects) {
+				log("considering object for unload...");
+				while(leastActiveObject !== null && typeof(leastActiveObject.const.dbImage) === 'undefined') { // Warning! can this wake a killed object to life? ... no should not be here!
+					log("skipping unsaved object (cannot unload something not saved)...");
 					objectCausality.removeFromActivityList(leastActiveObject); // Just remove them and make GC possible. Consider pre-filter for activity list.... 
 					leastActiveObject = objectCausality.getActivityListLast();
 				}
-				objectCausality.removeFromActivityList(leastActiveObject);
-				unloadObject(leastActiveObject);
+				log(leastActiveObject === null);
+				if (leastActiveObject !== null) {
+					log("remove it!!");
+					objectCausality.removeFromActivityList(leastActiveObject);
+					unloadObject(leastActiveObject);
+				}
 			}
+			logUngroup();
 		}
 		
 		function unloadObject(object) {
+			log("unloadObject");
 			// without emitting events.
 			for (property in object) {
 				delete object[property];
 			}
 			unloadImage(object.const.dbImage);
-			object.const.initializer = objectFromImageInitializer;
+			loadedObjects--;
 
-			if (object.const.incomingReferences === 0) {
-				killObject(object);
-			}
+			object.const.initializer = objectFromImageInitializer;
+			objectCausality.blockInitialize(function() {			
+				if (object.const.incomingReferences === 0) {
+					killObject(object);
+				}
+			});
 		}
 		
 		function killObject(object) {
@@ -703,14 +718,15 @@
 		
 		function unloadImage(dbImage) {
 			// without emitting events.
-			for (property in object) {
-				delete object[property];
+			for (property in dbImage) {
+				delete dbImage[property];
 			}
 			dbImage.const.initializer = imageFromDbIdInitializer;
-			
-			if (dbImage.const.incomingReferences === 0) {
-				killDbImage(dbImage);
-			}
+			imageCausality.blockInitialize(function() {
+				if (dbImage.const.incomingReferences === 0) {
+					killDbImage(dbImage);
+				}				
+			});
 		}
 		
 		function killDbImage(dbImage) {
@@ -816,6 +832,7 @@
 		Object.assign(objectCausalityConfiguration, {
 			name: 'objectCausality', 
 			recordPulseEvents : true,
+			objectActivityList : true
 			
 			// TODO: make it possible to run these following in conjunction with eternity.... as of now it will totally confuse eternity.... 
 			// mirrorRelations : true, // this works only in conjunction with mirrorStructuresAsCausalityObjects, otherwise isObject fails.... 
