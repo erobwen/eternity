@@ -144,15 +144,28 @@
 		function increaseLoadedCountersInIncomingStructure(dbImage, property) {
 			imageCausality.disableIncomingRelations(function() {
 				let incomingRelationStructure = dbImage[property];
-				if (incomingRelationStructure.incomingRelationStructure) {
-					if (typeof(incomingRelationStructure.const.incomingRelationStructureCount) === 'undefined') {
-						incomingRelationStructure.const.incomingRelationStructureCount = 0;
+				if (incomingRelationStructure.isIncomingRelationStructure) {
+					// Increase counter 
+					if (typeof(incomingRelationStructure.const.loadedIncomingCount) === 'undefined') {
+						incomingRelationStructure.const.loadedIncomingCount = 0;
 					}
-					incomingRelationStructure.const.incomingRelationStructureCount++;
+					incomingRelationStructure.const.loadedIncomingCount++;
 					
-					if (typeof(incomingRelationStructure.parent) !== 'undefined') {
-						
+					// Increase counter 
+					let nextStructure = incomingRelationStructure;
+					if (typeof(nextStructure.parent) !== 'undefined') {
+						if (typeof(nextStructure.const.loadedIncomingCount) === 'undefined') {
+							nextStructure.const.loadedIncomingCount = 0;
+						}
+						nextStructure.const.loadedIncomingCount++;
+						nextStructure = nextStructure.incomingStructures;
 					}
+					
+					// Increase counter 
+					if (typeof(nextStructure.const.loadedIncomingCount) === 'undefined') {
+						nextStructure.const.loadedIncomingCount = 0;
+					}
+					nextStructure.const.loadedIncomingCount++;
 				}
 			});
 		}
@@ -744,19 +757,74 @@
 			object.const.forwardsTo = createObjectPlaceholderFromDbImage(object.const.dbImage); // note: the dbImage might become a zombie as well...
 		}
 		
+		function decreaseCountersAndUnoadIncoming(dbImage, property) {
+			let value = dbImage[property];
+			if (value.isIncomingRelationStructure) {
+				let currentIncomingStructure = value;
+				let nextIncomingStructure;
+				if (typeof(value.parent) !== 'undefined') {
+					nextIncomingStructure = currentIncomingStructure.parent
+				} else {
+					nextIncomingStructure = currentIncomingStructure.incomingStructures;
+				}
+	
+				// Possibly unload incoming structure
+				currentIncomingStructure.const.loadedIncomingCount--;
+				if (currentIncomingStructure.const.loadedIncomingCount === 0) {
+					unloadImage(currentIncomingStructure);
+				}
+				
+				// Incoming structures or root incoming structure
+				currentIncomingStructure = nextIncomingStructure;
+				let referedDbImage;
+				if (typeof(currentIncomingStructure.isIncomingStructure) !== 'undefined') {
+					// We were at the root incoming structure, proceed to the main incoming structure
+					nextIncomingStructure = currentIncomingStructure.incomingStructures;
+				} else {
+					// Reached the object
+					referedDbImage = currentIncomingStructure.referencedObject;
+					nextIncomingStructure = null;
+				}
+				
+				// Possibly unload incoming structure
+				currentIncomingStructure.const.loadedIncomingCount--;
+				if (currentIncomingStructure.const.loadedIncomingCount === 0) {
+					unloadImage(currentIncomingStructure);
+				}
+				
+				
+				if (nextIncomingStructure !== null) {
+					currentIncomingStructure = nextIncomingStructure;
+					
+					// Reached the object
+					referedDbImage = currentIncomingStructure.referencedObject;
+					nextIncomingStructure = null;
+
+					// Possibly unload incoming structure
+					currentIncomingStructure.const.loadedIncomingCount--;
+					if (currentIncomingStructure.const.loadedIncomingCount === 0) {
+						unloadImage(currentIncomingStructure);
+					}
+				}
+				
+				// What to do with the object... kill if unloaded?
+				referedDbImage.const.loadedIncomingCount--;
+				// Idea: perhaps referedDbImage.const.incomingCount could be used.... as it is not persistent...
+				if (referedDbImage.const.loadedIncomingCount === 0) {
+					// if (referedDbImage.const.correspondingObject.const.)
+					// unloadImage(referedDbImage);
+					// if there are no incoming relations on the object also, kill both... 
+				}
+			}			
+		}
+		
 		function unloadImage(dbImage) {
 			log("unloadImage");
 			// without emitting events.
 			for (property in dbImage) {
 				imageCausality.disableIncomingRelations(function() {						
-					let value = dbImage[property];
-					if (typeof(value.incomingRelationStructure) !== 'undefined') {
-						value.const.incomingRelationStructureCount--;
-						if (value.const.incomingRelationStructureCount === 0) {
-							unloadImage(value);
-						}
-					}
-					delete dbImage[property]; // This cannot be right... it has to unload incoming structures gradually...
+					decreaseCountersAndUnoadIncoming(dbImage, property);
+					delete dbImage[property]; 
 				});
 			}
 			dbImage.const.initializer = imageFromDbIdInitializer;
