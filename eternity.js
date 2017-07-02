@@ -21,8 +21,7 @@
 			name : 'imageCausality',
 			recordPulseEvents : true, 
 			
-			incomingRelations: true, 
-			exposeIncomingRelationIntermediary : true,
+			useIncomingStructures: true, 
 			incomingStructuresAsCausalityObjects : true
 		});
 
@@ -829,7 +828,7 @@
 			}
 			dbImage.const.initializer = imageFromDbIdInitializer;
 			// imageCausality.blockInitialize(function() {
-				// if (dbImage.const.incomingReferences === 0) {
+				// if (dbImage.const.incomingReferenceCount === 0) {
 					// killDbImage(dbImage);
 				// }				
 			// });

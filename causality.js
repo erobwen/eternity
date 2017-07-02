@@ -15,18 +15,6 @@
 	let logUngroup = objectlog.exit;
 
 	function createCausalityInstance(configuration) {
-		let inPulse = 0;
-		
-		let postPulseProcess = 0;
-	 
-		let pulseEvents = [];
-		
-		let recordPulseEvents = false;
-		
-
-		// Causality instance
-		let causalityInstance;
-		
 		
 		/***************************************************************
 		 *
@@ -116,7 +104,7 @@
 					specifierProperty : specifierName, 
 					isIncomingStructure : true   // This is a reuse of this object as incoming node as well.
 				}
-				if (incomingStructuresAsCausalityObjects) {
+				if (configuration.incomingStructuresAsCausalityObjects) {
 					javascriptObject[specifierName] = createImmutable(specifier);
 				} else {
 					javascriptObject[specifierName] = specifier;				
@@ -413,7 +401,7 @@
 			let incomingStructures;
 			if (typeof(referencedObject.incoming) === 'undefined') {
 				incomingStructures = { isIncomingStructures : true, referredObject: referencedObject };
-				if (incomingStructuresAsCausalityObjects) {
+				if (configuration.incomingStructuresAsCausalityObjects) {
 					incomingStructures = create(incomingStructures);
 				}
 				referencedObject.incoming = incomingStructures;
@@ -424,7 +412,7 @@
 			// Create incoming for this particular property
 			if (typeof(incomingStructures[relationName]) === 'undefined') {
 				let incomingIncomingRelation = { isIncomingStructure : true, referredObject: referencedObject, incomingStructures : incomingStructures };
-				if (incomingStructuresAsCausalityObjects) {
+				if (configuration.incomingStructuresAsCausalityObjects) {
 					// Disable incoming relations here? otherwise we might end up with incoming structures between 
 					incomingIncomingRelation = create(incomingIncomingRelation);
 				}
@@ -492,7 +480,7 @@
 			if (typeof(incomingIncomingRelation.initialized) === 'undefined') {
 				incomingIncomingRelation.isRoot = true;
 				incomingIncomingRelation.contents = {};
-				if (incomingStructuresAsCausalityObjects) {
+				if (configuration.incomingStructuresAsCausalityObjects) {
 					incomingIncomingRelation.contents = create(incomingIncomingRelation.contents);
 				}
 				incomingIncomingRelation.contentsCounter = 0;
@@ -517,7 +505,7 @@
 					previous: null,
 					parent: null
 				};
-				if (incomingStructuresAsCausalityObjects) {
+				if (configuration.incomingStructuresAsCausalityObjects) {
 					newChunk.contents = create(newChunk.contents);
 					newChunk = create(newChunk);
 				}
@@ -577,10 +565,6 @@
 			},
 
 			push : function() {
-				// log("push");
-				// logGroup();
-				// log(incomingRelations);
-				// log(incomingStructuresDisabled);
 				if (!canWrite(this.const.object)) return;
 				inPulse++;
 
@@ -590,10 +574,12 @@
 				let removed = null;
 				let added = argumentsArray;
 				
-				if (incomingRelations && incomingStructuresDisabled === 0) {
+				// TODO: configuration.incomingReferenceCounters || .... 
+				if (configuration.useIncomingStructures && incomingStructuresDisabled === 0) {
 					incomingStructuresDisabled++
 					added = createAndRemoveArrayIncomingRelations(this.const.object, index, removed, added); // TODO: implement for other array manipulators as well. 
-					// TODO: What about removed adjusted?
+					// TODO: What about removed adjusted? 
+					// TODO: What about the events? 
 					incomingStructuresDisabled--
 				}
 				
@@ -1031,7 +1017,7 @@
 							registerChangeObserver(getSpecifier(this.const, "_enumerateObservers"));
 						}
 					}
-					if (incomingRelations && incomingStructuresDisabled === 0 && keyInTarget && key !== 'incoming') {
+					if (configuration.useIncomingStructures && incomingStructuresDisabled === 0 && keyInTarget && key !== 'incoming') {
 						// console.log("find referred object");
 						// console.log(key);
 						return findReferredObject(target[key]);
@@ -1107,17 +1093,45 @@
 			}
 		}
 		
-		function setHandlerObject(target, key, value) {
-			// logGroup();
-			if (configuration.objectActivityList) registerActivity(this);
-					
+		
+		
+		function increaseIncomingCounter(value) {
+			if (isObject(value)) {
+				if (typeof(value.const.incomingReferencesCount) === 'undefined') {
+					value.const.incomingReferencesCount = 0;
+				}
+				value.const.incomingReferencesCount++;
+			}
+		}
+		
+		function decreaseIncomingCounter(value) {
+			if (isObject(value)) {
+				value.const.incomingReferencesCount--;
+				if (value.const.incomingReferencesCount === 0) {
+					removedLastIncomingRelation(value);
+				}
+			}
+		}
+		
+		// if (configuration.useIncomingStructures) {
+			// if (configuration.useIncomingStructures && incomingStructuresDisabled === 0) {	
+				// increaseIncomingCounter(value);
+				// decreaseIncomingCounter(previousValue);
+				// decreaseIncomingCounter(previousIncomingStructure);
+			// } else {
+				// increaseIncomingCounter(value);
+				// decreaseIncomingCounter(previousValue);					
+			// }
+		// }
+		
+		function setHandlerObject(target, key, value) {					
 			// Overlays
 			if (this.const.forwardsTo !== null) {
 				let overlayHandler = this.const.forwardsTo.const.handler;
 				return overlayHandler.set.apply(overlayHandler, [overlayHandler.target, key, value]);
 			}
 			
-			// Writeprotection
+			// Write protection
 			if (!canWrite(this.const.object)) return;
 			
 			// Ensure initialized
@@ -1126,7 +1140,7 @@
 			// Get previous value		// Get previous value
 			let previousValue;
 			let previousIncomingStructure;
-			if (incomingRelations && incomingStructuresDisabled === 0) {  // && !isIndexParentOf(this.const.object, value) (not needed... )
+			if (configuration.useIncomingStructures && incomingStructuresDisabled === 0) {  // && !isIndexParentOf(this.const.object, value) (not needed... )
 				// console.log("causality.getHandlerObject:");
 				// console.log(key);
 				previousIncomingStructure = target[key];
@@ -1153,15 +1167,31 @@
 			inPulse++;
 			observerNotificationPostponed++;
 			let undefinedKey = !(key in target);
+					
+			// logGroup();
+			if (configuration.objectActivityList) registerActivity(this);
 			
 			// Perform assignment with regards to incoming structures.
 			let incomingStructureValue;
-			if (incomingRelations && incomingStructuresDisabled === 0 && !isIndexParentOf(this.const.object, value)) {
-				incomingStructuresDisabled++;
-				incomingStructureValue = createAndRemoveIncomingRelations(this.const.object, key, value, previousValue);
-				target[key] = incomingStructureValue; 
-				incomingStructuresDisabled--;
-			} else {
+			if (configuration.useIncomingStructures) {
+				increaseIncomingCounter(value);
+				decreaseIncomingCounter(previousValue);
+				decreaseIncomingCounter(previousIncomingStructure);
+				if (incomingStructuresDisabled === 0) { // && !isIndexParentOf(this.const.object, value)
+					incomingStructuresDisabled++;
+					incomingStructureValue = createAndRemoveIncomingRelations(this.const.object, key, value, previousValue);
+					target[key] = incomingStructureValue; 
+					incomingStructuresDisabled--;
+				} else {
+					target[key] = value;
+				}
+			} 
+			else if (configuration.incomingReferenceCounters){
+				increaseIncomingCounter(value);
+				decreaseIncomingCounter(previousValue);
+				target[key] = value;
+			} 
+			else {
 				target[key] = value;
 			}
 			
@@ -1177,7 +1207,7 @@
 			}
 
 			// Emit event
-			if (incomingRelations && incomingStructuresDisabled === 0 && !isIndexParentOf(this.const.object, value)) {
+			if (configuration.useIncomingStructures && incomingStructuresDisabled === 0 && !isIndexParentOf(this.const.object, value)) {
 				// Emit extra event 
 				incomingStructuresDisabled++
 				emitSetEvent(this, key, incomingStructureValue, previousIncomingStructure);
@@ -1687,6 +1717,12 @@
 		 *  Upon change do
 		 **********************************/
 
+		let inPulse = 0;
+		
+		let postPulseProcess = 0; // Remove??
+	 
+		let pulseEvents = [];
+		
 		function pulse(action) {
 			inPulse++;
 			action();
@@ -1754,40 +1790,40 @@
 		}
 
 		function emitImmutableCreationEvent(object) {
-			if (recordPulseEvents) {
+			if (configuration.recordPulseEvents) {
 				let event = { type: 'creation', object: object }
-				if (recordPulseEvents) {
+				if (configuration.recordPulseEvents) {
 					pulseEvents.push(event);
 				}
 			}		
 		} 
 		
 		function emitCreationEvent(handler) {
-			if (recordPulseEvents) {
+			if (configuration.recordPulseEvents) {
 				emitEvent(handler, { type: 'creation' });
 			}		
 		} 
 		 
 		function emitSpliceEvent(handler, index, removed, added) {
-			if (recordPulseEvents || typeof(handler.observers) !== 'undefined') {
+			if (configuration.recordPulseEvents || typeof(handler.observers) !== 'undefined') {
 				emitEvent(handler, { type: 'splice', index: index, removed: removed, added: added});
 			}
 		}
 
 		function emitSpliceReplaceEvent(handler, key, value, previousValue) {
-			if (recordPulseEvents || typeof(handler.observers) !== 'undefined') {
+			if (configuration.recordPulseEvents || typeof(handler.observers) !== 'undefined') {
 				emitEvent(handler, { type: 'splice', index: key, removed: [previousValue], added: [value] });
 			}
 		}
 
 		function emitSetEvent(handler, key, value, previousValue) {
-			if (recordPulseEvents || typeof(handler.observers) !== 'undefined') {
+			if (configuration.recordPulseEvents || typeof(handler.observers) !== 'undefined') {
 				emitEvent(handler, {type: 'set', property: key, newValue: value, oldValue: previousValue});
 			}
 		}
 
 		function emitDeleteEvent(handler, key, previousValue) {
-			if (recordPulseEvents || typeof(handler.observers) !== 'undefined') {
+			if (configuration.recordPulseEvents || typeof(handler.observers) !== 'undefined') {
 				emitEvent(handler, {type: 'delete', property: key, deletedValue: previousValue});
 			}
 		}
@@ -1795,13 +1831,13 @@
 		function emitEvent(handler, event) {
 			if (emitEventPaused === 0) {
 				// log("EMIT EVENT " + configuration.name + " " + event.type + " " + event.property + "=...");
-				if (incomingRelations) {
+				if (configuration.useIncomingStructures) {
 					event.incomingStructureEvent = incomingStructuresDisabled !== 0
 				}
 				// console.log(event);
 				// event.objectId = handler.const.id;
 				event.object = handler.const.object; 
-				if (recordPulseEvents) {
+				if (configuration.recordPulseEvents) {
 					pulseEvents.push(event);
 				}
 				if (typeof(handler.observers) !== 'undefined') {
@@ -1813,7 +1849,7 @@
 		}
 		
 		function emitUnobservableEvent(event) {
-			if (recordPulseEvents) {
+			if (configuration.recordPulseEvents) {
 				pulseEvents.push(event);
 			}
 		}
@@ -2838,7 +2874,18 @@
 			handler.activityListNext = null;
 			handler.activityListPrevious = null;
 		}
+		
+		
+		/************************************************************************
+		 *
+		 *  Debugging
+		 *
+		 ************************************************************************/
 		 
+		function getInPulse() {
+			return inPulse;
+		}
+		
 		/************************************************************************
 		 *
 		 *  Module installation and configuration
@@ -2846,37 +2893,6 @@
 		 ************************************************************************/
 
 		
-		let incomingRelations = false;
-		
-		let exposeIncomingRelationIntermediary;
-		let incomingStructuresAsCausalityObjects;
-		
-		function getConfiguration() {
-			return configuration;
-		}
-
-		// Set activate special features
-		let anySet = false;
-		for (property in configuration) {
-			anySet = configuration[property] || anySet;
-		}
-		if (anySet) {
-			configuration.activateSpecialFeatures = true;
-		}
-		// console.log(configuration);
-		
-		// Assign optimized variables (reduce one object indexing)
-		recordPulseEvents = configuration.recordPulseEvents;
-		incomingRelations = configuration.incomingRelations;
-		exposeIncomingRelationIntermediary = configuration.exposeIncomingRelationIntermediary;
-		incomingStructuresAsCausalityObjects = configuration.incomingStructuresAsCausalityObjects;
-		
-		function setCumulativeAssignment(value) {
-			console.log("DO NOT USE!!!!");
-			// setConfiguration({cumulativeAssignment : value}); 
-		}
-		 
-
 		// Language extensions
 		let languageExtensions = {
 			// Object creation and identification
@@ -2907,24 +2923,12 @@
 			setIndex : setIndex
 		}
 		
-		let trace = false;
-
-		function startTrace() {
-			trace = true;
-		}
-
-		function endTrace() {
-			trace = false;
-		}
-		
 		// Debugging and testing
 		let debuggingAndTesting = {
 			observeAll : observeAll,
 			cachedCallCount : cachedCallCount,
 			clearRepeaterLists : clearRepeaterLists,
 			resetObjectIds : resetObjectIds,
-			startTrace : startTrace,
-			endTrace : endTrace,
 			getInPulse : getInPulse
 		}
 			
@@ -2932,13 +2936,9 @@
 		 *  Module installation
 		 * @param target
 		 */
-		function install(target, configuration) {
+		function install(target) {
 			if (typeof(target) === 'undefined') {
 				target = (typeof(global) !== 'undefined') ? global : window;
-			} else {
-				if (typeof(configuration) !== 'undefined') {
-					setConfiguration(configuration);
-				}			
 			}
 
 			Object.assign(target, languageExtensions);
@@ -2947,21 +2947,15 @@
 		}
 
 		
-		function getInPulse() {
-			return inPulse;
-		}
-		causalityInstance = {
+		let causalityInstance = {
+			// Install causality to global scope. 
 			install : install,
 			
-			// Framework setup (usually not used by application code)
-			// setConfiguration : setConfiguration,
-			getConfiguration : getConfiguration,
-			// setCumulativeAssignment : setCumulativeAssignment,
-			
-			// Setup & Configuration
+			// Setup. Consider: add these to configuration instead? 
 			addPostPulseAction : addPostPulseAction,
 			setCustomCanRead : setCustomCanRead,
 			setCustomCanWrite : setCustomCanWrite,
+			addRemovedLastIncomingRelationCallback : addRemovedLastIncomingRelationCallback,
 			
 			// Id expressions
 			isIdExpression : isIdExpression, 
@@ -2969,9 +2963,7 @@
 			extractIdFromExpression : extractIdFromExpression,
 			transformPossibleIdExpression : transformPossibleIdExpression,
 			
-			addRemovedLastIncomingRelationCallback : addRemovedLastIncomingRelationCallback,
-			
-			// Framework interface
+			// Activity list interface
 			setActivityListFilter : setActivityListFilter,
 			getActivityListLast : getActivityListLast,
 			getActivityListFirst : getActivityListFirst,
@@ -3006,9 +2998,9 @@
 			activateSpecialFeatures : false, 
 			
 			// Special features
-			incomingRelations : false,
-			exposeIncomingRelationIntermediary : false,
+			useIncomingStructures : false,
 			incomingStructuresAsCausalityObjects: false,
+			incomingReferenceCounters : false, 
 			
 			cumulativeAssignment : false,
 			directStaticAccess : false,
@@ -3023,8 +3015,18 @@
 			requestedConfiguration = {};
 		}
 		
+		// Create configuration 
 		let defaultConfiguration = getDefaultConfiguration();
 		Object.assign(defaultConfiguration, requestedConfiguration);
+		let anySet = false;
+		for (property in defaultConfiguration) {
+			anySet = defaultConfiguration[property] || anySet;
+		}
+		if (anySet) {
+			defaultConfiguration.activateSpecialFeatures = true;
+		}
+		
+		// Create configuration signature
 		let configuration = sortedKeys(defaultConfiguration);
 		let signature = JSON.stringify(configuration);
 		// console.log("================= REQUEST: ==========");
