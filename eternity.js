@@ -733,7 +733,9 @@
 			// without emitting events.
 			
 			for (property in object) {
-				delete object[property];
+				if (property !== incoming) {
+					delete object[property];					
+				}
 			}
 			unloadImage(object.const.dbImage);
 			loadedObjects--;
@@ -807,13 +809,15 @@
 				}
 				
 				// What to do with the object... kill if unloaded?
-				referedDbImage.const.loadedIncomingCount--;
-				// Idea: perhaps referedDbImage.const.incomingCount could be used.... as it is not persistent...
-				if (referedDbImage.const.loadedIncomingCount === 0) {
-					// if (referedDbImage.const.correspondingObject.const.)
-					// unloadImage(referedDbImage);
-					// if there are no incoming relations on the object also, kill both... 
-				}
+				imageCausality.blockInitialize(function() {
+					referedDbImage.const.loadedIncomingCount--;
+					// Idea: perhaps referedDbImage.const.incomingCount could be used.... as it is not persistent...
+					if (referedDbImage.const.loadedIncomingCount === 0) {
+						// if (referedDbImage.const.correspondingObject.const.)
+						// unloadImage(referedDbImage);
+						// if there are no incoming relations on the object also, kill both... 
+					} 					
+				});
 			}			
 		}
 		
@@ -821,7 +825,8 @@
 			log("unloadImage");
 			// without emitting events.
 			for (property in dbImage) {
-				imageCausality.disableIncomingRelations(function() {						
+				imageCausality.disableIncomingRelations(function() {
+					// Incoming should be unloaded here also, since it can be recovered.
 					decreaseCountersAndUnoadIncoming(dbImage, property);
 					delete dbImage[property]; 
 				});
