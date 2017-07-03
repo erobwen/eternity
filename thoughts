@@ -19,3 +19,19 @@ Indicies cannot have weak links, this is because removal from an index usually r
 
 
 http://fgnass.github.io/spin.js/
+
+Killing: 
+
+When killing an object, nullify corresponding object on image. 
+
+When killing an image change dbImage to dbId on object. Make sure it has a loadObjectFromId initializer. Remove from dbIdToImageMap.
+
+Unload object should not destroy incoming relations... These are not saved and might be irreplaceable... we have to wait until there are no references to kill the object. 
+
+When adding incoming references on objects, do we really need to load object if it is a placeholder?...
+For incoming references to an image, we need to load the image before adding to them.
+
+However, when adding incoming references to a dbImage we need to load it for proper placement of incoming references... 
+
+
+ 
