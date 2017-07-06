@@ -300,16 +300,16 @@
 					}
 				}
 				
-				// What to do with the object... kill if unloaded?
-				imageCausality.blockInitialize(function() {
-					referedDbImage.const.loadedIncomingMacroReferenceCount--;
-					// Idea: perhaps referedDbImage.const.incomingCount could be used.... as it is not persistent...
-					if (referedDbImage.const.loadedIncomingMacroReferenceCount === 0) {
-						// if (referedDbImage.const.correspondingObject.const.)
-						// unloadImage(referedDbImage);
-						// if there are no incoming relations on the object also, kill both... 
-					} 					
-				});
+				// // What to do with the object... kill if unloaded?
+				// imageCausality.blockInitialize(function() {
+					// referedDbImage.const.loadedIncomingMacroReferenceCount--;
+					// // Idea: perhaps referedDbImage.const.incomingCount could be used.... as it is not persistent...
+					// if (referedDbImage.const.loadedIncomingMacroReferenceCount === 0) {
+						// // if (referedDbImage.const.correspondingObject.const.)
+						// // unloadImage(referedDbImage);
+						// // if there are no incoming relations on the object also, kill both... 
+					// } 					
+				// });
 			}			
 		}
 		
@@ -331,6 +331,9 @@
 						entity.const.incomingLoadedMicroCounter = 0;
 					}
 					entity.const.incomingLoadedMicroCounter--;
+					if (entity.const.incomingLoadedMicroCounter === 0 && entity.const.initializer !== null) {
+						killDbImage(entity);
+					}
 				}				
 			});
 		}
@@ -877,22 +880,27 @@
 				});
 			}
 			dbImage.const.initializer = imageFromDbIdInitializer;
-			// imageCausality.blockInitialize(function() {
-				// if (dbImage.const.incomingReferenceCount === 0) {
-					// killDbImage(dbImage);
-				// }				
-			// });
+			imageCausality.blockInitialize(function() {
+				if (dbImage.const.incomingLoadedMicroCounter === 0) {
+					killDbImage(dbImage);
+				}				
+			});
 		}
 		
 		function killDbImage(dbImage) {
 			log("killDbImage");
+			if (typeof(dbImage.const.correspondingObject) !== 'undefined') {
+				let object = dbImage.const.correspondingObject;
+				delete object.const.dbImage;
+				delete dbImage.const.correspondingObject;
+			}
 			delete dbIdToDbImageMap[dbImage.const.dbId];
 			dbImage.const.initializer = zombieImageInitializer;
 		}
 		
 		function zombieImageInitializer(dbImage) {
 			log("zombieImageInitializer");
-			dbImage.const.forwardsTo = createImagePlaceholderFromDbId(dbImage.const.dbId);
+			dbImage.const.forwardsTo = getDbImage(dbImage.const.dbId);
 		}
 		
 		/*-----------------------------------------------
