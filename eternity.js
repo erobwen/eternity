@@ -276,6 +276,28 @@
 			});
 		}				
 
+		function increaseImageIncomingLoadedCounter(entity) {
+			imageCausality.blockInitialize(function() {
+				if (imageCausality.isObject(entity)) {
+					if (typeof(entity.const.incomingLoadedMicroCounter) === 'undefined') {
+						entity.const.incomingLoadedMicroCounter = 0;
+					}
+					entity.const.incomingLoadedMicroCounter++;
+				}
+			});
+		}
+
+		function decreaseImageIncomingLoadedCounter(entity) {
+			imageCausality.blockInitialize(function() {
+				if (imageCausality.isObject(entity)) {
+					if (typeof(entity.const.incomingLoadedMicroCounter) === 'undefined') {
+						entity.const.incomingLoadedMicroCounter = 0;
+					}
+					entity.const.incomingLoadedMicroCounter--;
+				}				
+			});
+		}
+
 		
 		function postImagePulseAction(events) {
 			if (events.length > 0) {
@@ -298,19 +320,22 @@
 								
 							if (event.type === 'creation') {
 								pendingImageCreations[imageId] = dbImage;
+								
+								for (let property in dbImage) increaseImageIncomingLoadedCounter(dbImage[property]);
 								// if (typeof(pendingImageUpdates[imageId]) !== 'undefined') {
 									// // We will do a full write of this image, no need to update after.				
 									// delete pendingImageUpdates[dbId];   // will never happen anymore?
 								// }
 							} else if (event.type === 'set') {
-								let dbId = dbImage.const.dbId;
-								if (typeof(dbId) !== 'undefined') { // && typeof(pendingImageCreations[imageId]) === 'undefined'
+								if (typeof(dbImage.const.dbId) !== 'undefined') { // && typeof(pendingImageCreations[imageId]) === 'undefined'
+									let dbId = dbImage.const.dbId;
 									// Only update if we will not do a full write on this image. 
 									if (typeof(pendingImageUpdates[dbId]) === 'undefined') {
 										pendingImageUpdates[dbId] = {};
 									}
 									let imageUpdates = pendingImageUpdates[dbId];
-									imageUpdates[event.property] = event.newValue;				
+									imageUpdates[event.property] = event.newValue;
+									increaseImageIncomingLoadedCounter(event.newValue);
 								}
 							}				
 						}
@@ -560,6 +585,7 @@
 						// log("value loaded to image:");
 						// log(value);
 						property = imageCausality.transformPossibleIdExpression(property, dbIdToImageId);
+						increaseImageIncomingLoadedCounter(value);
 						dbImage[property] = value;
 						// if (property !== 'A') imageCausality.endTrace();
 						// log("loadFromDbIdToImage: " + dbId + " property: " + property + "...finished assigning");
@@ -765,7 +791,8 @@
 			object.const.forwardsTo = createObjectPlaceholderFromDbImage(object.const.dbImage); // note: the dbImage might become a zombie as well...
 		}
 		
-		function decreaseCountersAndUnoadIncoming(dbImage, property) {
+		
+		function decreaseLoadedIncomingMacroReferenceCounters(dbImage, property) {
 			let value = dbImage[property];
 			if (value.isIncomingRelationStructure) {
 				let currentIncomingStructure = value;
@@ -834,7 +861,9 @@
 			for (property in dbImage) {
 				imageCausality.disableIncomingRelations(function() {
 					// Incoming should be unloaded here also, since it can be recovered.
-					decreaseCountersAndUnoadIncoming(dbImage, property);
+					decreaseLoadedIncomingMacroReferenceCounters(dbImage, property);
+					decreaseImageIncomingLoadedCounter(value);
+					let value = dbImage[property];
 					delete dbImage[property]; 
 				});
 			}
