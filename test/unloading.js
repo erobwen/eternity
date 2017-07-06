@@ -22,6 +22,7 @@ describe("basics", function () {
 				log(object);
 				log(object.const.initializer);
 				result = object.const.initializer === null;
+				log(result);
 			});
 			return result;
 		}
@@ -40,19 +41,23 @@ describe("basics", function () {
 		A.B = B;
 		log("==================== SETUP COMPLETE ==========================");
 		log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
-		log("--------------------------------------------------------------");
+		log("---------------------- this should unload persistent -----------------");
 		B.C = C;
 		log("--------------------- after unload ---------------------------");
-		log(persistent.name);
-		// C.A = A;
+		// log(persistent.name);
+		
 		
 
 		
-		// // Persistent should be unloaded
-		// assert.equal(isLoaded(persistent), false);
-		// assert.equal(isLoaded(A), false);
-		// assert.equal(isLoaded(B), true);
-		// assert.equal(isLoaded(C), true);
+		// Persistent should be unloaded
+		assert.equal(isLoaded(persistent), false);
+		assert.equal(isLoaded(A), false);
+		assert.equal(isLoaded(B), true);
+		assert.equal(isLoaded(C), true);
+		
+		// Touch C
+		// C.A = A;
+		
 		
 		// // Touch A
 		// let dummy = A.name;

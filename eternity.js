@@ -252,7 +252,7 @@
 		
 		function decreaseLoadedIncomingMacroReferenceCounters(dbImage, property) {
 			let value = dbImage[property];
-			if (imageCausality.isObject(incomingRelationStructure) && value.isIncomingRelationStructure) {
+			if (imageCausality.isObject(value) && value.isIncomingRelationStructure) {
 				let currentIncomingStructure = value;
 				let nextIncomingStructure;
 				if (typeof(value.parent) !== 'undefined') {
@@ -840,7 +840,7 @@
 			// without emitting events.
 			
 			for (property in object) {
-				if (property !== incoming) {
+				if (property !== "incoming") {
 					delete object[property];					
 				}
 			}
@@ -873,9 +873,9 @@
 			for (property in dbImage) {
 				imageCausality.disableIncomingRelations(function() {
 					// Incoming should be unloaded here also, since it can be recovered.
+					let value = dbImage[property];
 					decreaseLoadedIncomingMacroReferenceCounters(dbImage, property);
 					decreaseImageIncomingLoadedCounter(value);
-					let value = dbImage[property];
 					delete dbImage[property]; 
 				});
 			}
@@ -912,6 +912,7 @@
 				if (mockMongoDB.getRecordsCount() === 0) {
 					// objectCausality.pulse(function() {
 						objectCausality.persistent = objectCausality.create();
+						loadedObjects++;
 						createEmptyDbImage(objectCausality.persistent);			
 					// });
 				} else {
