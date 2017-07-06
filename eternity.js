@@ -132,46 +132,13 @@
 						dbImage[property] = newValue;
 					});
 				} else {
-					dbImage[property] = newValue;
-					// Do some  magic here... how to update ordinary loaded counters... 
-					
-					// Update incoming structure counters. 
-					increaseLoadedIncomingMacroReferenceCounters(dbImage, property);
+					dbImage[property] = newValue; 
 				}
 			} else {
 				dbImage[property] = objectValue;
 			}
 		}
 
-		function increaseLoadedIncomingMacroReferenceCounters(dbImage, property) {
-			imageCausality.disableIncomingRelations(function() {
-				let incomingRelationStructure = dbImage[property];
-				if (incomingRelationStructure.isIncomingRelationStructure) {
-					// Increase counter 
-					if (typeof(incomingRelationStructure.const.loadedIncomingMacroReferenceCount) === 'undefined') {
-						incomingRelationStructure.const.loadedIncomingMacroReferenceCount = 0;
-					}
-					incomingRelationStructure.const.loadedIncomingMacroReferenceCount++;
-					
-					// Increase counter 
-					let nextStructure = incomingRelationStructure;
-					if (typeof(nextStructure.parent) !== 'undefined') {
-						if (typeof(nextStructure.const.loadedIncomingMacroReferenceCount) === 'undefined') {
-							nextStructure.const.loadedIncomingMacroReferenceCount = 0;
-						}
-						nextStructure.const.loadedIncomingMacroReferenceCount++;
-						nextStructure = nextStructure.incomingStructures;
-					}
-					
-					// Increase counter 
-					if (typeof(nextStructure.const.loadedIncomingMacroReferenceCount) === 'undefined') {
-						nextStructure.const.loadedIncomingMacroReferenceCount = 0;
-					}
-					nextStructure.const.loadedIncomingMacroReferenceCount++;
-				}
-			});
-		}
-		
 		function createEmptyDbImage(object, potentialParentImage, potentialParentProperty) {
 			// log(object, 3);
 			// log(object);
@@ -249,6 +216,127 @@
 		
 
 		/*-----------------------------------------------
+		 *           DB Image counters
+		 *
+		 *   OBS! these functions assume incoming relations 
+		 *   has been disabled!!!
+		 *-----------------------------------------------*/
+		 
+		function increaseLoadedIncomingMacroReferenceCounters(dbImage, property) {
+			let incomingRelationStructure = dbImage[property];
+			if (imageCausality.isObject(incomingRelationStructure) && incomingRelationStructure.isIncomingRelationStructure) {
+				// Increase counter 
+				if (typeof(incomingRelationStructure.const.loadedIncomingMacroReferenceCount) === 'undefined') {
+					incomingRelationStructure.const.loadedIncomingMacroReferenceCount = 0;
+				}
+				incomingRelationStructure.const.loadedIncomingMacroReferenceCount++;
+				
+				// Increase counter 
+				let nextStructure = incomingRelationStructure;
+				if (typeof(nextStructure.parent) !== 'undefined') {
+					if (typeof(nextStructure.const.loadedIncomingMacroReferenceCount) === 'undefined') {
+						nextStructure.const.loadedIncomingMacroReferenceCount = 0;
+					}
+					nextStructure.const.loadedIncomingMacroReferenceCount++;
+					nextStructure = nextStructure.incomingStructures;
+				}
+				
+				// Increase counter 
+				if (typeof(nextStructure.const.loadedIncomingMacroReferenceCount) === 'undefined') {
+					nextStructure.const.loadedIncomingMacroReferenceCount = 0;
+				}
+				nextStructure.const.loadedIncomingMacroReferenceCount++;
+			}
+		}
+		
+		
+		function decreaseLoadedIncomingMacroReferenceCounters(dbImage, property) {
+			let value = dbImage[property];
+			if (imageCausality.isObject(incomingRelationStructure) && value.isIncomingRelationStructure) {
+				let currentIncomingStructure = value;
+				let nextIncomingStructure;
+				if (typeof(value.parent) !== 'undefined') {
+					nextIncomingStructure = currentIncomingStructure.parent
+				} else {
+					nextIncomingStructure = currentIncomingStructure.incomingStructures;
+				}
+	
+				// Possibly unload incoming structure
+				currentIncomingStructure.const.loadedIncomingMacroReferenceCount--;
+				if (currentIncomingStructure.const.loadedIncomingMacroReferenceCount === 0) {
+					unloadImage(currentIncomingStructure);
+				}
+				
+				// Incoming structures or root incoming structure
+				currentIncomingStructure = nextIncomingStructure;
+				let referedDbImage;
+				if (typeof(currentIncomingStructure.isIncomingStructure) !== 'undefined') {
+					// We were at the root incoming structure, proceed to the main incoming structure
+					nextIncomingStructure = currentIncomingStructure.incomingStructures;
+				} else {
+					// Reached the object
+					referedDbImage = currentIncomingStructure.referencedObject;
+					nextIncomingStructure = null;
+				}
+				
+				// Possibly unload incoming structure
+				currentIncomingStructure.const.loadedIncomingMacroReferenceCount--;
+				if (currentIncomingStructure.const.loadedIncomingMacroReferenceCount === 0) {
+					unloadImage(currentIncomingStructure);
+				}
+				
+				
+				if (nextIncomingStructure !== null) {
+					currentIncomingStructure = nextIncomingStructure;
+					
+					// Reached the object
+					referedDbImage = currentIncomingStructure.referencedObject;
+					nextIncomingStructure = null;
+
+					// Possibly unload incoming structure
+					currentIncomingStructure.const.loadedIncomingMacroReferenceCount--;
+					if (currentIncomingStructure.const.loadedIncomingMacroReferenceCount === 0) {
+						unloadImage(currentIncomingStructure);
+					}
+				}
+				
+				// What to do with the object... kill if unloaded?
+				imageCausality.blockInitialize(function() {
+					referedDbImage.const.loadedIncomingMacroReferenceCount--;
+					// Idea: perhaps referedDbImage.const.incomingCount could be used.... as it is not persistent...
+					if (referedDbImage.const.loadedIncomingMacroReferenceCount === 0) {
+						// if (referedDbImage.const.correspondingObject.const.)
+						// unloadImage(referedDbImage);
+						// if there are no incoming relations on the object also, kill both... 
+					} 					
+				});
+			}			
+		}
+		
+		function increaseImageIncomingLoadedCounter(entity) {
+			imageCausality.blockInitialize(function() {
+				if (imageCausality.isObject(entity)) {
+					if (typeof(entity.const.incomingLoadedMicroCounter) === 'undefined') {
+						entity.const.incomingLoadedMicroCounter = 0;
+					}
+					entity.const.incomingLoadedMicroCounter++;
+				}
+			});
+		}
+
+		function decreaseImageIncomingLoadedCounter(entity) {
+			imageCausality.blockInitialize(function() {
+				if (imageCausality.isObject(entity)) {
+					if (typeof(entity.const.incomingLoadedMicroCounter) === 'undefined') {
+						entity.const.incomingLoadedMicroCounter = 0;
+					}
+					entity.const.incomingLoadedMicroCounter--;
+				}				
+			});
+		}
+
+
+		/*-----------------------------------------------
 		 *           Post DB image pulse events
 		 *-----------------------------------------------*/
 		 
@@ -276,28 +364,6 @@
 			});
 		}				
 
-		function increaseImageIncomingLoadedCounter(entity) {
-			imageCausality.blockInitialize(function() {
-				if (imageCausality.isObject(entity)) {
-					if (typeof(entity.const.incomingLoadedMicroCounter) === 'undefined') {
-						entity.const.incomingLoadedMicroCounter = 0;
-					}
-					entity.const.incomingLoadedMicroCounter++;
-				}
-			});
-		}
-
-		function decreaseImageIncomingLoadedCounter(entity) {
-			imageCausality.blockInitialize(function() {
-				if (imageCausality.isObject(entity)) {
-					if (typeof(entity.const.incomingLoadedMicroCounter) === 'undefined') {
-						entity.const.incomingLoadedMicroCounter = 0;
-					}
-					entity.const.incomingLoadedMicroCounter--;
-				}				
-			});
-		}
-
 		
 		function postImagePulseAction(events) {
 			if (events.length > 0) {
@@ -321,7 +387,10 @@
 							if (event.type === 'creation') {
 								pendingImageCreations[imageId] = dbImage;
 								
-								for (let property in dbImage) increaseImageIncomingLoadedCounter(dbImage[property]);
+								for (let property in dbImage) {
+									increaseImageIncomingLoadedCounter(dbImage[property]);
+									increaseLoadedIncomingMacroReferenceCounters(dbImage, property);
+								}
 								// if (typeof(pendingImageUpdates[imageId]) !== 'undefined') {
 									// // We will do a full write of this image, no need to update after.				
 									// delete pendingImageUpdates[dbId];   // will never happen anymore?
@@ -336,6 +405,7 @@
 									let imageUpdates = pendingImageUpdates[dbId];
 									imageUpdates[event.property] = event.newValue;
 									increaseImageIncomingLoadedCounter(event.newValue);
+									increaseLoadedIncomingMacroReferenceCounters(dbImage, property);
 								}
 							}				
 						}
@@ -586,6 +656,7 @@
 						// log(value);
 						property = imageCausality.transformPossibleIdExpression(property, dbIdToImageId);
 						increaseImageIncomingLoadedCounter(value);
+						increaseLoadedIncomingMacroReferenceCounters(dbImage, property);
 						dbImage[property] = value;
 						// if (property !== 'A') imageCausality.endTrace();
 						// log("loadFromDbIdToImage: " + dbId + " property: " + property + "...finished assigning");
@@ -792,68 +863,6 @@
 		}
 		
 		
-		function decreaseLoadedIncomingMacroReferenceCounters(dbImage, property) {
-			let value = dbImage[property];
-			if (value.isIncomingRelationStructure) {
-				let currentIncomingStructure = value;
-				let nextIncomingStructure;
-				if (typeof(value.parent) !== 'undefined') {
-					nextIncomingStructure = currentIncomingStructure.parent
-				} else {
-					nextIncomingStructure = currentIncomingStructure.incomingStructures;
-				}
-	
-				// Possibly unload incoming structure
-				currentIncomingStructure.const.loadedIncomingMacroReferenceCount--;
-				if (currentIncomingStructure.const.loadedIncomingMacroReferenceCount === 0) {
-					unloadImage(currentIncomingStructure);
-				}
-				
-				// Incoming structures or root incoming structure
-				currentIncomingStructure = nextIncomingStructure;
-				let referedDbImage;
-				if (typeof(currentIncomingStructure.isIncomingStructure) !== 'undefined') {
-					// We were at the root incoming structure, proceed to the main incoming structure
-					nextIncomingStructure = currentIncomingStructure.incomingStructures;
-				} else {
-					// Reached the object
-					referedDbImage = currentIncomingStructure.referencedObject;
-					nextIncomingStructure = null;
-				}
-				
-				// Possibly unload incoming structure
-				currentIncomingStructure.const.loadedIncomingMacroReferenceCount--;
-				if (currentIncomingStructure.const.loadedIncomingMacroReferenceCount === 0) {
-					unloadImage(currentIncomingStructure);
-				}
-				
-				
-				if (nextIncomingStructure !== null) {
-					currentIncomingStructure = nextIncomingStructure;
-					
-					// Reached the object
-					referedDbImage = currentIncomingStructure.referencedObject;
-					nextIncomingStructure = null;
-
-					// Possibly unload incoming structure
-					currentIncomingStructure.const.loadedIncomingMacroReferenceCount--;
-					if (currentIncomingStructure.const.loadedIncomingMacroReferenceCount === 0) {
-						unloadImage(currentIncomingStructure);
-					}
-				}
-				
-				// What to do with the object... kill if unloaded?
-				imageCausality.blockInitialize(function() {
-					referedDbImage.const.loadedIncomingMacroReferenceCount--;
-					// Idea: perhaps referedDbImage.const.incomingCount could be used.... as it is not persistent...
-					if (referedDbImage.const.loadedIncomingMacroReferenceCount === 0) {
-						// if (referedDbImage.const.correspondingObject.const.)
-						// unloadImage(referedDbImage);
-						// if there are no incoming relations on the object also, kill both... 
-					} 					
-				});
-			}			
-		}
 		
 		function unloadImage(dbImage) {
 			log("unloadImage");
