@@ -21,8 +21,9 @@
 			name : 'imageCausality',
 			recordPulseEvents : true, 
 			
-			useIncomingStructures: true, 
-			incomingStructuresAsCausalityObjects : true
+			useIncomingStructures: true,
+			incomingStructuresAsCausalityObjects : true,
+			blockInitializeForIncomingReferenceCounters: true,
 		});
 
 		// MongoDB
@@ -132,39 +133,41 @@
 					});
 				} else {
 					dbImage[property] = newValue;
+					// Do some  magic here... how to update ordinary loaded counters... 
+					
 					// Update incoming structure counters. 
-					increaseLoadedCountersInIncomingStructure(dbImage, property);
+					increaseLoadedIncomingMacroReferenceCounters(dbImage, property);
 				}
 			} else {
 				dbImage[property] = objectValue;
 			}
 		}
 
-		function increaseLoadedCountersInIncomingStructure(dbImage, property) {
+		function increaseLoadedIncomingMacroReferenceCounters(dbImage, property) {
 			imageCausality.disableIncomingRelations(function() {
 				let incomingRelationStructure = dbImage[property];
 				if (incomingRelationStructure.isIncomingRelationStructure) {
 					// Increase counter 
-					if (typeof(incomingRelationStructure.const.loadedIncomingCount) === 'undefined') {
-						incomingRelationStructure.const.loadedIncomingCount = 0;
+					if (typeof(incomingRelationStructure.const.loadedIncomingMacroReferenceCount) === 'undefined') {
+						incomingRelationStructure.const.loadedIncomingMacroReferenceCount = 0;
 					}
-					incomingRelationStructure.const.loadedIncomingCount++;
+					incomingRelationStructure.const.loadedIncomingMacroReferenceCount++;
 					
 					// Increase counter 
 					let nextStructure = incomingRelationStructure;
 					if (typeof(nextStructure.parent) !== 'undefined') {
-						if (typeof(nextStructure.const.loadedIncomingCount) === 'undefined') {
-							nextStructure.const.loadedIncomingCount = 0;
+						if (typeof(nextStructure.const.loadedIncomingMacroReferenceCount) === 'undefined') {
+							nextStructure.const.loadedIncomingMacroReferenceCount = 0;
 						}
-						nextStructure.const.loadedIncomingCount++;
+						nextStructure.const.loadedIncomingMacroReferenceCount++;
 						nextStructure = nextStructure.incomingStructures;
 					}
 					
 					// Increase counter 
-					if (typeof(nextStructure.const.loadedIncomingCount) === 'undefined') {
-						nextStructure.const.loadedIncomingCount = 0;
+					if (typeof(nextStructure.const.loadedIncomingMacroReferenceCount) === 'undefined') {
+						nextStructure.const.loadedIncomingMacroReferenceCount = 0;
 					}
-					nextStructure.const.loadedIncomingCount++;
+					nextStructure.const.loadedIncomingMacroReferenceCount++;
 				}
 			});
 		}
@@ -291,7 +294,7 @@
 							// log("Considering " + event.type + " event with object:");
 							// log(dbImage, 2);
 							let imageId = dbImage.const.id;
-							let dbId = dbImage.const.dbId;
+							// TODO: Consider if we allways have a dbId here? on new creation... 
 								
 							if (event.type === 'creation') {
 								pendingImageCreations[imageId] = dbImage;
@@ -300,6 +303,7 @@
 									// delete pendingImageUpdates[dbId];   // will never happen anymore?
 								// }
 							} else if (event.type === 'set') {
+								let dbId = dbImage.const.dbId;
 								if (typeof(dbId) !== 'undefined') { // && typeof(pendingImageCreations[imageId]) === 'undefined'
 									// Only update if we will not do a full write on this image. 
 									if (typeof(pendingImageUpdates[dbId]) === 'undefined') {
@@ -447,8 +451,8 @@
 		
 		let dbIdToDbImageMap = {};
 		
-		function getImagePlaceholderFromDbId(dbId) {
-			// log("getImagePlaceholderFromDbId: " + dbId);
+		function getDbImage(dbId) {
+			// log("getDbImage: " + dbId);
 			if (typeof(dbIdToDbImageMap[dbId]) === 'undefined') {
 				dbIdToDbImageMap[dbId] = createImagePlaceholderFromDbId(dbId);
 			}
@@ -461,6 +465,7 @@
 			log("createImagePlaceholderFromDbId: " + dbId);
 			let placeholder;
 			placeholder = imageCausality.create({});
+			placeholder.const.loadedIncomingReferenceCount = 0;
 			placeholder.const.dbId = dbId;
 			imageIdToImageMap[placeholder.const.id] = placeholder;
 			placeholder.const.initializer = imageFromDbIdInitializer;
@@ -588,7 +593,7 @@
 			// Ensure there is an image.
 			if (typeof(object.const.dbImage) === 'undefined') {
 				// log("create placeholder for image:" + dbId);
-				let placeholder = getImagePlaceholderFromDbId(dbId);
+				let placeholder = getDbImage(dbId);
 				connectObjectWithDbImage(object, placeholder);
 			}
 			loadFromDbImageToObject(object);
@@ -671,7 +676,9 @@
 			if (typeof(dbValue) === 'string') {
 				if (imageCausality.isIdExpression(dbValue)) {
 					let dbId = imageCausality.extractIdFromExpression(dbValue);
-					return getImagePlaceholderFromDbId(dbId);
+					let dbImage = getDbImage(dbId);
+					dbImage.const.loadedIncomingReferenceCount++;
+					return dbImage;
 				} else {
 					return dbValue;
 				}
@@ -770,8 +777,8 @@
 				}
 	
 				// Possibly unload incoming structure
-				currentIncomingStructure.const.loadedIncomingCount--;
-				if (currentIncomingStructure.const.loadedIncomingCount === 0) {
+				currentIncomingStructure.const.loadedIncomingMacroReferenceCount--;
+				if (currentIncomingStructure.const.loadedIncomingMacroReferenceCount === 0) {
 					unloadImage(currentIncomingStructure);
 				}
 				
@@ -788,8 +795,8 @@
 				}
 				
 				// Possibly unload incoming structure
-				currentIncomingStructure.const.loadedIncomingCount--;
-				if (currentIncomingStructure.const.loadedIncomingCount === 0) {
+				currentIncomingStructure.const.loadedIncomingMacroReferenceCount--;
+				if (currentIncomingStructure.const.loadedIncomingMacroReferenceCount === 0) {
 					unloadImage(currentIncomingStructure);
 				}
 				
@@ -802,17 +809,17 @@
 					nextIncomingStructure = null;
 
 					// Possibly unload incoming structure
-					currentIncomingStructure.const.loadedIncomingCount--;
-					if (currentIncomingStructure.const.loadedIncomingCount === 0) {
+					currentIncomingStructure.const.loadedIncomingMacroReferenceCount--;
+					if (currentIncomingStructure.const.loadedIncomingMacroReferenceCount === 0) {
 						unloadImage(currentIncomingStructure);
 					}
 				}
 				
 				// What to do with the object... kill if unloaded?
 				imageCausality.blockInitialize(function() {
-					referedDbImage.const.loadedIncomingCount--;
+					referedDbImage.const.loadedIncomingMacroReferenceCount--;
 					// Idea: perhaps referedDbImage.const.incomingCount could be used.... as it is not persistent...
-					if (referedDbImage.const.loadedIncomingCount === 0) {
+					if (referedDbImage.const.loadedIncomingMacroReferenceCount === 0) {
 						// if (referedDbImage.const.correspondingObject.const.)
 						// unloadImage(referedDbImage);
 						// if there are no incoming relations on the object also, kill both... 
@@ -944,8 +951,9 @@
 		Object.assign(objectCausalityConfiguration, {
 			name: 'objectCausality', 
 			recordPulseEvents : true,
-			objectActivityList : true
-			
+			objectActivityList : true,
+			blockInitializeForIncomingStructures: true, 
+			blockInitializeForIncomingReferenceCounters: true
 			// TODO: make it possible to run these following in conjunction with eternity.... as of now it will totally confuse eternity.... 
 			// incomingRelations : true, // this works only in conjunction with incomingStructuresAsCausalityObjects, otherwise isObject fails.... 
 			// incomingStructuresAsCausalityObjects : true
