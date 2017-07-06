@@ -37,13 +37,12 @@ describe("basics", function () {
 		persistent.name = "persistent"
 		persistent.A = A;
 		A.persistent = persistent;
-		log("--------------------------------------------------------------");
+		// log("--------------------------------------------------------------");
 		A.B = B;
-		log("==================== SETUP COMPLETE ==========================");
-		log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
+		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
 		log("---------------------- this should unload persistent -----------------");
 		B.C = C;
-		log("--------------------- after unload ---------------------------");
+		// log("--------------------- after unload ---------------------------");
 		// log(persistent.name);
 		
 		
@@ -55,18 +54,15 @@ describe("basics", function () {
 		assert.equal(isLoaded(B), true);
 		assert.equal(isLoaded(C), true);
 		
-		// Touch C
-		// C.A = A;
-		
-		
+		log("==================== Toch A ==========================");
 		// // Touch A
-		// let dummy = A.name;
+		let dummy = A.name;
 		
-		// // Persistent should be unloaded
-		// assert.equal(isLoaded(persistent), false);
-		// assert.equal(isLoaded(A), true);
-		// assert.equal(isLoaded(B), true);
-		// assert.equal(isLoaded(C), false);
+		// Persistent should be unloaded
+		assert.equal(isLoaded(persistent), false);
+		assert.equal(isLoaded(A), true);
+		assert.equal(isLoaded(B), true);
+		assert.equal(isLoaded(C), false);
 	});
 
     // it('should unload nodes as memory reaches limit, circluar infinite path', function () {

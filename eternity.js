@@ -22,6 +22,7 @@
 			recordPulseEvents : true, 
 			
 			useIncomingStructures: true,
+			incomingReferenceCounters : true, 
 			incomingStructuresAsCausalityObjects : true,
 			blockInitializeForIncomingReferenceCounters: true,
 		});
@@ -848,16 +849,17 @@
 			loadedObjects--;
 
 			object.const.initializer = objectFromImageInitializer;
-			// objectCausality.blockInitialize(function() {			
-				// if (object.const.incomingReferences === 0) {
-					// killObject(object);
-				// }
-			// });
+			objectCausality.blockInitialize(function() {			
+				if (object.const.incomingReferences === 0) {
+					killObject(object);
+				}
+			});
 		}
 		
 		function killObject(object) {
 			log("killObject");
-			object.const.dbImage.const.correspondingObject = null;
+			delete object.const.dbImage.const.correspondingObject;
+			delete object.const.dbImage;
 			object.const.initializer = zombieObjectInitializer;
 		}
 		
