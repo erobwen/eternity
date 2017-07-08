@@ -14,24 +14,9 @@
 	let logGroup = objectlog.enter;
 	let logUngroup = objectlog.exit;
 	
-	// function stacktrace() { 
-	  // function st2(f) {
-		// return !f ? [] : 
-			// st2(f.caller).concat([f.toString().split('(')[0].substring(9) + '(' + f.arguments.join(',') + ')']);
-	  // }
-	  // return st2(arguments.callee.caller);
-	// }
 	
 	function createCausalityInstance(configuration) {
-		log("=======================================================================================");
-		log("=======================================================================================");
-		log("=======================================================================================");
-		log("========================== NEW INSTANCE !!!!!!!!!!!!!!!!!!!!! =========================");
-		log("=======================================================================================");
-		log("=======================================================================================");
-		log("=======================================================================================");
-		log(configuration);
-		// stacktrace();
+
 		/***************************************************************
 		 *
 		 *  Id format
@@ -2944,7 +2929,7 @@
 			if (activityListFrozen === 0 && activityListFirst !== handler &&(activityListFilter === null || activityListFilter(handler.const.object))) {
 				activityListFrozen++;
 				blockingInitialize++;
-				log("<<< registerActivity: "  + handler.target.name + " >>>");
+				// log("<<< registerActivity: "  + handler.target.name + " >>>");
 				logGroup();
 				// log(handler.target);
 				// Init if not initialized
@@ -2966,7 +2951,7 @@
 				}
 				activityListFirst = handler;				
 				
-				logActivityList();
+				// logActivityList();
 				blockingInitialize--;
 				activityListFrozen--;
 				logUngroup();

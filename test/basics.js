@@ -29,13 +29,13 @@ describe("basics", function () {
 		let A = create({name : 'A'});
 		persistent.A = A;
 		
-		log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
+		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
 		eternity.unloadAllAndClearMemory();
 
 		assert.notEqual(A, persistent.A); // Should now be a different eternity object... freshly loaded.
 		A = persistent.A;
-		log(persistent);
-		log(persistent.A);
+		// log(persistent);
+		// log(persistent.A);
 		assert.equal("A", persistent.A.name);
 		eternity.clearDatabaseAndClearMemory();
 	});
@@ -46,7 +46,7 @@ describe("basics", function () {
 		B.bitsAndPieces = 256;
 		A.B = B;
 		persistent.A = A;		
-		log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
+		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
 		
 		eternity.unloadAllAndClearMemory();
 		
@@ -75,7 +75,7 @@ describe("basics", function () {
 	it('should save refered objects recursivley, continue after save', function () {
 		let A = create({name : 'A'});
 		persistent.A = A;
-		log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
+		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
 		
 		eternity.unloadAllAndClearMemory();
 		// log("==================== CLEAR MEMORY ==========================");
@@ -99,7 +99,7 @@ describe("basics", function () {
 		persistent.A.D = D;
 		persistent.B.D = D;
 	
-		log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
+		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
 
 		eternity.unloadAllAndClearMemory();
 		// log("==================== CLEAR MEMORY ==========================");

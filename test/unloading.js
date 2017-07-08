@@ -22,39 +22,37 @@ describe("basics", function () {
 				eternity.freezeActivityList(function() {
 					// log(object.const.initializer);
 					result = object.const.initializer === null;
-					log(object.name + " isLoaded: " + result);
+					// log(object.name + " isLoaded: " + result);
 				});
 			});
 			return result;
 		}
 
 		// persistent
-		log("--------------------------------------------------------------");
+		// log("--------------------------------------------------------------");
 		let A = create({name: "A"});
-		log("--------------------------------------------------------------");
+		// log("--------------------------------------------------------------");
 		let B = create({name: "B"});
-		log("--------------------------------------------------------------");
+		// log("--------------------------------------------------------------");
 		let C = create({name: "C"});
-		log("--------------------------------------------------------------");
-		
-		log("--------------------------------------------------------------");
+		// log("--------------------------------------------------------------");
 		persistent.name = "persistent"
-		log("--------------------------------------------------------------");
+		// log("--------------------------------------------------------------");
 		persistent.A = A;
-		log("--------------------------------------------------------------");
-		eternity.logActivityList();
+		// log("--------------------------------------------------------------");
+		// eternity.logActivityList();
 		A.persistent = persistent;
-		eternity.logActivityList();
-		log("---------------------------- A.B = B; ----------------------------------");
-		eternity.logActivityList();
+		// eternity.logActivityList();
+		// log("---------------------------- A.B = B; ----------------------------------");
+		// eternity.logActivityList();
 		A.B = B;
-		eternity.logActivityList();
-		log("--------------------------- B.C = C; -----------------------------------");
-		eternity.logActivityList();
+		// eternity.logActivityList();
+		// log("--------------------------- B.C = C; -----------------------------------");
+		// eternity.logActivityList();
 		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
 		B.C = C;
-		eternity.logActivityList();
-		log("--------------------- d ---------------------------");
+		// eternity.logActivityList();
+		// log("--------------------- d ---------------------------");
 		// log(persistent.name);
 		
 		
@@ -66,10 +64,10 @@ describe("basics", function () {
 		assert.equal(isLoaded(B), true);
 		assert.equal(isLoaded(C), true);
 		
-		log("==================== Touch A ==========================");
+		// log("==================== Touch A ==========================");
 		// // Touch A
 		let dummy = A.name;
-		log("---------------------------------------");
+		// log("---------------------------------------");
 		
 		// Persistent should be unloaded
 		assert.equal(isLoaded(persistent), false);

@@ -19,7 +19,7 @@
 		// Image causality
 		// let imageCausality = requireUncached("causalityjs_advanced");
 		let imageCausality = require("./causality.js")({ 
-			name : 'imageCausality',
+			name : 'imageCausality:' + JSON.stringify(configuration),
 			recordPulseEvents : true, 
 			
 			useIncomingStructures: true,
@@ -36,19 +36,6 @@
 		let log = objectlog.log;
 		let logGroup = objectlog.enter;
 		let logUngroup = objectlog.exit;
-		// let log = log;
-		// log("=======================================================================================");
-		// log("=======================================================================================");
-		// log("=======================================================================================");
-		// log("========================== NEW INSTANCE !!!!!!!!!!!!!!!!!!!!! =========================");
-		// log("=======================================================================================");
-		// log("=======================================================================================");
-		// log("=======================================================================================");
-		/*-----------------------------------------------
-		 *     persistentObjectIdToObjectMap... Important, needs to 
-		 *-----------------------------------------------*/
-		
-		// let persistentObjectIdToObjectMap = {}
 		
 
 		/*-----------------------------------------------
@@ -59,14 +46,14 @@
 
 		function postObjectPulseAction(events) {
 			// log("postObjectPulseAction: " + events.length + " events");
-			logGroup();
+			// logGroup();
 			objectCausality.freezeActivityList(function() {
 				// log(events, 3);
 				transferChangesToImage(events);
 				unloadAndKillObjects();
 			});
 			
-			logUngroup();
+			// logUngroup();
 		} 
 		
 		
@@ -429,7 +416,7 @@
 				});
 				// log(mockMongoDB.getAllRecordsParsed(), 4);
 				
-				logUngroup();
+				// logUngroup();
 			}
 		} 
 
@@ -458,7 +445,7 @@
 
 		function flushToDatabase() {
 			// log("flushToDatabase:");
-			logGroup();
+			// logGroup();
 			// log(pendingImageCreations, 2);
 			// log(pendingImageUpdates, 2);
 			// This one could do a stepwise execution to not block the server. 
@@ -485,7 +472,7 @@
 				}
 			}
 			pendingImageUpdates = {};
-			logUngroup();
+			// logUngroup();
 		}
 		
 		function imageIdToDbId(imageId) {
@@ -609,13 +596,13 @@
 		
 		function objectFromImageInitializer(object) {
 			// log("initialize object " + object.const.id + " from dbImage " + object.const.dbImage.const.id + ", dbId:" + object.const.dbId);
-			logGroup();
+			// logGroup();
 			objectCausality.withoutEmittingEvents(function() {
 				imageCausality.withoutEmittingEvents(function() {
 					loadFromDbImageToObject(object);
 				});
 			});
-			logUngroup();
+			// logUngroup();
 		}
 		
 		function createObjectPlaceholderFromDbId(dbId) {
@@ -628,13 +615,13 @@
 		
 		function objectFromIdInitializer(object) {
 			// log("initialize object " + object.const.id + " from dbId: " + object.const.dbId);
-			logGroup();
+			// logGroup();
 			objectCausality.withoutEmittingEvents(function() {
 				imageCausality.withoutEmittingEvents(function() {
 					loadFromDbIdToObject(object);
 				});
 			});
-			logUngroup();
+			// logUngroup();
 		}
 		
 		function dbIdToImageId(dbId) {
@@ -822,7 +809,7 @@
 			// log("unloadAndKillObjects");
 			if (loadedObjects > maxNumberOfLoadedObjects) {
 				// log("... needs cleanup.... ");
-				logGroup();
+				// logGroup();
 				objectCausality.withoutEmittingEvents(function() {
 					imageCausality.withoutEmittingEvents(function() {
 						let leastActiveObject = objectCausality.getActivityListLast();
@@ -1014,7 +1001,7 @@
 		let objectCausalityConfiguration = {};
 		Object.assign(objectCausalityConfiguration, configuration.causalityConfiguration);
 		Object.assign(objectCausalityConfiguration, {
-			name: 'objectCausality', 
+			name: 'objectCausality:' + JSON.stringify(configuration), 
 			recordPulseEvents : true,
 			objectActivityList : true,
 			blockInitializeForIncomingStructures: true, 
@@ -1023,9 +1010,9 @@
 			// incomingRelations : true, // this works only in conjunction with incomingStructuresAsCausalityObjects, otherwise isObject fails.... 
 			// incomingStructuresAsCausalityObjects : true
 		});
-		if (typeof(configuration.causalityConfiguration) !== 'undefined' && typeof(configuration.causalityConfiguration.name) !== 'undefined') {
-			objectCausalityConfiguration.name = configuration.causalityConfiguration.name + ".objectCausality";
-		}
+		// if (typeof(configuration.causalityConfiguration) !== 'undefined' && typeof(configuration.causalityConfiguration.name) !== 'undefined') {
+			// objectCausalityConfiguration.name = configuration.causalityConfiguration.name + ".objectCausality";
+		// }
 		objectCausality = require("./causality.js")(objectCausalityConfiguration);
 		
 		let argumentsToArray = function(arguments) {
@@ -1053,6 +1040,8 @@
 		
 		
 		setupDatabase();
+		
+		
 		return objectCausality;
 	}
 
