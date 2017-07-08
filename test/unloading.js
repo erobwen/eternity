@@ -19,30 +19,37 @@ describe("basics", function () {
 		function isLoaded(object) {
 			let result;
 			eternity.blockInitialize(function() {
-				log(object);
-				log(object.const.initializer);
-				result = object.const.initializer === null;
-				log(result);
+				eternity.freezeActivityList(function() {
+					log(object);
+					log(object.const.initializer);
+					result = object.const.initializer === null;
+					log(result);					
+				});
 			});
 			return result;
 		}
 
-		log("--------------------------------------------------------------");
 		// persistent
+		log("--------------------------------------------------------------");
 		let A = create({name: "A"});
+		log("--------------------------------------------------------------");
 		let B = create({name: "B"});
+		log("--------------------------------------------------------------");
 		let C = create({name: "C"});
+		log("--------------------------------------------------------------");
 		
 		log("--------------------------------------------------------------");
 		persistent.name = "persistent"
+		log("--------------------------------------------------------------");
 		persistent.A = A;
+		log("--------------------------------------------------------------");
 		A.persistent = persistent;
-		// log("--------------------------------------------------------------");
+		log("---------------------------- A.B = B; ----------------------------------");
 		A.B = B;
+		log("--------------------------- B.C = C; -----------------------------------");
 		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
-		log("---------------------- this should unload persistent -----------------");
 		B.C = C;
-		// log("--------------------- after unload ---------------------------");
+		log("--------------------- d ---------------------------");
 		// log(persistent.name);
 		
 		
@@ -54,9 +61,10 @@ describe("basics", function () {
 		assert.equal(isLoaded(B), true);
 		assert.equal(isLoaded(C), true);
 		
-		log("==================== Toch A ==========================");
+		log("==================== Touch A ==========================");
 		// // Touch A
 		let dummy = A.name;
+		log("---------------------------------------");
 		
 		// Persistent should be unloaded
 		assert.equal(isLoaded(persistent), false);

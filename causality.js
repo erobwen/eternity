@@ -997,7 +997,7 @@
 	*/
 		
 		function getHandlerObject(target, key) {
-			if (configuration.objectActivityList) registerActivity(this);
+			// log("getHandlerObject, key: " + key);
 			key = key.toString();
 			// console.log("getHandlerObject: " + key);
 			// if (key instanceof 'Symbol') { incoming
@@ -1010,6 +1010,7 @@
 			}
 			
 			ensureInitialized(this, target);
+			if (configuration.objectActivityList) registerActivity(this);
 					
 			if (key === "const" || key === "nonForwardStatic") {
 				return this.const;
@@ -2881,8 +2882,28 @@
 			removeFromActivityListHandler(proxy.const.handler);
 		}
 		
+		let activityListFrozen = 0;
+		function freezeActivityList(action) {
+			activityListFrozen++;
+			action();
+			activityListFrozen--;
+		}
+		
+		function stacktrace() { 
+			function st2(f) {
+				return !f ? [] : 
+					st2(f.caller).concat([f.toString().split('(')[0].substring(9) + '(' + f.arguments.join(',') + ')']);
+			}
+			return st2(arguments.callee.caller);
+		}
+
 		function registerActivity(handler) {
-			if (activityListFilter === null || activityListFilter(handler.const.object)) {
+			if (activityListFrozen === 0 && activityListFirst !== handler &&(activityListFilter === null || activityListFilter(handler.const.object))) {
+				activityListFrozen++;
+				blockingInitialize++;
+				log("<<< registerActivity: "  + handler.target.name + " >>>");
+				logGroup();
+				// log(handler.target);
 				// Init if not initialized
 				if (typeof(handler.activityListNext) === 'undefined') {
 					handler.activityListNext = null;
@@ -2901,16 +2922,30 @@
 					activityListLast = handler;
 				}
 				activityListFirst = handler;				
+				
+				// priority list
+				let current = activityListFirst;
+				// let current = activityListLast;
+				
+				// log("activityList: ");
+				while(current !== null && typeof(current) !== 'undefined') {
+					log(current.const.object.name);
+					// current = current.activityListPrevious;
+					current = current.activityListNext;
+				}
+				blockingInitialize--;
+				activityListFrozen--;
+				logUngroup();
 			}
 		}
 		
 		function removeFromActivityListHandler(handler) {
 			// Remove from wherever it is in the structure
 			if (handler.activityListNext !== null) {
-				handler.activityListNext.previous = handler.activityListPrevious;
+				handler.activityListNext.activityListPrevious = handler.activityListPrevious;
 			}
 			if (handler.activityListPrevious !== null) {
-				handler.activityListPrevious.next = handler.activityListNext;
+				handler.activityListPrevious.activityListNext = handler.activityListNext;
 			}
 			if (activityListLast === handler) {
 				activityListLast = handler.activityListPrevious;
@@ -3011,6 +3046,7 @@
 			transformPossibleIdExpression : transformPossibleIdExpression,
 			
 			// Activity list interface
+			freezeActivityList : freezeActivityList,
 			setActivityListFilter : setActivityListFilter,
 			getActivityListLast : getActivityListLast,
 			getActivityListFirst : getActivityListFirst,

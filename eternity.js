@@ -53,16 +53,18 @@
 		function postObjectPulseAction(events) {
 			log("postObjectPulseAction: " + events.length + " events");
 			logGroup();
-			log(events, 3);
-			
-			transferChangesToImage(events);
-			unloadAndKillObjects();
+			objectCausality.freezeActivityList(function() {
+				log(events, 3);
+				transferChangesToImage(events);
+				unloadAndKillObjects();
+			});
 			
 			logUngroup();
 		} 
 		
 		
 		function transferChangesToImage(events) {
+			log("transferChangesToImage");
 			if (events.length > 0) {
 				// log("... Model pulse complete, update image and flood create images & flood unstable ");
 				log("events.length = " + events.length);
@@ -744,6 +746,7 @@
 				}
 				// log(object);
 			}
+			loadedObjects++;
 			// log(object);
 			// logUngroup();
 		}
@@ -808,8 +811,9 @@
 		
 		
 		function unloadAndKillObjects() {
+			log("unloadAndKillObjects");
 			if (loadedObjects > maxNumberOfLoadedObjects) {
-				log("unloadAndKillObjects");
+				log("... needs cleanup.... ");
 				logGroup();
 				objectCausality.withoutEmittingEvents(function() {
 					imageCausality.withoutEmittingEvents(function() {
@@ -836,23 +840,27 @@
 		}
 		
 		function unloadObject(object) {
-			log("unloadObject");
-			log(object);
-			// without emitting events.
-			
-			for (property in object) {
-				if (property !== "incoming") {
-					delete object[property];					
+			objectCausality.freezeActivityList(function() {				
+				log("unloadObject");
+				logGroup();
+				// log(object);
+				// without emitting events.
+				
+				for (property in object) {
+					if (property !== "incoming") {
+						delete object[property];					
+					}
 				}
-			}
-			unloadImage(object.const.dbImage);
-			loadedObjects--;
+				unloadImage(object.const.dbImage);
+				loadedObjects--;
 
-			object.const.initializer = objectFromImageInitializer;
-			objectCausality.blockInitialize(function() {			
-				if (object.const.incomingReferences === 0) {
-					killObject(object);
-				}
+				object.const.initializer = objectFromImageInitializer;
+				// objectCausality.blockInitialize(function() {			
+					// if (object.const.incomingReferencesCount === 0) {
+						// killObject(object);
+					// }
+				// });
+				logUngroup();
 			});
 		}
 		
@@ -882,11 +890,11 @@
 				});
 			}
 			dbImage.const.initializer = imageFromDbIdInitializer;
-			imageCausality.blockInitialize(function() {
-				if (dbImage.const.incomingLoadedMicroCounter === 0) {
-					killDbImage(dbImage);
-				}				
-			});
+			// imageCausality.blockInitialize(function() {
+				// if (dbImage.const.incomingLoadedMicroCounter === 0) {
+					// killDbImage(dbImage);
+				// }				
+			// });
 		}
 		
 		function killDbImage(dbImage) {
