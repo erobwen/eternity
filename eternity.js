@@ -8,35 +8,18 @@
         root.eternity = factory(); // Support browser global
     }
 }(this, function () {
-	// Require uncached, to support multipple causalities. 
-	// const dbIdPrefix = "_causality_persistent_id_";
-	// const dbIdExpressionPrefix = "_causality_persistent_id_expression";
+	// Helper
+	let argumentsToArray = function(arguments) {
+		return Array.prototype.slice.call(arguments);
+	};
+	
+	// Neat logging
+	let objectlog = require('./objectlog.js');
+	let log = objectlog.log;
+	let logGroup = objectlog.enter;
+	let logUngroup = objectlog.exit;
+
 	function createEternityInstance(configuration) {
-
-		// Primary causality object space
-		let objectCausality
-			
-		// Image causality
-		// let imageCausality = requireUncached("causalityjs_advanced");
-		let imageCausality = require("./causality.js")({ 
-			name : 'imageCausality:' + JSON.stringify(configuration),
-			recordPulseEvents : true, 
-			
-			useIncomingStructures: true,
-			incomingReferenceCounters : true, 
-			incomingStructuresAsCausalityObjects : true,
-			blockInitializeForIncomingReferenceCounters: true,
-		});
-
-		// MongoDB
-		let mockMongoDB = require("./mockMongoDB.js")(JSON.stringify(configuration));
-
-		// Neat logging
-		let objectlog = require('./objectlog.js');
-		let log = objectlog.log;
-		let logGroup = objectlog.enter;
-		let logUngroup = objectlog.exit;
-		
 
 		/*-----------------------------------------------
 		 *          Object post pulse events
@@ -998,6 +981,24 @@
 		 *           Setup object causality
 		 *-----------------------------------------------*/
 		 
+		// MongoDB
+		let mockMongoDB = require("./mockMongoDB.js")(JSON.stringify(configuration));	
+		
+			
+		// Image causality
+		// let imageCausality = requireUncached("causalityjs_advanced");
+		let imageCausality = require("./causality.js")({ 
+			name : 'imageCausality:' + JSON.stringify(configuration),
+			recordPulseEvents : true, 
+			
+			useIncomingStructures: true,
+			incomingReferenceCounters : true, 
+			incomingStructuresAsCausalityObjects : true,
+			blockInitializeForIncomingReferenceCounters: true,
+		});
+
+		
+		// Primary causality object space
 		let objectCausalityConfiguration = {};
 		Object.assign(objectCausalityConfiguration, configuration.causalityConfiguration);
 		Object.assign(objectCausalityConfiguration, {
@@ -1010,23 +1011,7 @@
 			// incomingRelations : true, // this works only in conjunction with incomingStructuresAsCausalityObjects, otherwise isObject fails.... 
 			// incomingStructuresAsCausalityObjects : true
 		});
-		// if (typeof(configuration.causalityConfiguration) !== 'undefined' && typeof(configuration.causalityConfiguration.name) !== 'undefined') {
-			// objectCausalityConfiguration.name = configuration.causalityConfiguration.name + ".objectCausality";
-		// }
-		objectCausality = require("./causality.js")(objectCausalityConfiguration);
-		
-		let argumentsToArray = function(arguments) {
-			return Array.prototype.slice.call(arguments);
-		};
-
-		let originalCreate = objectCausality.create;
-		let createdObjects = 0;
-		// objectCausality.create = function() {  
-			// createdObjects++;
-			// let argumentsList = argumentsToArray(arguments);
-			// originalCreate.apply(null, argumentsList);
-			// // Consider kill here instead of at pulse end?
-		// }
+		let objectCausality = require("./causality.js")(objectCausalityConfiguration);
 		
 		// Additions 
 		objectCausality.addPostPulseAction(postObjectPulseAction);
@@ -1039,6 +1024,7 @@
 		imageCausality.addPostPulseAction(postImagePulseAction);
 		
 		
+		// Setup database
 		setupDatabase();
 		
 		
