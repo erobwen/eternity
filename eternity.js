@@ -12,6 +12,7 @@
 	// const dbIdPrefix = "_causality_persistent_id_";
 	// const dbIdExpressionPrefix = "_causality_persistent_id_expression";
 	function createEternityInstance(configuration) {
+
 		// Primary causality object space
 		let objectCausality
 			
@@ -28,7 +29,7 @@
 		});
 
 		// MongoDB
-		let mockMongoDB = require("./mockMongoDB.js");
+		let mockMongoDB = require("./mockMongoDB.js")(JSON.stringify(configuration));
 
 		// Neat logging
 		let objectlog = require('./objectlog.js');
@@ -36,7 +37,13 @@
 		let logGroup = objectlog.enter;
 		let logUngroup = objectlog.exit;
 		// let log = log;
-
+		// log("=======================================================================================");
+		// log("=======================================================================================");
+		// log("=======================================================================================");
+		// log("========================== NEW INSTANCE !!!!!!!!!!!!!!!!!!!!! =========================");
+		// log("=======================================================================================");
+		// log("=======================================================================================");
+		// log("=======================================================================================");
 		/*-----------------------------------------------
 		 *     persistentObjectIdToObjectMap... Important, needs to 
 		 *-----------------------------------------------*/
@@ -51,10 +58,10 @@
 		let unstableImages = [];
 
 		function postObjectPulseAction(events) {
-			log("postObjectPulseAction: " + events.length + " events");
+			// log("postObjectPulseAction: " + events.length + " events");
 			logGroup();
 			objectCausality.freezeActivityList(function() {
-				log(events, 3);
+				// log(events, 3);
 				transferChangesToImage(events);
 				unloadAndKillObjects();
 			});
@@ -64,10 +71,10 @@
 		
 		
 		function transferChangesToImage(events) {
-			log("transferChangesToImage");
+			// log("transferChangesToImage");
 			if (events.length > 0) {
 				// log("... Model pulse complete, update image and flood create images & flood unstable ");
-				log("events.length = " + events.length);
+				// log("events.length = " + events.length);
 				if (typeof(objectCausality.noCleanups) !== 'undefined')
 					events.foo.bar;
 				// log(events, 2);
@@ -75,7 +82,7 @@
 					
 					// Mark unstable and flood create new images into existance.
 					events.forEach(function(event) {
-						log("event: " + event.type + " " + event.property);
+						// log("event: " + event.type + " " + event.property);
 						
 						// Catch togging of independently persistent
 						if (event.type === 'set') {
@@ -194,6 +201,7 @@
 				object.const.dbImage = dbImage;
 				dbImage.const.correspondingObject = object;
 				loadedObjects++;
+				objectCausality.pokeObject(object);
 			}	
 		}
 		
@@ -209,7 +217,7 @@
 		
 			// TODO: Do this asynchronously
 		function floodUnstable(potentiallyUnstableImage, parent, parentRelation) {
-			if (parent === null || (parent === unstableImage._eternityParent && parentRelation === unstableImage._eternityParentProperty)) {
+			if (parent === null || (parent === potentiallyUnstableImage._eternityParent && parentRelation === potentiallyUnstableImage._eternityParentProperty)) {
 				unstableImages.push(potentiallyUnstableImage);
 				for (let property in potentiallyUnstableImage) {
 					floodUnstable(potentiallyUnstableImage[property], potentiallyUnstableImage, property);
@@ -363,9 +371,9 @@
 			objectCausality.blockInitialize(function() {
 				imageCausality.blockInitialize(function() {
 					// log(event, 1);
-					if (event.type === 'set') {
-						log(valueToString(event.object) + ".set " + event.property + " to " + valueToString(event.newValue) + (event.incomingStructureEvent ? " [incoming]" : ""));
-					}
+					// if (event.type === 'set') {
+						// log(valueToString(event.object) + ".set " + event.property + " to " + valueToString(event.newValue) + (event.incomingStructureEvent ? " [incoming]" : ""));
+					// }
 				});
 			});
 		}				
@@ -373,8 +381,8 @@
 		
 		function postImagePulseAction(events) {
 			if (events.length > 0) {
-				log("postImagePulseAction: " + events.length + " events");
-				logGroup();
+				// log("postImagePulseAction: " + events.length + " events");
+				// logGroup();
 				//log(" ... Image pulse complete, sort events according to object id and flush to database");
 				
 				// log(events, 3);
@@ -449,7 +457,7 @@
 		}
 
 		function flushToDatabase() {
-			log("flushToDatabase:");
+			// log("flushToDatabase:");
 			logGroup();
 			// log(pendingImageCreations, 2);
 			// log(pendingImageUpdates, 2);
@@ -563,7 +571,7 @@
 		}
 		
 		function createImagePlaceholderFromDbId(dbId) {
-			log("createImagePlaceholderFromDbId: " + dbId);
+			// log("createImagePlaceholderFromDbId: " + dbId);
 			let placeholder;
 			placeholder = imageCausality.create({});
 			placeholder.const.loadedIncomingReferenceCount = 0;
@@ -577,20 +585,20 @@
 			// if (dbImage.const.dbId === 1)
 				// dbImage.foo.bar;
 			// log("");
-			log("initialize image " + dbImage.const.id + " from dbId: " + dbImage.const.dbId); 
-			logGroup();
+			// log("initialize image " + dbImage.const.id + " from dbId: " + dbImage.const.dbId); 
+			// logGroup();
 			objectCausality.withoutEmittingEvents(function() {
 				imageCausality.withoutEmittingEvents(function() {
 					loadFromDbIdToImage(dbImage);
 				});
 			});
 			// log(dbImage);
-			logUngroup();
+			// logUngroup();
 			// log(dbImage);
 		}	
 		
 		function createObjectPlaceholderFromDbImage(dbImage) {
-			log("createObjectPlaceholderFromDbImage " + dbImage.const.id);
+			// log("createObjectPlaceholderFromDbImage " + dbImage.const.id);
 			let placeholder;
 			placeholder = objectCausality.create();
 			placeholder.const.dbId = dbImage.const.dbId;
@@ -600,7 +608,7 @@
 		}
 		
 		function objectFromImageInitializer(object) {
-			log("initialize object " + object.const.id + " from dbImage " + object.const.dbImage.const.id + ", dbId:" + object.const.dbId);
+			// log("initialize object " + object.const.id + " from dbImage " + object.const.dbImage.const.id + ", dbId:" + object.const.dbId);
 			logGroup();
 			objectCausality.withoutEmittingEvents(function() {
 				imageCausality.withoutEmittingEvents(function() {
@@ -611,7 +619,7 @@
 		}
 		
 		function createObjectPlaceholderFromDbId(dbId) {
-			log("createObjectPlaceholderFromDbId: " + dbId);
+			// log("createObjectPlaceholderFromDbId: " + dbId);
 			let placeholder;
 			placeholder.const.dbId = dbId;
 			placeholder.const.initializer = objectFromIdInitializer;
@@ -619,7 +627,7 @@
 		}
 		
 		function objectFromIdInitializer(object) {
-			log("initialize object " + object.const.id + " from dbId: " + object.const.dbId);
+			// log("initialize object " + object.const.id + " from dbId: " + object.const.dbId);
 			logGroup();
 			objectCausality.withoutEmittingEvents(function() {
 				imageCausality.withoutEmittingEvents(function() {
@@ -639,7 +647,7 @@
 		}
 		
 		function loadFromDbIdToImage(dbImage) {
-			log("loadFromDbIdToImage dbId: " + dbImage.const.dbId + " dbImage:" + dbImage.const.id);
+			// log("loadFromDbIdToImage dbId: " + dbImage.const.dbId + " dbImage:" + dbImage.const.id);
 			imageCausality.disableIncomingRelations(function() {			
 				let dbId = dbImage.const.dbId;
 				
@@ -709,7 +717,7 @@
 		function loadFromDbImageToObject(object) {
 			let dbImage = object.const.dbImage;
 			// log("----------------------------------------");
-			log("loadFromDbImageToObject dbId: " + dbImage.const.dbId);
+			// log("loadFromDbImageToObject dbId: " + dbImage.const.dbId);
 			// logGroup();
 			// log(dbImage);
 			// log(object);
@@ -811,38 +819,38 @@
 		
 		
 		function unloadAndKillObjects() {
-			log("unloadAndKillObjects");
+			// log("unloadAndKillObjects");
 			if (loadedObjects > maxNumberOfLoadedObjects) {
-				log("... needs cleanup.... ");
+				// log("... needs cleanup.... ");
 				logGroup();
 				objectCausality.withoutEmittingEvents(function() {
 					imageCausality.withoutEmittingEvents(function() {
 						let leastActiveObject = objectCausality.getActivityListLast();
 						while (leastActiveObject !== null && loadedObjects > maxNumberOfLoadedObjects) {
-							log("considering object for unload...");
+							// log("considering object for unload...");
 							while(leastActiveObject !== null && typeof(leastActiveObject.const.dbImage) === 'undefined') { // Warning! can this wake a killed object to life? ... no should not be here!
-								log("skipping unsaved object (cannot unload something not saved)...");
+								// log("skipping unsaved object (cannot unload something not saved)...");
 								objectCausality.removeFromActivityList(leastActiveObject); // Just remove them and make GC possible. Consider pre-filter for activity list.... 
 								leastActiveObject = objectCausality.getActivityListLast();
 							}
 							if (leastActiveObject !== null) {
-								log("remove it!!");
+								// log("remove it!!");
 								objectCausality.removeFromActivityList(leastActiveObject);
 								unloadObject(leastActiveObject);
 							}
 						}
 					});
 				});				
-				logUngroup();
+				// logUngroup();
 			} else {
-				log("... still room for all loaded... ");
+				// log("... still room for all loaded... ");
 			}
 		}
 		
 		function unloadObject(object) {
 			objectCausality.freezeActivityList(function() {				
-				log("unloadObject");
-				logGroup();
+				// log("unloadObject");
+				// logGroup();
 				// log(object);
 				// without emitting events.
 				
@@ -860,12 +868,12 @@
 						// killObject(object);
 					// }
 				// });
-				logUngroup();
+				// logUngroup();
 			});
 		}
 		
 		function killObject(object) {
-			log("killObject");
+			// log("killObject");
 			delete object.const.dbImage.const.correspondingObject;
 			delete object.const.dbImage;
 			object.const.initializer = zombieObjectInitializer;
@@ -878,7 +886,7 @@
 		
 		
 		function unloadImage(dbImage) {
-			log("unloadImage");
+			// log("unloadImage");
 			// without emitting events.
 			for (property in dbImage) {
 				imageCausality.disableIncomingRelations(function() {
@@ -898,7 +906,7 @@
 		}
 		
 		function killDbImage(dbImage) {
-			log("killDbImage");
+			// log("killDbImage");
 			if (typeof(dbImage.const.correspondingObject) !== 'undefined') {
 				let object = dbImage.const.correspondingObject;
 				delete object.const.dbImage;
@@ -909,7 +917,7 @@
 		}
 		
 		function zombieImageInitializer(dbImage) {
-			log("zombieImageInitializer");
+			// log("zombieImageInitializer");
 			dbImage.const.forwardsTo = getDbImage(dbImage.const.dbId);
 		}
 		
@@ -972,8 +980,8 @@
 							let dbImage = object.const.dbImage;
 							if (typeof(dbImage.incoming) !== 'undefined') {
 								let relations = dbImage.incoming;
-								log(relations);
-								log("here");
+								// log(relations);
+								// log("here");
 								if (typeof(relations[property]) !== 'undefined') {
 									let relation = relations[property];
 									let contents = relation.contents;
@@ -981,7 +989,7 @@
 										let referer = getObjectFromImage(contents[id]);
 										callback(referer);
 									}
-									log(relation);
+									// log(relation);
 									let currentChunk = relation.first
 									while (currentChunk !== null) {
 										let contents = currentChunk.contents;
@@ -1015,6 +1023,9 @@
 			// incomingRelations : true, // this works only in conjunction with incomingStructuresAsCausalityObjects, otherwise isObject fails.... 
 			// incomingStructuresAsCausalityObjects : true
 		});
+		if (typeof(configuration.causalityConfiguration) !== 'undefined' && typeof(configuration.causalityConfiguration.name) !== 'undefined') {
+			objectCausalityConfiguration.name = configuration.causalityConfiguration.name + ".objectCausality";
+		}
 		objectCausality = require("./causality.js")(objectCausalityConfiguration);
 		
 		let argumentsToArray = function(arguments) {

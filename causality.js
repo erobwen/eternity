@@ -13,9 +13,25 @@
 	let log = objectlog.log;
 	let logGroup = objectlog.enter;
 	let logUngroup = objectlog.exit;
-
+	
+	// function stacktrace() { 
+	  // function st2(f) {
+		// return !f ? [] : 
+			// st2(f.caller).concat([f.toString().split('(')[0].substring(9) + '(' + f.arguments.join(',') + ')']);
+	  // }
+	  // return st2(arguments.callee.caller);
+	// }
+	
 	function createCausalityInstance(configuration) {
-		
+		log("=======================================================================================");
+		log("=======================================================================================");
+		log("=======================================================================================");
+		log("========================== NEW INSTANCE !!!!!!!!!!!!!!!!!!!!! =========================");
+		log("=======================================================================================");
+		log("=======================================================================================");
+		log("=======================================================================================");
+		log(configuration);
+		// stacktrace();
 		/***************************************************************
 		 *
 		 *  Id format
@@ -2875,7 +2891,10 @@
 		}
 		
 		function pokeObject(object) {
+			let tmpFrozen = activityListFrozen;
+			activityListFrozen = 0;
 			registerActivity(object.const.handler);
+			activityListFrozen = tmpFrozen;
 		}
 
 		function removeFromActivityList(proxy) {
@@ -2895,6 +2914,30 @@
 					st2(f.caller).concat([f.toString().split('(')[0].substring(9) + '(' + f.arguments.join(',') + ')']);
 			}
 			return st2(arguments.callee.caller);
+		}
+		
+		function logActivityList() {
+			activityListFrozen++;
+			blockingInitialize++;
+		
+			let current = activityListFirst;
+			let result = "[";
+			let first = true;
+						// log("activityList: ");
+			while(current !== null && typeof(current) !== 'undefined') {
+				if (!first) {
+					result += ", ";
+				}
+				result += current.const.object.name;
+				// current = current.activityListPrevious;
+				current = current.activityListNext;
+				first = false;
+			}
+			
+			log(result + "]");
+			
+			blockingInitialize--;
+			activityListFrozen--;
 		}
 
 		function registerActivity(handler) {
@@ -2923,16 +2966,7 @@
 				}
 				activityListFirst = handler;				
 				
-				// priority list
-				let current = activityListFirst;
-				// let current = activityListLast;
-				
-				// log("activityList: ");
-				while(current !== null && typeof(current) !== 'undefined') {
-					log(current.const.object.name);
-					// current = current.activityListPrevious;
-					current = current.activityListNext;
-				}
+				logActivityList();
 				blockingInitialize--;
 				activityListFrozen--;
 				logUngroup();
@@ -3046,6 +3080,7 @@
 			transformPossibleIdExpression : transformPossibleIdExpression,
 			
 			// Activity list interface
+			logActivityList : logActivityList,
 			freezeActivityList : freezeActivityList,
 			setActivityListFilter : setActivityListFilter,
 			getActivityListLast : getActivityListLast,

@@ -12,7 +12,7 @@ describe("basics", function () {
 
 
     it('should unload nodes as memory reaches limit, circluar path', function () {
-		let eternity = require('../eternity')({maxNumberOfLoadedObjects : 2});  // Includes persistent root.
+		let eternity = require('../eternity')({name: "unloading", causalityConfiguration: {name: "unloading"}, maxNumberOfLoadedObjects : 2});  // Includes persistent root.
 		let create = eternity.create;
 		let persistent = eternity.persistent;
 		
@@ -20,10 +20,9 @@ describe("basics", function () {
 			let result;
 			eternity.blockInitialize(function() {
 				eternity.freezeActivityList(function() {
-					log(object);
-					log(object.const.initializer);
+					// log(object.const.initializer);
 					result = object.const.initializer === null;
-					log(result);					
+					log(object.name + " isLoaded: " + result);
 				});
 			});
 			return result;
@@ -43,12 +42,18 @@ describe("basics", function () {
 		log("--------------------------------------------------------------");
 		persistent.A = A;
 		log("--------------------------------------------------------------");
+		eternity.logActivityList();
 		A.persistent = persistent;
+		eternity.logActivityList();
 		log("---------------------------- A.B = B; ----------------------------------");
+		eternity.logActivityList();
 		A.B = B;
+		eternity.logActivityList();
 		log("--------------------------- B.C = C; -----------------------------------");
+		eternity.logActivityList();
 		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
 		B.C = C;
+		eternity.logActivityList();
 		log("--------------------- d ---------------------------");
 		// log(persistent.name);
 		
@@ -69,8 +74,8 @@ describe("basics", function () {
 		// Persistent should be unloaded
 		assert.equal(isLoaded(persistent), false);
 		assert.equal(isLoaded(A), true);
-		assert.equal(isLoaded(B), true);
-		assert.equal(isLoaded(C), false);
+		assert.equal(isLoaded(B), false);
+		assert.equal(isLoaded(C), true);
 	});
 
     // it('should unload nodes as memory reaches limit, circluar infinite path', function () {
