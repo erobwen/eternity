@@ -47,12 +47,12 @@ describe("basics", function () {
 		// eternity.logActivityList();
 		A.B = B;
 		// eternity.logActivityList();
-		// log("--------------------------- B.C = C; -----------------------------------");
+		log("--------------------------- B.C = C; -----------------------------------");
 		// eternity.logActivityList();
 		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
 		B.C = C;
 		// eternity.logActivityList();
-		// log("--------------------- d ---------------------------");
+		log("--------------------------------------------------");
 		// log(persistent.name);
 		
 		
