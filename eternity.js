@@ -569,28 +569,27 @@
 		
 		function createObjectPlaceholderFromDbImage(dbImage) {
 			// log("createObjectPlaceholderFromDbImage " + dbImage.const.id);
-			let placeholder;
-			placeholder = objectCausality.create();
+			// connectObjectWithDbImage(placeholder, dbImage);
+			let placeholder = objectCausality.create();
 			placeholder.const.dbId = dbImage.const.dbId;
-			connectObjectWithDbImage(placeholder, dbImage);
-			placeholder.const.initializer = objectFromImageInitializer;
+			placeholder.const.initializer = objectFromIdInitializer;
 			return placeholder;
 		}
 		
-		function objectFromImageInitializer(object) {
-			// log("initialize object " + object.const.id + " from dbImage " + object.const.dbImage.const.id + ", dbId:" + object.const.dbId);
-			// logGroup();
-			objectCausality.withoutEmittingEvents(function() {
-				imageCausality.withoutEmittingEvents(function() {
-					loadFromDbImageToObject(object);
-				});
-			});
-			// logUngroup();
-		}
+		// function objectFromImageInitializer(object) {
+			// // log("initialize object " + object.const.id + " from dbImage " + object.const.dbImage.const.id + ", dbId:" + object.const.dbId);
+			// // logGroup();
+			// objectCausality.withoutEmittingEvents(function() {
+				// imageCausality.withoutEmittingEvents(function() {
+					// loadFromDbImageToObject(object);
+				// });
+			// });
+			// // logUngroup();
+		// }
 		
 		function createObjectPlaceholderFromDbId(dbId) {
 			// log("createObjectPlaceholderFromDbId: " + dbId);
-			let placeholder;
+			let placeholder = objectCausality.create();
 			placeholder.const.dbId = dbId;
 			placeholder.const.initializer = objectFromIdInitializer;
 			return placeholder;
@@ -832,7 +831,8 @@
 				unloadImage(object.const.dbImage);
 				loadedObjects--;
 
-				object.const.initializer = objectFromImageInitializer;
+				object.const.dbId = object.const.dbImage.const.dbId;
+				object.const.initializer = objectFromIdInitializer;
 				objectCausality.blockInitialize(function() {
 					log("Trying to kill object...");
 					// log(object.const.incomingReferencesCount)
@@ -897,11 +897,12 @@
 				delete dbImage.const.correspondingObject;
 			}
 			delete dbIdToDbImageMap[dbImage.const.dbId];
-			dbImage.const.initializer = zombieImageInitializer;
+			// dbImage.const.initializer = zombieImageInitializer;
 		}
 		
+		// There should never be any zombie image... 
 		function zombieImageInitializer(dbImage) {
-			// log("zombieImageInitializer");
+			log("zombieImageInitializer");
 			dbImage.const.forwardsTo = getDbImage(dbImage.const.dbId);
 		}
 		
