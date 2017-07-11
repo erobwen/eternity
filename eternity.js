@@ -294,30 +294,30 @@
 			}			
 		}
 		
-		function increaseImageIncomingLoadedCounter(entity) {
-			imageCausality.blockInitialize(function() {
-				if (imageCausality.isObject(entity)) {
-					if (typeof(entity.const.incomingLoadedMicroCounter) === 'undefined') {
-						entity.const.incomingLoadedMicroCounter = 0;
-					}
-					entity.const.incomingLoadedMicroCounter++;
-				}
-			});
-		}
+		// function increaseImageIncomingLoadedCounter(entity) {
+			// imageCausality.blockInitialize(function() {
+				// if (imageCausality.isObject(entity)) {
+					// if (typeof(entity.const.incomingLoadedMicroCounter) === 'undefined') {
+						// entity.const.incomingLoadedMicroCounter = 0;
+					// }
+					// entity.const.incomingLoadedMicroCounter++;
+				// }
+			// });
+		// }
 
-		function decreaseImageIncomingLoadedCounter(entity) {
-			imageCausality.blockInitialize(function() {
-				if (imageCausality.isObject(entity)) {
-					if (typeof(entity.const.incomingLoadedMicroCounter) === 'undefined') {
-						entity.const.incomingLoadedMicroCounter = 0;
-					}
-					entity.const.incomingLoadedMicroCounter--;
-					if (entity.const.incomingLoadedMicroCounter === 0 && entity.const.initializer !== null) {
-						killDbImage(entity);
-					}
-				}				
-			});
-		}
+		// function decreaseImageIncomingLoadedCounter(entity) {
+			// imageCausality.blockInitialize(function() {
+				// if (imageCausality.isObject(entity)) {
+					// if (typeof(entity.const.incomingLoadedMicroCounter) === 'undefined') {
+						// entity.const.incomingLoadedMicroCounter = 0;
+					// }
+					// entity.const.incomingLoadedMicroCounter--;
+					// if (entity.const.incomingLoadedMicroCounter === 0 && entity.const.initializer !== null) {
+						// killDbImage(entity);
+					// }
+				// }				
+			// });
+		// }
 
 
 		/*-----------------------------------------------
@@ -372,7 +372,7 @@
 								pendingImageCreations[imageId] = dbImage;
 								
 								for (let property in dbImage) {
-									increaseImageIncomingLoadedCounter(dbImage[property]);
+									// increaseImageIncomingLoadedCounter(dbImage[property]);
 									increaseLoadedIncomingMacroReferenceCounters(dbImage, property);
 								}
 								// if (typeof(pendingImageUpdates[imageId]) !== 'undefined') {
@@ -388,7 +388,7 @@
 									}
 									let imageUpdates = pendingImageUpdates[dbId];
 									imageUpdates[event.property] = event.newValue;
-									increaseImageIncomingLoadedCounter(event.newValue);
+									// increaseImageIncomingLoadedCounter(event.newValue);
 									increaseLoadedIncomingMacroReferenceCounters(dbImage, property);
 								}
 							}				
@@ -638,7 +638,7 @@
 						// log("value loaded to image:");
 						// log(value);
 						property = imageCausality.transformPossibleIdExpression(property, dbIdToImageId);
-						increaseImageIncomingLoadedCounter(value);
+						// increaseImageIncomingLoadedCounter(value);
 						increaseLoadedIncomingMacroReferenceCounters(dbImage, property);
 						dbImage[property] = value;
 						// if (property !== 'A') imageCausality.endTrace();
@@ -832,6 +832,8 @@
 				loadedObjects--;
 
 				object.const.dbId = object.const.dbImage.const.dbId;
+				
+				
 				object.const.initializer = objectFromIdInitializer;
 				objectCausality.blockInitialize(function() {
 					log("Trying to kill object...");
@@ -846,12 +848,18 @@
 		
 		function killObject(object) {
 			log("killObject");
+			let dbImage = object.const.dbImage;
+
 			log(object.const.target);
 			object.const.dbId = object.const.dbImage.const.dbId;
-			object.const.isZombie = true;
+			
 			// TODO: save dbId here as well?
 			delete object.const.dbImage.const.correspondingObject;
 			delete object.const.dbImage;
+
+			// Kill DB image if possible...
+			tryKillImage(dbImage);
+			
 			object.const.initializer = zombieObjectInitializer;
 		}
 		
@@ -859,7 +867,7 @@
 			log("zombieObjectInitializer");
 			let dbId = object.const.dbId;
 			let dbImage = getDbImage(dbId);
-			delete object.const.isZombie;
+			object.const.isZombie = true; // Access this by object.nonForwardStatic.isZombie
 			object.const.forwardsTo = getObjectFromImage(dbImage); // note: the dbImage might become a zombie as well...
 		}
 		
@@ -874,29 +882,36 @@
 					// Incoming should be unloaded here also, since it can be recovered.
 					let value = dbImage[property];
 					decreaseLoadedIncomingMacroReferenceCounters(dbImage, property);
-					decreaseImageIncomingLoadedCounter(value);
+					// decreaseImageIncomingLoadedCounter(value);
 					delete dbImage[property]; 
 				});
 			}
 			dbImage.const.initializer = imageFromDbIdInitializer;
-			imageCausality.blockInitialize(function() {
-				log("Trying to kill image...");
-				log(dbImage.const.incomingReferencesCount)
-				if (dbImage.const.incomingLoadedMicroCounter === 0) {
-					killDbImage(dbImage);
-				}				
-			});
+			
+			// log(dbImage.const.incomingReferencesCount)
+			tryKillImage(dbImage);
+			
 			logUngroup();
+		}
+		
+		function tryKillImage(dbImage) {
+			// log("Trying to kill image...");
+			imageCausality.blockInitialize(function() {
+				if (dbImage.const.incomingReferencesCount === 0 && typeof(dbImage.const.correspondingObject) === 'undefined') {
+					killDbImage(dbImage)
+				}
+			});
 		}
 		
 		function killDbImage(dbImage) {
 			log("killDbImage");
-			if (typeof(dbImage.const.correspondingObject) !== 'undefined') {
-				let object = dbImage.const.correspondingObject;
-				delete object.const.dbImage;
-				delete dbImage.const.correspondingObject;
-			}
+			// if (typeof(dbImage.const.correspondingObject) !== 'undefined') {
+				// let object = dbImage.const.correspondingObject;
+				// delete object.const.dbImage;
+				// delete dbImage.const.correspondingObject;
+			// }
 			delete dbIdToDbImageMap[dbImage.const.dbId];
+
 			// dbImage.const.initializer = zombieImageInitializer;
 		}
 		
@@ -1011,6 +1026,12 @@
 			incomingStructuresAsCausalityObjects : true,
 			blockInitializeForIncomingReferenceCounters: true,
 		});
+		imageCausality.addPostPulseAction(postImagePulseAction);
+		imageCausality.addRemovedLastIncomingRelationCallback(function(dbImage) {
+			tryKillImage(dbImage);
+		});
+
+
 
 		
 		// Primary causality object space
@@ -1037,7 +1058,6 @@
 		objectCausality.forAllPersistentIncomingNow = forAllPersistentIncomingNow;
 		objectCausality.imageCausality = imageCausality;
 		objectCausality.instance = objectCausality;
-		imageCausality.addPostPulseAction(postImagePulseAction);
 		
 		
 		// Setup database
