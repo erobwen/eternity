@@ -360,7 +360,7 @@
 				imageCausality.disableIncomingRelations(function () {
 					events.forEach(function(event) {
 						if (!isMacroEvent(event)) {
-							logEvent(event);
+							// logEvent(event);
 						
 							let dbImage = event.object;
 							// log("Considering " + event.type + " event with object:");
@@ -818,9 +818,9 @@
 		
 		function unloadObject(object) {
 			objectCausality.freezeActivityList(function() {				
-				log("unloadObject");
-				log(object);
-				logGroup();
+				// log("unloadObject");
+				// log(object);
+				// logGroup();
 				// without emitting events.
 				
 				for (property in object) {
@@ -836,7 +836,7 @@
 				
 				object.const.initializer = objectFromIdInitializer;
 				objectCausality.blockInitialize(function() {
-					log("Trying to kill object...");
+					// log("Trying to kill object...");
 					// log(object.const.incomingReferencesCount)
 					if (object.const.incomingReferencesCount === 0) {
 						killObject(object);
@@ -847,10 +847,10 @@
 		}
 		
 		function killObject(object) {
-			log("killObject");
+			// log("killObject");
 			let dbImage = object.const.dbImage;
 
-			log(object.const.target);
+			// log(object.const.target);
 			object.const.dbId = object.const.dbImage.const.dbId;
 			
 			// TODO: save dbId here as well?
@@ -864,7 +864,7 @@
 		}
 		
 		function zombieObjectInitializer(object) {
-			log("zombieObjectInitializer");
+			// log("zombieObjectInitializer");
 			let dbId = object.const.dbId;
 			let dbImage = getDbImage(dbId);
 			object.const.isZombie = true; // Access this by object.nonForwardStatic.isZombie
@@ -874,8 +874,8 @@
 		
 		
 		function unloadImage(dbImage) {
-			log("unloadImage");
-			logGroup();
+			// log("unloadImage");
+			// logGroup();
 			// without emitting events.
 			for (property in dbImage) {
 				imageCausality.disableIncomingRelations(function() {
@@ -891,7 +891,7 @@
 			// log(dbImage.const.incomingReferencesCount)
 			tryKillImage(dbImage);
 			
-			logUngroup();
+			// logUngroup();
 		}
 		
 		function tryKillImage(dbImage) {
@@ -904,7 +904,7 @@
 		}
 		
 		function killDbImage(dbImage) {
-			log("killDbImage");
+			// log("killDbImage");
 			// if (typeof(dbImage.const.correspondingObject) !== 'undefined') {
 				// let object = dbImage.const.correspondingObject;
 				// delete object.const.dbImage;
@@ -917,7 +917,7 @@
 		
 		// There should never be any zombie image... 
 		function zombieImageInitializer(dbImage) {
-			log("zombieImageInitializer");
+			// log("zombieImageInitializer");
 			dbImage.const.forwardsTo = getDbImage(dbImage.const.dbId);
 		}
 		
