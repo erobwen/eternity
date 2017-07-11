@@ -64,10 +64,12 @@ describe("basics", function () {
 		assert.equal(isLoaded(B), true);
 		assert.equal(isLoaded(C), true);
 		
-		// log("==================== Touch A ==========================");
+		log("==================== Touch A ==========================");
 		// // Touch A
-		let dummy = A.name;
-		// log("---------------------------------------");
+		// let dummy = A.name;
+		log(A.name);
+		log(A.name);
+		log("---------------------------------------");
 		
 		// Persistent should be unloaded
 		assert.equal(isLoaded(persistent), false);

@@ -819,9 +819,9 @@
 		
 		function unloadObject(object) {
 			objectCausality.freezeActivityList(function() {				
-				// log("unloadObject");
-				// logGroup();
-				// log(object);
+				log("unloadObject");
+				log(object);
+				logGroup();
 				// without emitting events.
 				
 				for (property in object) {
@@ -833,30 +833,41 @@
 				loadedObjects--;
 
 				object.const.initializer = objectFromImageInitializer;
-				// objectCausality.blockInitialize(function() {			
-					// if (object.const.incomingReferencesCount === 0) {
-						// killObject(object);
-					// }
-				// });
-				// logUngroup();
+				objectCausality.blockInitialize(function() {
+					log("Trying to kill object...");
+					// log(object.const.incomingReferencesCount)
+					if (object.const.incomingReferencesCount === 0) {
+						killObject(object);
+					}
+				});
+				logUngroup();
 			});
 		}
 		
 		function killObject(object) {
-			// log("killObject");
+			log("killObject");
+			log(object.const.target);
+			object.const.dbId = object.const.dbImage.const.dbId;
+			object.const.isZombie = true;
+			// TODO: save dbId here as well?
 			delete object.const.dbImage.const.correspondingObject;
 			delete object.const.dbImage;
 			object.const.initializer = zombieObjectInitializer;
 		}
 		
 		function zombieObjectInitializer(object) {
-			object.const.forwardsTo = createObjectPlaceholderFromDbImage(object.const.dbImage); // note: the dbImage might become a zombie as well...
+			log("zombieObjectInitializer");
+			let dbId = object.const.dbId;
+			let dbImage = getDbImage(dbId);
+			delete object.const.isZombie;
+			object.const.forwardsTo = getObjectFromImage(dbImage); // note: the dbImage might become a zombie as well...
 		}
 		
 		
 		
 		function unloadImage(dbImage) {
-			// log("unloadImage");
+			log("unloadImage");
+			logGroup();
 			// without emitting events.
 			for (property in dbImage) {
 				imageCausality.disableIncomingRelations(function() {
@@ -868,15 +879,18 @@
 				});
 			}
 			dbImage.const.initializer = imageFromDbIdInitializer;
-			// imageCausality.blockInitialize(function() {
-				// if (dbImage.const.incomingLoadedMicroCounter === 0) {
-					// killDbImage(dbImage);
-				// }				
-			// });
+			imageCausality.blockInitialize(function() {
+				log("Trying to kill image...");
+				log(dbImage.const.incomingReferencesCount)
+				if (dbImage.const.incomingLoadedMicroCounter === 0) {
+					killDbImage(dbImage);
+				}				
+			});
+			logUngroup();
 		}
 		
 		function killDbImage(dbImage) {
-			// log("killDbImage");
+			log("killDbImage");
 			if (typeof(dbImage.const.correspondingObject) !== 'undefined') {
 				let object = dbImage.const.correspondingObject;
 				delete object.const.dbImage;
@@ -1005,6 +1019,7 @@
 			name: 'objectCausality:' + JSON.stringify(configuration), 
 			recordPulseEvents : true,
 			objectActivityList : true,
+			incomingReferenceCounters : true, 
 			blockInitializeForIncomingStructures: true, 
 			blockInitializeForIncomingReferenceCounters: true
 			// TODO: make it possible to run these following in conjunction with eternity.... as of now it will totally confuse eternity.... 

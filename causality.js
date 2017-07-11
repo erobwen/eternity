@@ -1004,14 +1004,15 @@
 			// if (key instanceof 'Symbol') { incoming
 				// throw "foobar";
 			// }
+			ensureInitialized(this, target);
+			if (configuration.objectActivityList) registerActivity(this);
+			
 			if (this.const.forwardsTo !== null && key !== "nonForwardStatic") {
 				let overlayHandler = this.const.forwardsTo.const.handler;
 				let result = overlayHandler.get.apply(overlayHandler, [overlayHandler.target, key]);
 				return result;
 			}
 			
-			ensureInitialized(this, target);
-			if (configuration.objectActivityList) registerActivity(this);
 					
 			if (key === "const" || key === "nonForwardStatic") {
 				return this.const;
