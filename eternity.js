@@ -67,7 +67,7 @@
 									createDbImageForObject(object, null, null);
 								} else if (!event.newValue) {
 									// Had an image that becomes unstable
-									floodUnstable(event.object.const.dbImage, null, null);
+									markUnstable(event.object.const.dbImage);
 								}
 								
 							} else if (typeof(object.const.dbImage) !== 'undefined'){
@@ -81,7 +81,7 @@
 										if (oldValueDbImage._eternityParent === objectDbImage 
 											&& oldValueDbImage._eternityParentProperty === event.property) {
 											
-											floodUnstable(oldValueDbImage, null, null);
+											markUnstable(oldValueDbImage);
 										}
 									}
 								}
@@ -184,6 +184,23 @@
 				return entity;
 			}
 		} 
+		
+		function markUnstable(potentiallyUnstableImage) {
+			// objectCausality.disableIncomingRelations(function() {
+			// let persistentDbImage = objectCausality.persistent.const.dbImage;
+			
+			// if (typeof(persistentDbImage._eternityFirstUnstable)) {
+				
+			// }
+			// potentiallyUnstableImage._eternityPreviousUnstable = persistentDbImage._eternityFirstUnstable;
+			
+			// // Create a sub-pulse in the imageCausality.... 
+			// persistentDbImage._eternityFirstUnstable = potentiallyUnstableImage;
+				// // if (typeof(objectCausality.persistent.firstUnstable) === 'undefined') {
+					// // objectCausality.persistent.firstUnstable.
+				// // } 
+			// });
+		}
 		
 			// TODO: Do this asynchronously
 		function floodUnstable(potentiallyUnstableImage, parent, parentRelation) {
@@ -695,7 +712,7 @@
 			// log(object);
 			object.const.name = dbImage.const.name; // TODO remove debugg
 			for (let property in dbImage) {
-				if (property !== 'incoming') {
+				if (property !== 'incoming' && !property.startsWith("_eternity")) {
 					// log("load property: " + property);
 					// log("-------");
 					let value = dbImage[property];
