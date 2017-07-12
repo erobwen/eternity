@@ -1007,6 +1007,7 @@
 			ensureInitialized(this, target);
 			
 			if (this.const.forwardsTo !== null && key !== "nonForwardConst") {
+				// TODO: test that this can handle recursive forwards. 
 				let overlayHandler = this.const.forwardsTo.const.handler;
 				let result = overlayHandler.get.apply(overlayHandler, [overlayHandler.target, key]);
 				return result;

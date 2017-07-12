@@ -8,10 +8,10 @@ let logGroup = objectlog.enter;
 let logUngroup = objectlog.exit;
 
 // Tests based on mobx test/array.js
-describe("basics", function () {
+describe("loading, unloading & zombiefication", function () {
 
 
-    it('should unload nodes as memory reaches limit, circluar path', function () {
+    it('should unload nodes as memory reaches limit', function () {
 		let eternity = require('../eternity')({name: "unloading", causalityConfiguration: {name: "unloading"}, maxNumberOfLoadedObjects : 2});  // Includes persistent root.
 		let create = eternity.create;
 		let persistent = eternity.persistent;
@@ -28,7 +28,7 @@ describe("basics", function () {
 			return result;
 		}
 
-        function isKilled(object) {
+        function isDead(object) {
             let result;
             eternity.blockInitialize(function() {
                 eternity.freezeActivityList(function() {
@@ -72,7 +72,7 @@ describe("basics", function () {
 		log("---------------------------- A.B = B; ----------------------------------");
 		A.B = B;
 		assert.equal(isLoaded(persistent), false);
-        assert.equal(isKilled(persistent), false);
+        assert.equal(isDead(persistent), false);
 		
 		assert.equal(isLoaded(A), true);
 		
@@ -82,10 +82,10 @@ describe("basics", function () {
 		log("--------------------------- B.C = C; -----------------------------------");
 		B.C = C;
 		assert.equal(isLoaded(persistent), false);
-        assert.equal(isKilled(persistent), true);
+        assert.equal(isDead(persistent), true);
 		
 		assert.equal(isLoaded(A), false);
-        assert.equal(isKilled(A), true);
+        assert.equal(isDead(A), true);
 		
 		assert.equal(isLoaded(B), true);
 		
@@ -93,14 +93,13 @@ describe("basics", function () {
 		
 		log("--------------------------- Touch A -----------------------------------");
 		let dummy = A.name;
-		log("---------------------------------------");
 		
 		assert.equal(isLoaded(persistent), false);
-        assert.equal(isKilled(persistent), true);
+        assert.equal(isDead(persistent), true);
 		
 		// A becomes a zombie
 		assert.equal(isLoaded(A), true);
-		assert.equal(isKilled(A), false);
+		assert.equal(isDead(A), false);
 		assert.equal(isZombie(A), true);
 
 		assert.equal(isLoaded(B), false);
@@ -109,16 +108,15 @@ describe("basics", function () {
 		
 		log("--------------------------- Touch persistent -----------------------------------");
 		let persistentA = persistent.A;
-		log("---------------------------------------");
 		
 		// Persistent becomes a zombie
 		assert.equal(isLoaded(persistent), true);
-        assert.equal(isKilled(persistent), false);
+        assert.equal(isDead(persistent), false);
 		assert.equal(isZombie(persistent), true);
 		
 		// A is still a zombie
 		assert.equal(isLoaded(A), true);
-		assert.equal(isKilled(A), false);
+		assert.equal(isDead(A), false);
 		assert.equal(isZombie(A), true);
 
 		assert.equal(isLoaded(B), false);
@@ -132,6 +130,25 @@ describe("basics", function () {
 		// Persistent is also a zombie, but A.persistent refers to its non-zombie version. 
 		assert.equal(A.persistent === persistent, false);  // Equality without const does not work anymore, becuase one of them is a zombie. 
 		assert.equal(A.persistent.const === A.persistent.const, true);
+		
+		log("--------------------------- Touch B -----------------------------------");
+		let bName = B.name;
+		
+		// Persistent becomes a zombie
+		assert.equal(isLoaded(persistent), true);
+		assert.equal(isDead(persistent), false);
+		assert.equal(isZombie(persistent), true);
+		
+		// A is still a zombie
+		assert.equal(isLoaded(A), false);
+		assert.equal(isDead(A), false);
+		assert.equal(isZombie(A), true);
+
+		assert.equal(isLoaded(B), true);
+		assert.equal(isDead(B), false);
+		assert.equal(isZombie(B), true);
+		
+		assert.equal(isLoaded(C), false);
 	});
 });
 

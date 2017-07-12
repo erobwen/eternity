@@ -647,6 +647,8 @@
 						// printKeys(dbImage);
 					}				
 				}
+				dbImage.const.name = dbRecord.name; // TODO remove debugg
+
 				// log("finished loadFromDbIdToImage: ");
 				// log(dbImage.const.dbId);
 				// printKeys(dbImage);
@@ -691,6 +693,7 @@
 			// logGroup();
 			// log(dbImage);
 			// log(object);
+			object.const.name = dbImage.const.name; // TODO remove debugg
 			for (let property in dbImage) {
 				if (property !== 'incoming') {
 					// log("load property: " + property);
