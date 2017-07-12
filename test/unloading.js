@@ -52,39 +52,37 @@ describe("basics", function () {
             return result;
         }
 
-
-        
-
-		// persistent
-		// log("--------------------------------------------------------------");
+		// Setup a starting point (name in const for easy debugging)
 		let A = create({name: "A"});
-		// log("--------------------------------------------------------------");
+		A.const.name = "A";
+
 		let B = create({name: "B"});
-		// log("--------------------------------------------------------------");
+		B.const.name = "B";
+
 		let C = create({name: "C"});
-		// log("--------------------------------------------------------------");
-		persistent.name = "persistent"
-		// log("--------------------------------------------------------------");
+		C.const.name = "C";
+
+		// Start building a structure
+		persistent.name = "persistent";
+		persistent.const.name = "persistent"
 		persistent.A = A;
-		// log("--------------------------------------------------------------");
-		// eternity.logActivityList();
 		A.persistent = persistent;
-		// eternity.logActivityList();
-		// log("---------------------------- A.B = B; ----------------------------------");
-		// eternity.logActivityList();
-		A.B = B;
-		// eternity.logActivityList();
-		// log("--------------------------- B.C = C; -----------------------------------");
-		// eternity.logActivityList();
-		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
-		B.C = C;
-		// eternity.logActivityList();
-		// log("--------------------------------------------------");
-		// log(persistent.name);
 		
-		// Persistent should be unloaded
+		// Exceed the memory limit (3 objects loaded is too much)
+		log("---------------------------- A.B = B; ----------------------------------");
+		A.B = B;
 		assert.equal(isLoaded(persistent), false);
-        // assert.equal(isKilled(persistent), true);
+        assert.equal(isKilled(persistent), true);
+		
+		assert.equal(isLoaded(A), true);
+		
+		assert.equal(isLoaded(B), true);
+		
+		// Exceed the memory limit again, persistent and A no longer has any incoming references and will be killed
+		log("--------------------------- B.C = C; -----------------------------------");
+		B.C = C;
+		assert.equal(isLoaded(persistent), false);
+        assert.equal(isKilled(persistent), true);
 		
 		assert.equal(isLoaded(A), false);
         assert.equal(isKilled(A), true);
@@ -93,18 +91,17 @@ describe("basics", function () {
 		
 		assert.equal(isLoaded(C), true);
 		
-		// log("==================== Touch A ==========================");
-		// // Touch A
-		let dummy = A.name;
-		// log(A.name);
-		// log(A.name);
-		// log("---------------------------------------");
+		log("--------------------------- Toch A -----------------------------------");
+		// let dummy = A.name;
+		// // log(A.name);
+		// // log(A.name);
+		// // log("---------------------------------------");
 		
-		// Persistent should be unloaded
-		assert.equal(isLoaded(persistent), false);
-		assert.equal(isLoaded(A), true);
-		assert.equal(isLoaded(B), false);
-		assert.equal(isLoaded(C), true);
+		// // Persistent should be unloaded
+		// assert.equal(isLoaded(persistent), false);
+		// assert.equal(isLoaded(A), true);
+		// assert.equal(isLoaded(B), false);
+		// assert.equal(isLoaded(C), true);
 	});
 
     // it('should unload nodes as memory reaches limit, circluar infinite path', function () {

@@ -761,7 +761,7 @@
 		 
 		/*
 		function getHandlerArrayOptimized(target, key) {
-			if (this.const.forwardsTo !== null && key !== 'nonForwardStatic') { //  && (typeof(overlayBypass[key]) === 'undefined')
+			if (this.const.forwardsTo !== null && key !== 'nonForwardConst') { //  && (typeof(overlayBypass[key]) === 'undefined')
 				let overlayHandler = this.const.forwardsTo.const.handler;
 				return overlayHandler.get.apply(overlayHandler, [overlayHandler.target, key]);
 			}
@@ -782,7 +782,7 @@
 		*/
 		
 		function getHandlerArray(target, key) {
-			if (this.const.forwardsTo !== null && key !== 'nonForwardStatic') { // && (typeof(overlayBypass[key]) === 'undefined')
+			if (this.const.forwardsTo !== null && key !== 'nonForwardConst') { // && (typeof(overlayBypass[key]) === 'undefined')
 				// console.log(this.const.forwardsTo);
 				let overlayHandler = this.const.forwardsTo.const.handler;
 				return overlayHandler.get.apply(overlayHandler, [overlayHandler.target, key]);
@@ -790,7 +790,7 @@
 			
 			ensureInitialized(this, target);
 			
-			if (key === "const" || key === "nonForwardStatic") {
+			if (key === "const" || key === "nonForwardConst") {
 				return this.const;
 			} else if (constArrayOverrides[key]) {
 				return constArrayOverrides[key].bind(this);
@@ -965,7 +965,7 @@
 		function getHandlerObjectOptimized(target, key) {
 			key = key.toString();
 
-			if (this.const.forwardsTo !== null && key !== "nonForwardStatic") {
+			if (this.const.forwardsTo !== null && key !== "nonForwardConst") {
 				let overlayHandler = this.const.forwardsTo.const.handler;
 				let result = overlayHandler.get.apply(overlayHandler, [overlayHandler.target, key]);
 				return result;
@@ -1005,16 +1005,16 @@
 				// throw "foobar";
 			// }
 			ensureInitialized(this, target);
-			if (configuration.objectActivityList) registerActivity(this);
 			
-			if (this.const.forwardsTo !== null && key !== "nonForwardStatic") {
+			if (this.const.forwardsTo !== null && key !== "nonForwardConst") {
 				let overlayHandler = this.const.forwardsTo.const.handler;
 				let result = overlayHandler.get.apply(overlayHandler, [overlayHandler.target, key]);
 				return result;
 			}
 			
+			if (configuration.objectActivityList) registerActivity(this);
 					
-			if (key === "const" || key === "nonForwardStatic") {
+			if (key === "const" || key === "nonForwardConst") {
 				return this.const;
 			} else if (configuration.directStaticAccess && typeof(this.const[key]) !== 'undefined') { // TODO: implement directStaticAccess for other readers. 
 				// console.log("direct const access: " + key);
@@ -1148,18 +1148,21 @@
 			// }
 		// }
 		
-		function setHandlerObject(target, key, value) {					
+		function setHandlerObject(target, key, value) {			
+			// Ensure initialized
+			ensureInitialized(this, target);
+			
 			// Overlays
 			if (this.const.forwardsTo !== null) {
 				let overlayHandler = this.const.forwardsTo.const.handler;
 				return overlayHandler.set.apply(overlayHandler, [overlayHandler.target, key, value]);
 			}
 			
+			// logGroup();
+			if (configuration.objectActivityList) registerActivity(this);
+			
 			// Write protection
 			if (!canWrite(this.const.object)) return;
-			
-			// Ensure initialized
-			ensureInitialized(this, target);
 			
 			// Get previous value		// Get previous value
 			let previousValue;
@@ -1192,8 +1195,7 @@
 			observerNotificationPostponed++;
 			let undefinedKey = !(key in target);
 					
-			// logGroup();
-			if (configuration.objectActivityList) registerActivity(this);
+
 			
 			// Perform assignment with regards to incoming structures.
 			let incomingStructureValue;
@@ -1499,7 +1501,7 @@
 			}
 			
 			handler.const.const = handler.const;
-			handler.const.nonForwardStatic = handler.const;
+			handler.const.nonForwardConst = handler.const;
 			
 			// TODO: consider what we should do when we have reverse references. Should we loop through createdTarget and form proper reverse structures?
 			// Experiments: 
@@ -2704,8 +2706,8 @@
 		}
 
 		function mergeOverlayIntoObject(object) {
-			let overlay = object.nonForwardStatic.forwardsTo;
-			object.nonForwardStatic.forwardsTo = null;
+			let overlay = object.nonForwardConst.forwardsTo;
+			object.nonForwardConst.forwardsTo = null;
 			mergeInto(overlay, object);
 		}
 
@@ -2718,7 +2720,7 @@
 		}
 
 		function genericRemoveForwarding() {
-			this.nonForwardStatic.forwardsTo = null;
+			this.nonForwardConst.forwardsTo = null;
 		}
 
 		function genericMergeAndRemoveForwarding() {
@@ -2781,7 +2783,7 @@
 						// console.log("Assimilating:");
 						withoutRecording(function() { // Do not observe reads from the overlays
 							cacheRecord.newlyCreated.forEach(function(created) {
-								if (created.nonForwardStatic.forwardsTo !== null) {
+								if (created.nonForwardConst.forwardsTo !== null) {
 									// console.log("Has overlay, merge!!!!");
 									mergeOverlayIntoObject(created);
 								} else {

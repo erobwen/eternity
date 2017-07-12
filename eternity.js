@@ -601,6 +601,7 @@
 			objectCausality.withoutEmittingEvents(function() {
 				imageCausality.withoutEmittingEvents(function() {
 					loadFromDbIdToObject(object);
+					delete object.const.isUnloaded;
 				});
 			});
 			// logUngroup();
@@ -788,10 +789,10 @@
 		
 		
 		function unloadAndKillObjects() {
-			// log("unloadAndKillObjects");
+			log("unloadAndKillObjects");
 			if (loadedObjects > maxNumberOfLoadedObjects) {
-				// log("... needs cleanup.... ");
-				// logGroup();
+				log("... needs cleanup.... ");
+				logGroup();
 				objectCausality.withoutEmittingEvents(function() {
 					imageCausality.withoutEmittingEvents(function() {
 						let leastActiveObject = objectCausality.getActivityListLast();
@@ -810,7 +811,7 @@
 						}
 					});
 				});				
-				// logUngroup();
+				logUngroup();
 			} else {
 				// log("... still room for all loaded... ");
 			}
@@ -818,9 +819,9 @@
 		
 		function unloadObject(object) {
 			objectCausality.freezeActivityList(function() {				
-				// log("unloadObject");
-				// log(object);
-				// logGroup();
+				log("unloadObject");
+				log(object);
+				logGroup();
 				// without emitting events.
 				
 				for (property in object) {
@@ -828,40 +829,75 @@
 						delete object[property];					
 					}
 				}
-				unloadImage(object.const.dbImage);
 				loadedObjects--;
+				unloadImage(object.const.dbImage);
 
 				object.const.dbId = object.const.dbImage.const.dbId;
 				
 				
+				object.const.isUnloaded = true;
 				object.const.initializer = objectFromIdInitializer;
-				objectCausality.blockInitialize(function() {
-					// log("Trying to kill object...");
-					// log(object.const.incomingReferencesCount)
-					if (object.const.incomingReferencesCount === 0) {
-						killObject(object);
-					}
-				});
+				log("try to kill object just unloaded...");
+				tryKillObject(object);
+				// objectCausality.blockInitialize(function() {
+					// // log("Trying to kill object...");
+					// // log(object.const.incomingReferencesCount)
+					// if (object.const.incomingReferencesCount === 0) {
+						// killObject(object);
+					// }
+				// });
 				logUngroup();
 			});
 		}
-
+		
+		
+		function objName(object) {
+			let result = "";
+			objectCausality.freezeActivityList(function() {
+				objectCausality.blockInitialize(function() {
+					// log("name: " + object.const.name + " (non forward: )");
+					result = object.const.name;
+				});
+			});
+			return result;
+		}
+		
+		function logObj(object) {
+			objectCausality.freezeActivityList(function() {
+				objectCausality.blockInitialize(function() {
+					// log("name: " + object.const.name + " (non forward: )");
+					log("Object: " + object.const.name + " (non forward: " + object.nonForwardConst.name + ")");
+				});
+			}); 
+		}
 		
 		function tryKillObject(object) {
-            log("tryKillObject");
+            log("tryKillObject: " + objName(object));
+			logGroup();
+			logObj(object);
             objectCausality.blockInitialize(function() {
                 objectCausality.freezeActivityList(function() {
                     // Kill if unloaded
-                    if (typeof(object.const.dbImage) !== 'undefined' && object.const.initialize !== null) {
+					let isPersistentlyStored = typeof(object.const.dbImage) !== 'undefined';
+					let isUnloaded = typeof(object.const.initializer) === 'function'
+                    if (isPersistentlyStored && isUnloaded) {
+						log("kill it!");
+						log(object.const.initialize);
                         killObject(object);
-                    }
+                    } else {
+						log("show mercy!");
+						log(isPersistentlyStored);
+						log(isUnloaded);
+						// log(object.const.ini);q
+					}
                 });
             });
+			logUngroup();
         }
 
 		
 		function killObject(object) {
-			// log("killObject");
+			log("killObject: " + objName(object));
 			let dbImage = object.const.dbImage;
 
 			// log(object.const.target);
@@ -883,7 +919,7 @@
 			// log("zombieObjectInitializer");
 			let dbId = object.const.dbId;
 			let dbImage = getDbImage(dbId);
-			// object.const.isZombie = true; // Access this by object.nonForwardStatic.isZombie
+			// object.const.isZombie = true; // Access this by object.nonForwardConst.isZombie
 			object.const.forwardsTo = getObjectFromImage(dbImage); // note: the dbImage might become a zombie as well...
 		}
 		
@@ -1075,9 +1111,10 @@
 		objectCausality.imageCausality = imageCausality;
 		objectCausality.instance = objectCausality;
 		// TODO: install this... 
-		// objectCausality.addRemovedLastIncomingRelationCallback(function(dbImage) {
-            // tryKillObject(dbImage);
-        // });
+		objectCausality.addRemovedLastIncomingRelationCallback(function(dbImage) {
+			log("incoming relations reaced zero...")
+            tryKillObject(dbImage);
+        });
 
 		
 		// Setup database
