@@ -72,7 +72,7 @@ describe("basics", function () {
 		log("---------------------------- A.B = B; ----------------------------------");
 		A.B = B;
 		assert.equal(isLoaded(persistent), false);
-        assert.equal(isKilled(persistent), true);
+        assert.equal(isKilled(persistent), false);
 		
 		assert.equal(isLoaded(A), true);
 		
@@ -91,17 +91,17 @@ describe("basics", function () {
 		
 		assert.equal(isLoaded(C), true);
 		
-		log("--------------------------- Toch A -----------------------------------");
-		// let dummy = A.name;
-		// // log(A.name);
-		// // log(A.name);
-		// // log("---------------------------------------");
+		// log("--------------------------- Toch A -----------------------------------");
+		// // let dummy = A.name;
+		// // // log(A.name);
+		// // // log(A.name);
+		// // // log("---------------------------------------");
 		
-		// // Persistent should be unloaded
-		// assert.equal(isLoaded(persistent), false);
-		// assert.equal(isLoaded(A), true);
-		// assert.equal(isLoaded(B), false);
-		// assert.equal(isLoaded(C), true);
+		// // // Persistent should be unloaded
+		// // assert.equal(isLoaded(persistent), false);
+		// // assert.equal(isLoaded(A), true);
+		// // assert.equal(isLoaded(B), false);
+		// // assert.equal(isLoaded(C), true);
 	});
 
     // it('should unload nodes as memory reaches limit, circluar infinite path', function () {

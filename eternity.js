@@ -874,20 +874,22 @@
 		function tryKillObject(object) {
             log("tryKillObject: " + objName(object));
 			logGroup();
-			logObj(object);
+			// logObj(object);
             objectCausality.blockInitialize(function() {
                 objectCausality.freezeActivityList(function() {
                     // Kill if unloaded
 					let isPersistentlyStored = typeof(object.const.dbImage) !== 'undefined';
 					let isUnloaded = typeof(object.const.initializer) === 'function'
-                    if (isPersistentlyStored && isUnloaded) {
+					let hasNoIncoming = object.const.incomingReferencesCount  === 0;
+                    if (isPersistentlyStored && isUnloaded && hasNoIncoming) {
 						log("kill it!");
-						log(object.const.initialize);
                         killObject(object);
                     } else {
 						log("show mercy!");
-						log(isPersistentlyStored);
-						log(isUnloaded);
+						
+						log("has incoming: " + !hasNoIncoming);
+						log("is persistently stored: " + isPersistentlyStored);
+						log("is unloaded: " + isUnloaded);
 						// log(object.const.ini);q
 					}
                 });
