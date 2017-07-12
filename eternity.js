@@ -845,15 +845,28 @@
 				logUngroup();
 			});
 		}
+
+		
+		function tryKillObject(object) {
+            log("tryKillObject");
+            objectCausality.blockInitialize(function() {
+                objectCausality.freezeActivityList(function() {
+                    // Kill if unloaded
+                    if (typeof(object.const.dbImage) !== 'undefined' && object.const.initialize !== null) {
+                        killObject(object);
+                    }
+                });
+            });
+        }
+
 		
 		function killObject(object) {
 			// log("killObject");
 			let dbImage = object.const.dbImage;
 
 			// log(object.const.target);
+			object.const.isKilled = true;
 			object.const.dbId = object.const.dbImage.const.dbId;
-			
-			// TODO: save dbId here as well?
 			delete object.const.dbImage.const.correspondingObject;
 			delete object.const.dbImage;
 
@@ -864,10 +877,13 @@
 		}
 		
 		function zombieObjectInitializer(object) {
+            delete object.const.isKilled;
+            object.const.isZombie = true;
+			
 			// log("zombieObjectInitializer");
 			let dbId = object.const.dbId;
 			let dbImage = getDbImage(dbId);
-			object.const.isZombie = true; // Access this by object.nonForwardStatic.isZombie
+			// object.const.isZombie = true; // Access this by object.nonForwardStatic.isZombie
 			object.const.forwardsTo = getObjectFromImage(dbImage); // note: the dbImage might become a zombie as well...
 		}
 		
@@ -916,10 +932,10 @@
 		}
 		
 		// There should never be any zombie image... 
-		function zombieImageInitializer(dbImage) {
-			// log("zombieImageInitializer");
-			dbImage.const.forwardsTo = getDbImage(dbImage.const.dbId);
-		}
+		// function zombieImageInitializer(dbImage) {
+			// // log("zombieImageInitializer");
+			// dbImage.const.forwardsTo = getDbImage(dbImage.const.dbId);
+		// }
 		
 		/*-----------------------------------------------
 		 *           Setup database
@@ -1058,7 +1074,11 @@
 		objectCausality.forAllPersistentIncomingNow = forAllPersistentIncomingNow;
 		objectCausality.imageCausality = imageCausality;
 		objectCausality.instance = objectCausality;
-		
+		// TODO: install this... 
+		// objectCausality.addRemovedLastIncomingRelationCallback(function(dbImage) {
+            // tryKillObject(dbImage);
+        // });
+
 		
 		// Setup database
 		setupDatabase();

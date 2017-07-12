@@ -28,6 +28,33 @@ describe("basics", function () {
 			return result;
 		}
 
+        function isKilled(object) {
+            let result;
+            eternity.blockInitialize(function() {
+                eternity.freezeActivityList(function() {
+                    // log(object.const);
+                    result = typeof(object.const.isKilled) !== 'undefined';
+                    // log(object.name + " isLoaded: " + result);
+                });
+            });
+            return result;
+        }
+        
+        function isZombie(object) {
+            let result;
+            eternity.blockInitialize(function() {
+                eternity.freezeActivityList(function() {
+                    // log(object.const.initializer);
+                    result = typeof(object.const.isZombie) !== 'undefined';
+                    // log(object.name + " isLoaded: " + result);
+                });
+            });
+            return result;
+        }
+
+
+        
+
 		// persistent
 		// log("--------------------------------------------------------------");
 		let A = create({name: "A"});
@@ -55,13 +82,15 @@ describe("basics", function () {
 		// log("--------------------------------------------------");
 		// log(persistent.name);
 		
-		
-
-		
 		// Persistent should be unloaded
 		assert.equal(isLoaded(persistent), false);
+        // assert.equal(isKilled(persistent), true);
+		
 		assert.equal(isLoaded(A), false);
+        assert.equal(isKilled(A), true);
+		
 		assert.equal(isLoaded(B), true);
+		
 		assert.equal(isLoaded(C), true);
 		
 		// log("==================== Touch A ==========================");
