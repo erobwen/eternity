@@ -45,7 +45,7 @@ describe("basics", function () {
             eternity.blockInitialize(function() {
                 eternity.freezeActivityList(function() {
                     // log(object.const.initializer);
-                    result = typeof(object.const.isZombie) !== 'undefined';
+                    result = typeof(object.nonForwardConst.isZombie) !== 'undefined';
                     // log(object.name + " isLoaded: " + result);
                 });
             });
@@ -91,26 +91,48 @@ describe("basics", function () {
 		
 		assert.equal(isLoaded(C), true);
 		
-		// log("--------------------------- Toch A -----------------------------------");
-		// // let dummy = A.name;
-		// // // log(A.name);
-		// // // log(A.name);
-		// // // log("---------------------------------------");
+		log("--------------------------- Touch A -----------------------------------");
+		let dummy = A.name;
+		log("---------------------------------------");
 		
-		// // // Persistent should be unloaded
-		// // assert.equal(isLoaded(persistent), false);
-		// // assert.equal(isLoaded(A), true);
-		// // assert.equal(isLoaded(B), false);
-		// // assert.equal(isLoaded(C), true);
+		assert.equal(isLoaded(persistent), false);
+        assert.equal(isKilled(persistent), true);
+		
+		// A becomes a zombie
+		assert.equal(isLoaded(A), true);
+		assert.equal(isKilled(A), false);
+		assert.equal(isZombie(A), true);
+
+		assert.equal(isLoaded(B), false);
+		
+		assert.equal(isLoaded(C), true);
+		
+		log("--------------------------- Touch persistent -----------------------------------");
+		let persistentA = persistent.A;
+		log("---------------------------------------");
+		
+		// Persistent becomes a zombie
+		assert.equal(isLoaded(persistent), true);
+        assert.equal(isKilled(persistent), false);
+		assert.equal(isZombie(persistent), true);
+		
+		// A is still a zombie
+		assert.equal(isLoaded(A), true);
+		assert.equal(isKilled(A), false);
+		assert.equal(isZombie(A), true);
+
+		assert.equal(isLoaded(B), false);
+		
+		assert.equal(isLoaded(C), false);
+		
+		// Examine zombie properties 
+		assert.equal(A === persistent.A, false);  // Equality without const does not work anymore, becuase one of them is a zombie. 
+		assert.equal(A.const === persistent.A.const, true);
+		
+		// Persistent is also a zombie, but A.persistent refers to its non-zombie version. 
+		assert.equal(A.persistent === persistent, false);  // Equality without const does not work anymore, becuase one of them is a zombie. 
+		assert.equal(A.persistent.const === A.persistent.const, true);
 	});
-
-    // it('should unload nodes as memory reaches limit, circluar infinite path', function () {
-	// });
-
-    // it('should handle zombie objects correctly', function () {
-	// });	
-	
-	
 });
 
 

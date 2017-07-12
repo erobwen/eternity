@@ -789,9 +789,9 @@
 		
 		
 		function unloadAndKillObjects() {
-			log("unloadAndKillObjects");
+			// log("unloadAndKillObjects");
 			if (loadedObjects > maxNumberOfLoadedObjects) {
-				log("... needs cleanup.... ");
+				log("Too many objects, unload some... ");
 				logGroup();
 				objectCausality.withoutEmittingEvents(function() {
 					imageCausality.withoutEmittingEvents(function() {

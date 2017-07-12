@@ -1514,6 +1514,7 @@
 
 			if (inReCache()) {
 				if (cacheId !== null &&  typeof(context.cacheIdObjectMap[cacheId]) !== 'undefined') {
+					// TODO: what if we have zombie objects in the cacheIdOBjectMap... we need to save their previous forwarding... and restore it at the end of the reCache.... 
 					// Overlay previously created
 					let infusionTarget = context.cacheIdObjectMap[cacheId];
 					infusionTarget.const.handler.const.forwardsTo = proxy;
@@ -2730,6 +2731,8 @@
 		/************************************************************************
 		 *
 		 *  Projection (continous creation and infusion)
+		 *
+		 *  TODO: Deal with zombie objects that is already forwarding... 
 		 *
 		 ************************************************************************/
 
