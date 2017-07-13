@@ -69,7 +69,7 @@ describe("loading, unloading & zombiefication", function () {
 		A.persistent = persistent;
 		
 		// Exceed the memory limit (3 objects loaded is too much)
-		log("---------------------------- A.B = B; ----------------------------------");
+		// log("---------------------------- A.B = B; ----------------------------------");
 		A.B = B;
 		assert.equal(isLoaded(persistent), false);
         assert.equal(isDead(persistent), false);
@@ -79,7 +79,7 @@ describe("loading, unloading & zombiefication", function () {
 		assert.equal(isLoaded(B), true);
 		
 		// Exceed the memory limit again, persistent and A no longer has any incoming references and will be killed
-		log("--------------------------- B.C = C; -----------------------------------");
+		// log("--------------------------- B.C = C; -----------------------------------");
 		B.C = C;
 		assert.equal(isLoaded(persistent), false);
         assert.equal(isDead(persistent), true);
@@ -91,7 +91,7 @@ describe("loading, unloading & zombiefication", function () {
 		
 		assert.equal(isLoaded(C), true);
 		
-		log("--------------------------- Touch A -----------------------------------");
+		// log("--------------------------- Touch A -----------------------------------");
 		let dummy = A.name;
 		
 		assert.equal(isLoaded(persistent), false);
@@ -106,7 +106,7 @@ describe("loading, unloading & zombiefication", function () {
 		
 		assert.equal(isLoaded(C), true);
 		
-		log("--------------------------- Touch persistent -----------------------------------");
+		// log("--------------------------- Touch persistent -----------------------------------");
 		let persistentA = persistent.A;
 		
 		// Persistent becomes a zombie
@@ -131,7 +131,7 @@ describe("loading, unloading & zombiefication", function () {
 		assert.equal(A.persistent === persistent, false);  // Equality without const does not work anymore, becuase one of them is a zombie. 
 		assert.equal(A.persistent.const === A.persistent.const, true);
 		
-		log("--------------------------- Touch B -----------------------------------");
+		// log("--------------------------- Touch B -----------------------------------");
 		let bName = B.name;
 		
 		// Persistent becomes a zombie
