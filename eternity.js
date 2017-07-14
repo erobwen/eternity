@@ -630,7 +630,7 @@
 		
 		function convertTmpDbIdToDbId(entity) {
 			if (isTmpDbId(entity)) {
-				return imageCausality.idExpression(tmpDbIdToDbId[parseInt(entity.slice(tmpDbIdPrefix.length))]);
+				return imageCausality.idExpression(tmpDbIdToDbId[entity]);
 			} else {
 				return entity;
 			}
