@@ -22,13 +22,16 @@ describe("basics", function () {
 		log("Database contents:");
 		log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
 
-		assert.equal(1, eternity.mockMongoDB.getRecordsCount());
-		assert.equal(42, eternity.mockMongoDB.getRecord(0).foo);
+		assert.equal(2, eternity.mockMongoDB.getRecordsCount());
+		assert.equal(42, eternity.mockMongoDB.getRecord(1).foo);
 
 		eternity.unloadAllAndClearMemory();
 		
 		assert.equal(42, persistent.foo);		
+		
 		eternity.clearDatabaseAndClearMemory();
+		persistent = eternity.persistent; // has to be done here!
+		
 		assert.equal(true, typeof(persistent.foo) === 'undefined');
 	});
 	

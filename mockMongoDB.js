@@ -31,6 +31,7 @@
 		
 		function saveNewRecord(dataRecord) {
 			log("saveNewRecord:");
+			logGroup();
 			let id = dataRecords.length;
 			// dataRecord.id = "_id_" + id + "_di_"; // debug
 			
@@ -42,11 +43,14 @@
 			log(dataRecord);
 			dataRecords.push(JSON.stringify(dataRecord));
 			log(dataRecords, 3);
+			logUngroup();
 			return id;
 		}
 
 		function updateRecord(id, contents) {
 			log("updateRecord: " + id);
+			logGroup();
+			log(contents)
 			if (typeof(dataRecords[id]) === "undefined") {
 				throw new Error("Trying to update nonexistent data record.");
 			}
@@ -59,6 +63,7 @@
 			// console.log("updateRecord");
 			dataRecords[id] = JSON.stringify(contents);
 			log(dataRecords, 3);
+			logUngroup();
 			return id;
 		}
 		

@@ -368,40 +368,13 @@
 		}				
 
 
-		// should disableIncomingRelations
-		function serializeDbImage(dbImage) {
-			// imageCausality.disableIncomingRelations(function() {
-			// log(dbImage, 2);
-			// log(imageCausality.isObject(dbImage));
-			let serialized = (dbImage instanceof Array) ? [] : {};
-			for (let property in dbImage) {
-				// TODO: convert idExpressions
-				if (property !== 'const') {
-					// && property != 'incoming'
-					let value = convertReferencesToDbIdsOrTemporaryIds(dbImage[property]);
-					property = imageCausality.transformPossibleIdExpression(property, imageIdToDbId);
-					serialized[property] = value;
-				}
-			}
-			serialized["_eternitySerializedTmpDbId"] = dbImage.const.serializedTmpDbId; 
-			// });	
-			return serialized;			
-		}
 
 		let nextTmpDbId;
 		let tmpDbIdToDbImage;
 		let tmpDbIdToDbId;
 		let tmpDbIdPrefix = "_tmp_id_";
 		
-		function createTemporaryDbId(dbImage) {
-			let tmpDbId = nextTmpDbId++;
-			let serializedTmpDbId = tmpDbIdPrefix + tmpDbId;
-			// dbImage.const.tmpDbId = tmpDbId; 
-			dbImage.const.serializedTmpDbId = serializedTmpDbId;
-			tmpDbIdToDbImage[serializedTmpDbId] = dbImage;
-			return serializedTmpDbId;
-		}
-		
+
 		function postImagePulseAction(events) {
 			log("postImagePulseAction: " + events.length + " events");
 			logGroup();
@@ -427,6 +400,41 @@
 			logUngroup();
 		} 
 
+		
+		/*-----------------------------------------------
+		 *        First stage: Compile update 
+		 *-----------------------------------------------*/
+		
+		function getTmpDbId(dbImage) {
+			if (typeof(dbImage.const.serializedTmpDbId) === 'undefined') {
+				createTemporaryDbId(dbImage);
+			}
+			return dbImage.const.serializedTmpDbId;
+		}
+		
+		function createTemporaryDbId(dbImage) {
+			let tmpDbId = nextTmpDbId++;
+			let serializedTmpDbId = tmpDbIdPrefix + tmpDbId;
+			// dbImage.const.tmpDbId = tmpDbId; 
+			dbImage.const.serializedTmpDbId = serializedTmpDbId;
+			tmpDbIdToDbImage[serializedTmpDbId] = dbImage;
+			return serializedTmpDbId;
+		}
+		
+		
+		function imageIdToDbIdOrTmpDbId(imageId) {
+			if (typeof(imageIdToImageMap[imageId]) !== 'undefined') {
+				let dbImage = imageIdToImageMap[imageId];
+				if (typeof(dbImage.const.dbId) !== 'undefined') {
+					return dbImage.const.dbId;
+				} else {
+					return getTmpDbId(dbImage);
+				}
+			}
+			return "";
+		}
+
+		
 		function compileUpdate(events) {
 			log("compileUpdate:");
 			logGroup();
@@ -454,7 +462,7 @@
 							}
 							
 							// Serialized image creation, with temporary db ids. 
-							let tmpDbId = createTemporaryDbId(dbImage);
+							let tmpDbId = getTmpDbId(dbImage);
 							pendingUpdate.imageCreations[tmpDbId] = serializeDbImage(dbImage);
 							
 							// if (typeof(pendingUpdate.imageUpdates[imageId]) !== 'undefined') {
@@ -488,6 +496,7 @@
 			logUngroup();
 		}
 		
+		
 		function isMacroEvent(event) {
 			return imageEventHasObjectValue(event) && !event.incomingStructureEvent;
 		}
@@ -497,11 +506,68 @@
 			return imageCausality.isObject(event.newValue) || imageCausality.isObject(event.oldValue);
 		}
 		
+	
+		// should disableIncomingRelations
+		function serializeDbImage(dbImage) {
+			// imageCausality.disableIncomingRelations(function() {
+			// log(dbImage, 2);
+			// log(imageCausality.isObject(dbImage));
+			let serialized = (dbImage instanceof Array) ? [] : {};
+			for (let property in dbImage) {
+				// TODO: convert idExpressions
+				if (property !== 'const') {
+					// && property != 'incoming'
+					let value = convertReferencesToDbIdsOrTemporaryIds(dbImage[property]);
+					property = imageCausality.transformPossibleIdExpression(property, imageIdToDbIdOrTmpDbId);
+					serialized[property] = value;
+				}
+			}
+			return serialized;			
+		}
+		
+		
+		function convertReferencesToDbIdsOrTemporaryIds(entity) {
+			// log();
+			// log("convertReferencesToDbIdsOrTemporaryIds: ");
+			// log(entity, 2);
+			// log(imageCausality.isObject(entity));
+			if (imageCausality.isObject(entity)) {
+				let dbImage = entity;
+				if (hasDbId(entity)) {
+					return dbImage.const.serializedMongoDbId;
+				} else {
+					return getTmpDbId(entity);
+				}
+			} else if (entity !== null && typeof(entity) === 'object') {
+				// log("===========");
+				// log(entity, 3);
+				// log("===========");
+				
+				// entity.foo.bar;
+				
+				let converted = (entity instanceof Array) ? [] : {};
+				for (let property in entity) {
+					if (property !== 'const') {
+						// TODO: convert idExpressions here? 
+						converted[property] = convertReferencesToDbIdsOrTemporaryIds(entity[property]);
+					}
+				}
+				return converted;
+			} else {
+				return entity;
+			}
+		}
+		
 		
 		function hasDbId(dbImage) {
 			// log(dbImage);
 			return typeof(dbImage.const.dbId) !== 'undefined';
 		}
+		
+		
+		/*-----------------------------------------------
+		 *        Second stage: Write in two phases
+		 *-----------------------------------------------*/
 
 		function twoPhaseComit() {
 			log("twoPhaseComit:");
@@ -513,7 +579,7 @@
 			// Create 
 			let imageCreations = pendingUpdate.imageCreations;
 			for (let tmpDbId in imageCreations) {
-				writePlaceholderToDatabase(imageCreations[tmpDbId]);
+				writePlaceholderToDatabase(tmpDbId); // sets up tmpDbIdToDbId
 			}
 			for (let tmpDbId in imageCreations) {
 				writeSerializedImageToDatabase(tmpDbIdToDbId[tmpDbId], replaceTmpDbIdsWithDbIds(imageCreations[tmpDbId]));
@@ -536,18 +602,26 @@
 			// Note: this stage can be ignored in recovery mode, as then there no previously loaded objects.
 			for (let tmpDbId in tmpDbIdToDbImage) {
 				let dbImage = tmpDbIdToDbImage[tmpDbId];
-				dbImage.const.dbId = tmpDbIdToDbId[tmpDbId];
+				let dbId = tmpDbIdToDbId[tmpDbId];
+				dbImage.const.dbId = dbId;
+				dbImage.const.serializedMongoDbId = imageCausality.idExpression(dbId);
 			}
 			
 			// Finish, clean up transaction
-			mockMongoDB.updateRecord(1, {});
+			mockMongoDB.updateRecord(0, {});
 			
 			logUngroup();
 		}
 		
 		
 		function replaceTmpDbIdsWithDbIds(entity) {
-			return replaceRecursivley(entity, isTmpDbId, convertTmpDbIdToDbId);
+			log("replaceTmpDbIdsWithDbIds");
+			logGroup();
+			log(entity);
+			let result = replaceRecursivley(entity, isTmpDbId, convertTmpDbIdToDbId);
+			log(result);
+			logUngroup();
+			return result;
 		}
 		
 		function isTmpDbId(entity) {
@@ -566,6 +640,7 @@
 			if (pattern(entity)) {
 				return replacer(entity)
 			} else if (typeof(entity) === 'object') {
+				if (entity === null) return null;
 				let newObject = (entity instanceof Array) ? [] : {};
 				for (let property in entity) {
 					newObject[property] = replaceRecursivley(entity[property], pattern, replacer); 
@@ -586,70 +661,15 @@
 			return "";
 		}
 		
-		function imageIdToDbIdOrTmpDbId(imageId) {
-			if (typeof(imageIdToImageMap[imageId]) !== 'undefined') {
-				let dbImage = imageIdToImageMap[imageId];
-				if (typeof(dbImage.const.dbId) !== 'undefined') {
-					return dbImage.const.dbId;
-				} else if (typeof(dbImage.const.tmpDbId) !== 'undefined') {
-					return dbImage.const.serializedTmpDbId; // Serialized to distinguish from ordinary...					
-				}
-			}
-			return "";
-		}
-
 
 		function writeSerializedImageToDatabase(dbId, serializedDbImage) {	
 			mockMongoDB.updateRecord(dbId, serializedDbImage);			
 		}
 		
 		
-		function writePlaceholderToDatabase(serializedDbImage) {
-			let tmpDbId = serializedDbImage._eternitySerializedTmpDbId;
+		function writePlaceholderToDatabase(tmpDbId) {
 			let dbId = mockMongoDB.saveNewRecord({_eternitySerializedTmpDbId : tmpDbId}); // A temporary id so we can trace it down in case of failure.
 			tmpDbIdToDbId[tmpDbId] = dbId; //imageCausality.idExpression(dbId); ? 
-		}
-		
-		function writePlaceholderForImageToDatabase(dbImage) {
-			let dbId = mockMongoDB.saveNewRecord({});
-			dbImage.const.dbId = dbId;
-			dbImage.const.serializedMongoDbId = imageCausality.idExpression(dbId);
-			return dbId;
-		}
-		
-		
-		function convertReferencesToDbIdsOrTemporaryIds(entity) {
-			// log();
-			// log("convertReferencesToDbIdsOrTemporaryIds: ");
-			// log(entity, 2);
-			// log(imageCausality.isObject(entity));
-			if (imageCausality.isObject(entity)) {
-				let dbImage = entity;
-				if (!hasDbId(entity)) {
-
-					return createTemporaryDbId(entity);
-					// writePlaceholderForImageToDatabase(dbImage);
-				} else {
-					return dbImage.const.serializedMongoDbId;
-				}
-			} else if (entity !== null && typeof(entity) === 'object') {
-				// log("===========");
-				// log(entity, 3);
-				// log("===========");
-				
-				// entity.foo.bar;
-				
-				let converted = (entity instanceof Array) ? [] : {};
-				for (let property in entity) {
-					if (property !== 'const') {
-						// TODO: convert idExpressions here? 
-						converted[property] = convertReferencesToDbIdsOrTemporaryIds(entity[property]);
-					}
-				}
-				return converted;
-			} else {
-				return entity;
-			}
 		}
 		
 		
@@ -1129,7 +1149,7 @@
 				loadedObjects++;
 
 				log("----------- create db image ------------");
-				createEmptyDbImage(objectCausality.persistent);
+				createEmptyDbImage(objectCausality.persistent, null, null);
 
 				// });
 			} else {
