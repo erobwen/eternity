@@ -30,6 +30,7 @@
 		}
 		
 		function saveNewRecord(dataRecord) {
+			log("saveNewRecord:");
 			let id = dataRecords.length;
 			// dataRecord.id = "_id_" + id + "_di_"; // debug
 			
@@ -38,12 +39,17 @@
 			dataRecord = copy;
 			
 			// console.log("saveNewRecord");
-			// console.log(dataRecord);
+			log(dataRecord);
 			dataRecords.push(JSON.stringify(dataRecord));
+			log(dataRecords, 3);
 			return id;
 		}
 
 		function updateRecord(id, contents) {
+			log("updateRecord: " + id);
+			if (typeof(dataRecords[id]) === "undefined") {
+				throw new Error("Trying to update nonexistent data record.");
+			}
 			// contents.id = "_id_" + id + "_di_";
 
 			let copy = { id : "_id_" + id + "_di_" };
@@ -52,6 +58,7 @@
 
 			// console.log("updateRecord");
 			dataRecords[id] = JSON.stringify(contents);
+			log(dataRecords, 3);
 			return id;
 		}
 		

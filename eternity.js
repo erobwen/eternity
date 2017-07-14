@@ -15,8 +15,8 @@
 	
 	// Neat logging
 	let objectlog = require('./objectlog.js');
-	// let log = objectlog.log;
-	function log() {}
+	let log = objectlog.log;
+	// function log() {}
 	let logGroup = objectlog.enter;
 	let logUngroup = objectlog.exit;
 
@@ -29,15 +29,17 @@
 		let unstableImages = [];
 
 		function postObjectPulseAction(events) {
-			// log("postObjectPulseAction: " + events.length + " events");
-			// logGroup();
-			objectCausality.freezeActivityList(function() {
-				// log(events, 3);
-				transferChangesToImage(events);
-				unloadAndKillObjects();
-			});
+			log("postObjectPulseAction: " + events.length + " events");
+			logGroup();
+			if (events.length > 0) {
+				objectCausality.freezeActivityList(function() {
+					// log(events, 3);
+					transferChangesToImage(events);
+					unloadAndKillObjects();
+				});				
+			}
 			
-			// logUngroup();
+			logUngroup();
 		} 
 		
 		
@@ -381,96 +383,110 @@
 					serialized[property] = value;
 				}
 			}
-			serialized["_eternity_temporary_db_id"] = dbImage.const.tmpDbId; 
+			serialized["_eternitySerializedTmpDbId"] = dbImage.const.serializedTmpDbId; 
 			// });	
 			return serialized;			
 		}
 
 		let nextTmpDbId;
-		let tmpIdToDbImage;
-		let tmpIdToDbId;
-		let tmpIdPrefix = "_tmp_id_";
+		let tmpDbIdToDbImage;
+		let tmpDbIdToDbId;
+		let tmpDbIdPrefix = "_tmp_id_";
 		
 		function createTemporaryDbId(dbImage) {
-			let tmpId = nextTmpDbId++;
-			dbImage.const.tmpId = tmpId; 
-			dbImage.const.serializedTmpId = tmpIdPrefix + tmpId;
-			tmpIdToDbImage[tmpId] = dbImage;
-			return dbImage.const.serializedTmpId;
+			let tmpDbId = nextTmpDbId++;
+			let serializedTmpDbId = tmpDbIdPrefix + tmpDbId;
+			// dbImage.const.tmpDbId = tmpDbId; 
+			dbImage.const.serializedTmpDbId = serializedTmpDbId;
+			tmpDbIdToDbImage[serializedTmpDbId] = dbImage;
+			return serializedTmpDbId;
 		}
 		
 		function postImagePulseAction(events) {
-			// Serialize changes in memory
+			log("postImagePulseAction: " + events.length + " events");
+			logGroup();
+			if (events.length > 0) {
+						
+				// Serialize changes in memory
+				compileUpdate(events);
+				
+				
+				// Push changes to database
+				twoPhaseComit();
+				
+				// Cleanup
+				tmpDbId = 0;
+				tmpDbIdToDbImage = null;
+				tmpDbIdToDbId = null;
+				pendingUpdate = null;
+			
+			} else {
+				log("no events...");
+				// throw new Error("a pulse with no events?");
+			}
+			logUngroup();
+		} 
+
+		function compileUpdate(events) {
+			log("compileUpdate:");
+			logGroup();
 			imageCausality.disableIncomingRelations(function () { // All incoming structures fully visible!
 				
 				// Temporary ids for two phase comit to database.
 				nextTmpDbId = 0;
-				tmpIdToDbImage = {};
-				tmpIdToDbId = {};
+				tmpDbIdToDbImage = {};
+				tmpDbIdToDbId = {};
 				pendingUpdate = {
 					imageCreations : {},
 					imageUpdates : {}
 				}
-				
-				if (events.length > 0) {
-					// log("postImagePulseAction: " + events.length + " events");
-					// logGroup();
 
-					// Extract updates and creations to be done.
-					events.forEach(function(event) {
-						if (!isMacroEvent(event)) {
-							let dbImage = event.object;
-							let imageId = dbImage.const.id;
-								
-							if (event.type === 'creation') {
+				// Extract updates and creations to be done.
+				events.forEach(function(event) {
+					if (!isMacroEvent(event)) {
+						let dbImage = event.object;
+						let imageId = dbImage.const.id;
+							
+						if (event.type === 'creation') {
+							// Maintain image structure
+							for (let property in dbImage) {
+								increaseLoadedIncomingMacroReferenceCounters(dbImage, property);
+							}
+							
+							// Serialized image creation, with temporary db ids. 
+							let tmpDbId = createTemporaryDbId(dbImage);
+							pendingUpdate.imageCreations[tmpDbId] = serializeDbImage(dbImage);
+							
+							// if (typeof(pendingUpdate.imageUpdates[imageId]) !== 'undefined') {
+								// // We will do a full write of this image, no need to update after.				
+								// delete pendingUpdate.imageUpdates[dbId];   // will never happen anymore?
+							// }
+						} else if (event.type === 'set') {
+							if (typeof(dbImage.const.dbId) !== 'undefined') { // && typeof(pendingUpdate.imageCreations[imageId]) === 'undefined'
 								// Maintain image structure
-								for (let property in dbImage) {
-									increaseLoadedIncomingMacroReferenceCounters(dbImage, property);
-								}
+								increaseLoadedIncomingMacroReferenceCounters(dbImage, event.property);
+								// decreaseLoadedIncomingMacroReferenceCounters(dbImage, event.); // TODO: Decrease counters here?
 								
-								// Serialized image creation, with temporary db ids. 
-								let tmpDbId = createTemporaryDbId(dbImage);
-								pendingUpdate.imageCreations[tmpDbId] = serializeDbImage(dbImage);
-								
-								// if (typeof(pendingUpdates.imageUpdates[imageId]) !== 'undefined') {
-									// // We will do a full write of this image, no need to update after.				
-									// delete pendingUpdates.imageUpdates[dbId];   // will never happen anymore?
-								// }
-							} else if (event.type === 'set') {
-								if (typeof(dbImage.const.dbId) !== 'undefined') { // && typeof(pendingUpdate.imageCreations[imageId]) === 'undefined'
-									// Maintain image structure
-									increaseLoadedIncomingMacroReferenceCounters(dbImage, event.property);
-									// decreaseLoadedIncomingMacroReferenceCounters(dbImage, event.); // TODO: Decrease counters here?
-									
-									// Only update if we will not do a full write on this image. 
-									let dbId = dbImage.const.dbId;
-									if (typeof(pendingUpdates.imageUpdates[dbId]) === 'undefined') {
-										pendingUpdates.imageUpdates[dbId] = {};
-									}
-									let imageUpdates = pendingUpdates.imageUpdates[dbId];
-									
-									// Serialized value with temporary db ids. 
-									let newValue = convertReferencesToDbIdsOrTemporaryIds(event.newValue);
-									let property = event.property;
-									property = imageCausality.transformPossibleIdExpression(property, imageIdToDbIdOrTmpId);
-									imageUpdates[event.property] = newValue;
+								// Only update if we will not do a full write on this image. 
+								let dbId = dbImage.const.dbId;
+								if (typeof(pendingUpdate.imageUpdates[dbId]) === 'undefined') {
+									pendingUpdate.imageUpdates[dbId] = {};
 								}
-							}				
-						}
-					});								
-				}
+								let imageUpdates = pendingUpdate.imageUpdates[dbId];
+								
+								// Serialized value with temporary db ids. 
+								let newValue = convertReferencesToDbIdsOrTemporaryIds(event.newValue);
+								let property = event.property;
+								property = imageCausality.transformPossibleIdExpression(property, imageIdToDbIdOrTmpDbId);
+								imageUpdates[event.property] = newValue;
+							}
+						}				
+					}
+				});								
 			});
-			
-			// Push changes to database
-			twoPhaseComit();
-			
-			// Cleanup
-			tmpDbId = 0;
-			tmpIdToDbImage = null;
-			tmpIdToDbId = null;
-			pendingUpdate = null;
-		} 
-
+			log(pendingUpdate, 3);
+			logUngroup();
+		}
 		
 		function isMacroEvent(event) {
 			return imageEventHasObjectValue(event) && !event.incomingStructureEvent;
@@ -488,29 +504,29 @@
 		}
 
 		function twoPhaseComit() {
-			// log("twoPhaseComit:");
-			// logGroup();
+			log("twoPhaseComit:");
+			logGroup();
 
 			// First Phase, store transaction in database for transaction completion after failure (cannot rollback since previous values are not stored, could be future feature?). This write is atomic to MongoDb.
-			mockMongoDB.updateRecord(1, pendingUpdate);
+			mockMongoDB.updateRecord(0, pendingUpdate);
 			
 			// Create 
 			let imageCreations = pendingUpdate.imageCreations;
-			for (let tmpId in imageCreations) {
-				writePlaceholderToDatabase(imageCreations[tmpId]);
+			for (let tmpDbId in imageCreations) {
+				writePlaceholderToDatabase(imageCreations[tmpDbId]);
 			}
-			for (let tmpId in imageCreations) {
-				writeSerializedImageToDatabase(tmpIdToDbId[tmpId], replaceTmpIdsWithDbIds(imageCreations[tmpId]));
+			for (let tmpDbId in imageCreations) {
+				writeSerializedImageToDatabase(tmpDbIdToDbId[tmpDbId], replaceTmpDbIdsWithDbIds(imageCreations[tmpDbId]));
 			}
 			
 			// TODO: Update entire record if the number of updates are more than half of fields.
 			// log("pendingImageUpdates:" + Object.keys(pendingImageUpdates).length);
 			for (let id in pendingUpdate.imageUpdates) {
 				// log("update dbImage id:" + id + " keys: " + Object.keys(pendingImageUpdates[id]));
-				let updates = pendingImageUpdates[id];
+				let updates = pendingUpdate.imageUpdates[id];
 				for (let property in updates) {
 					let value = updates[property];
-					value = replaceTmpIdsWithDbIds(value);
+					value = replaceTmpDbIdsWithDbIds(value);
 					property = imageCausality.transformPossibleIdExpression(property, tmpDbIdToDbId);
 					mockMongoDB.updateRecordPath(id, [property], value);
 				}
@@ -518,9 +534,9 @@
 
 			// Write dbIds back to the images. TODO: consider, how do they get back to the object? maybe not, so we need to move it there in the unload code. 
 			// Note: this stage can be ignored in recovery mode, as then there no previously loaded objects.
-			for (let tmpId in tmpIdToDbImage) {
-				let dbImage = tmpIdToDbImage[tmpId];
-				dbImage.const.dbId = tmpIdToDbId[tmpId];
+			for (let tmpDbId in tmpDbIdToDbImage) {
+				let dbImage = tmpDbIdToDbImage[tmpDbId];
+				dbImage.const.dbId = tmpDbIdToDbId[tmpDbId];
 			}
 			
 			// Finish, clean up transaction
@@ -530,17 +546,17 @@
 		}
 		
 		
-		function replaceTmpIdsWithDbIds(entity) {
-			return replaceRecursivley(entity, isTmpId, tmpDbIdToDbId);
+		function replaceTmpDbIdsWithDbIds(entity) {
+			return replaceRecursivley(entity, isTmpDbId, convertTmpDbIdToDbId);
 		}
 		
-		function isTmpId(entity) {
-			return (typeof(entity) === 'string') && entity.startsWith(tmpIdPrefix);
+		function isTmpDbId(entity) {
+			return (typeof(entity) === 'string') && entity.startsWith(tmpDbIdPrefix);
 		}
 		
-		function tmpDbIdToDbId(entity) {
-			if (isTmpId(entity)) {
-				return imageCausality.idExpression(tmpIdToDbId[parseInt(entity.slice(tmpIdPrefix.length))]);
+		function convertTmpDbIdToDbId(entity) {
+			if (isTmpDbId(entity)) {
+				return imageCausality.idExpression(tmpDbIdToDbId[parseInt(entity.slice(tmpDbIdPrefix.length))]);
 			} else {
 				return entity;
 			}
@@ -570,13 +586,13 @@
 			return "";
 		}
 		
-		function imageIdToDbIdOrTmpId(imageId) {
+		function imageIdToDbIdOrTmpDbId(imageId) {
 			if (typeof(imageIdToImageMap[imageId]) !== 'undefined') {
 				let dbImage = imageIdToImageMap[imageId];
 				if (typeof(dbImage.const.dbId) !== 'undefined') {
 					return dbImage.const.dbId;
 				} else if (typeof(dbImage.const.tmpDbId) !== 'undefined') {
-					return dbImage.const.serializedTmpId; // Serialized to distinguish from ordinary...					
+					return dbImage.const.serializedTmpDbId; // Serialized to distinguish from ordinary...					
 				}
 			}
 			return "";
@@ -589,9 +605,9 @@
 		
 		
 		function writePlaceholderToDatabase(serializedDbImage) {
-			let tmpDbId = serializedDbImage._eternity_temporary_db_id;
-			let dbId = mockMongoDB.saveNewRecord({_eternity_temporary_db_id : tmpDbId}); // A temporary id so we can trace it down in case of failure.
-			tmpIdToDbId[tmpDbId] = dbId; //imageCausality.idExpression(dbId); ? 
+			let tmpDbId = serializedDbImage._eternitySerializedTmpDbId;
+			let dbId = mockMongoDB.saveNewRecord({_eternitySerializedTmpDbId : tmpDbId}); // A temporary id so we can trace it down in case of failure.
+			tmpDbIdToDbId[tmpDbId] = dbId; //imageCausality.idExpression(dbId); ? 
 		}
 		
 		function writePlaceholderForImageToDatabase(dbImage) {
@@ -1097,33 +1113,30 @@
 		 *-----------------------------------------------*/
 		
 		function setupDatabase() {
+			log("setupDatabase");
+			logGroup();
+
 			// if (typeof(objectCausality.persistent) === 'undefined') {
 			if (mockMongoDB.getRecordsCount() === 0) {
+				log("setup from an empty database...");
+				
+				// Note: image pulse should write here... 
+				log("----------- create db image ------------");
+				mockMongoDB.saveNewRecord({ isUpdatePlaceholder: true}); // placeholder for transaction. Always with object id 1.
 				// objectCausality.pulse(function() {
-					objectCausality.persistent = objectCausality.create();
-					loadedObjects++;
-					createEmptyDbImage(objectCausality.persistent);
-					// Note: image pulse should write here... 
-					mockMongoDB.saveNewRecord({}); // placeholder for transaction. Always with object id 1.
+				log("------------- create persistent object ----------");
+				objectCausality.persistent = objectCausality.create();
+				loadedObjects++;
+
+				log("----------- create db image ------------");
+				createEmptyDbImage(objectCausality.persistent);
+
 				// });
 			} else {
-				objectCausality.persistent = createObjectPlaceholderFromDbId(0);
+				log("setup from a non-empty database");
+				objectCausality.persistent = createObjectPlaceholderFromDbId(1);
 			}
-			// } else {
-				// let target = objectCausality.persistent.const.target
-				// for (let property in target) {
-					// delete target[property];
-				// }
-				// if (mockMongoDB.getRecordsCount() === 0) {
-					// createEmptyDbImage(objectCausality.persistent);
-				// } else {
-					// objectCausality.persistent.const.dbId = 0;
-					// delete objectCausality.persistent.const.dbImage;
-					
-					// objectCausality.persistent.const.initializer = objectFromIdInitializer;
-				// } 
-				// dbIdToDbImageMap = {};
-			// }	
+			logUngroup();
 		}
 		
 		
