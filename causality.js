@@ -998,7 +998,7 @@
 	*/
 		
 		function getHandlerObject(target, key) {
-			// log("getHandlerObject, key: " + key);
+			if (trace.basic > 0) log("getHandlerObject, key: "  + this.const.name + "." + key);
 			key = key.toString();
 			// console.log("getHandlerObject: " + key);
 			// if (key instanceof 'Symbol') { incoming
@@ -1149,18 +1149,25 @@
 			// }
 		// }
 		
+		let trace = { basic : 0}; 
+		
+		
 		function setHandlerObject(target, key, value) {			
 			// Ensure initialized
+			if (trace.basic > 0) log("setHandlerObject: " + this.const.name + ".key = ");
 			ensureInitialized(this, target);
 			
 			// Overlays
 			if (this.const.forwardsTo !== null) {
+				if (trace.basic > 0) log("forward");
 				let overlayHandler = this.const.forwardsTo.const.handler;
 				return overlayHandler.set.apply(overlayHandler, [overlayHandler.target, key, value]);
 			}
+			if (trace.basic > 0) log("here");
 			
 			// logGroup();
 			if (configuration.objectActivityList) registerActivity(this);
+			if (trace.basic > 0) log("configuration.objectActivityList: " + configuration.objectActivityList);
 			
 			// Write protection
 			if (!canWrite(this.const.object)) return;
@@ -2890,6 +2897,7 @@
 		}
 
 		function removeFromActivityList(proxy) {
+			log("<<< removeFromActivityList : "  + proxy.const.name + " >>>");
 			removeFromActivityListHandler(proxy.const.handler);
 		}
 		
@@ -2936,7 +2944,7 @@
 			if (activityListFrozen === 0 && activityListFirst !== handler &&(activityListFilter === null || activityListFilter(handler.const.object))) {
 				activityListFrozen++;
 				blockingInitialize++;
-				// log("<<< registerActivity: "  + handler.const.name + " >>>");
+				log("<<< registerActivity: "  + handler.const.name + " >>>");
 				logGroup();
 				// log(handler.target);
 				// Init if not initialized
@@ -2958,7 +2966,7 @@
 				}
 				activityListFirst = handler;				
 				
-				// logActivityList();
+				logActivityList();
 				blockingInitialize--;
 				activityListFrozen--;
 				logUngroup();
@@ -3037,7 +3045,8 @@
 			cachedCallCount : cachedCallCount,
 			clearRepeaterLists : clearRepeaterLists,
 			resetObjectIds : resetObjectIds,
-			getInPulse : getInPulse
+			getInPulse : getInPulse,
+			trace : trace
 		}
 			
 		/**

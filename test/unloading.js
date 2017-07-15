@@ -80,35 +80,36 @@ describe("loading, unloading & zombiefication", function () {
 		
 		// Exceed the memory limit again, persistent and A no longer has any incoming references and will be killed
 		log("--------------------------- B.C = C; -----------------------------------");
+		eternity.trace.basic++;
 		B.C = C;
+		eternity.trace.basic--;
 		// log("-----");
 		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);
 		
+		// assert.equal(isLoaded(persistent), false);
+        // assert.equal(isDead(persistent), true);
 		
-		assert.equal(isLoaded(persistent), false);
-        assert.equal(isDead(persistent), true);
+		// assert.equal(isLoaded(A), false);
+        // assert.equal(isDead(A), true);
 		
-		assert.equal(isLoaded(A), false);
-        assert.equal(isDead(A), true);
+		// assert.equal(isLoaded(B), true);
 		
-		assert.equal(isLoaded(B), true);
+		// assert.equal(isLoaded(C), true);
 		
-		assert.equal(isLoaded(C), true);
+		// log("--------------------------- Touch A -----------------------------------");
+		// let dummy = A.name;
 		
-		log("--------------------------- Touch A -----------------------------------");
-		let dummy = A.name;
+		// assert.equal(isLoaded(persistent), false);
+        // assert.equal(isDead(persistent), true);
 		
-		assert.equal(isLoaded(persistent), false);
-        assert.equal(isDead(persistent), true);
+		// // A becomes a zombie
+		// assert.equal(isLoaded(A), true);
+		// assert.equal(isDead(A), false);
+		// assert.equal(isZombie(A), true);
 		
-		// A becomes a zombie
-		assert.equal(isLoaded(A), true);
-		assert.equal(isDead(A), false);
-		assert.equal(isZombie(A), true);
+		// assert.equal(isLoaded(B), false);
 		
-		assert.equal(isLoaded(B), false);
-		
-		assert.equal(isLoaded(C), true);
+		// assert.equal(isLoaded(C), true);
 		
 		
 		// log("--------------------------- Touch persistent -----------------------------------");

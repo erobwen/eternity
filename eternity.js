@@ -957,21 +957,23 @@
 				objectCausality.withoutEmittingEvents(function() {
 					imageCausality.withoutEmittingEvents(function() {
 						let leastActiveObject = objectCausality.getActivityListLast();
-						while (leastActiveObject !== null && loadedObjects > maxNumberOfLoadedObjects) {
-							// log("considering object for unload...");
-							while(leastActiveObject !== null && typeof(leastActiveObject.const.dbImage) === 'undefined') { // Warning! can this wake a killed object to life? ... no should not be here!
-								// log("skipping unsaved object (cannot unload something not saved)...");
-								objectCausality.removeFromActivityList(leastActiveObject); // Just remove them and make GC possible. Consider pre-filter for activity list.... 
-								leastActiveObject = objectCausality.getActivityListLast();
+						objectCausality.freezeActivityList(function() {
+							while (leastActiveObject !== null && loadedObjects > maxNumberOfLoadedObjects) {
+								// log("considering object for unload...");
+								while(leastActiveObject !== null && typeof(leastActiveObject.const.dbImage) === 'undefined') { // Warning! can this wake a killed object to life? ... no should not be here!
+									// log("skipping unsaved object (cannot unload something not saved)...");
+									objectCausality.removeFromActivityList(leastActiveObject); // Just remove them and make GC possible. Consider pre-filter for activity list.... 
+									leastActiveObject = objectCausality.getActivityListLast();
+								}
+								if (leastActiveObject !== null) {
+									// log("remove it!!");
+									objectCausality.removeFromActivityList(leastActiveObject);
+									unloadObject(leastActiveObject);
+								}
 							}
-							if (leastActiveObject !== null) {
-								// log("remove it!!");
-								objectCausality.removeFromActivityList(leastActiveObject);
-								unloadObject(leastActiveObject);
-							}
-						}
+						});
 					});
-				});				
+				});
 				logUngroup();
 			} else {
 				// log("... still room for all loaded... ");
@@ -980,8 +982,7 @@
 		
 		function unloadObject(object) {
 			objectCausality.freezeActivityList(function() {				
-				log("unloadObject");
-				log(object);
+				log("unloadObject " + object.const.name);
 				logGroup();
 				// without emitting events.
 				
@@ -1042,15 +1043,18 @@
 					let isPersistentlyStored = typeof(object.const.dbImage) !== 'undefined';
 					let isUnloaded = typeof(object.const.initializer) === 'function'
 					let hasNoIncoming = object.const.incomingReferencesCount  === 0;
-                    if (isPersistentlyStored && isUnloaded && hasNoIncoming) {
+                    
+					log("is unloaded: " + isUnloaded);
+					log("has incoming: " + !hasNoIncoming);
+					log("is persistently stored: " + isPersistentlyStored);
+					
+					if (isPersistentlyStored && isUnloaded && hasNoIncoming) {
 						log("kill it!");
                         killObject(object);
                     } else {
 						log("show mercy!");
 						
-						log("has incoming: " + !hasNoIncoming);
-						log("is persistently stored: " + isPersistentlyStored);
-						log("is unloaded: " + isUnloaded);
+
 						// log(object.const.ini);q
 					}
                 });
