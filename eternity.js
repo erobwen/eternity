@@ -569,7 +569,7 @@
 			// logGroup();
 
 			// First Phase, store transaction in database for transaction completion after failure (cannot rollback since previous values are not stored, could be future feature?). This write is atomic to MongoDb.
-			mockMongoDB.updateRecord(updateDbId, pendingUpdate);
+			if (configuration.twoPhaseComit) mockMongoDB.updateRecord(updateDbId, pendingUpdate);
 			
 			// Create 
 			let imageCreations = pendingUpdate.imageCreations;
@@ -604,7 +604,7 @@
 			}
 			
 			// Finish, clean up transaction
-			mockMongoDB.updateRecord(updateDbId, {});
+			if (configuration.twoPhaseComit) mockMongoDB.updateRecord(updateDbId, {});
 			
 			// logUngroup();
 		}
@@ -1152,11 +1152,11 @@
 			if (mockMongoDB.getRecordsCount() === 0) {
 				// log("setup from an empty database...");
 				
-				// Update placeholder
-				updateDbId = mockMongoDB.saveNewRecord({ isUpdatePlaceholder: true});
-
 				// Persistent root object
 				persistentDbId = mockMongoDB.saveNewRecord({ name : "persistent" });
+
+				// Update placeholder
+				if (configuration.twoPhaseComit) updateDbId = mockMongoDB.saveNewRecord({ isUpdatePlaceholder: true});
 			}
 			objectCausality.persistent = createObjectPlaceholderFromDbId(persistentDbId);
 			
@@ -1305,6 +1305,7 @@
 	function getDefaultConfiguration() {
 		return {
 			maxNumberOfLoadedObjects : 10000,
+			twoPhaseComit : false,
 			causalityConfiguration : {}
 		}
 	}
