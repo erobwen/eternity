@@ -69,7 +69,7 @@ describe("loading, unloading & zombiefication", function () {
 		A.persistent = persistent;
 		
 		// Exceed the memory limit (3 objects loaded is too much)
-		// log("---------------------------- A.B = B; ----------------------------------");
+		log("---------------------------- A.B = B; ----------------------------------");
 		A.B = B;
 		assert.equal(isLoaded(persistent), false);
         assert.equal(isDead(persistent), false);
@@ -79,8 +79,12 @@ describe("loading, unloading & zombiefication", function () {
 		assert.equal(isLoaded(B), true);
 		
 		// Exceed the memory limit again, persistent and A no longer has any incoming references and will be killed
-		// log("--------------------------- B.C = C; -----------------------------------");
+		log("--------------------------- B.C = C; -----------------------------------");
 		B.C = C;
+		log("-----");
+		log(eternity.mockMongoDB.getAllRecordsParsed(), 3);
+		
+		
 		assert.equal(isLoaded(persistent), false);
         assert.equal(isDead(persistent), true);
 		
@@ -91,7 +95,7 @@ describe("loading, unloading & zombiefication", function () {
 		
 		assert.equal(isLoaded(C), true);
 		
-		// log("--------------------------- Touch A -----------------------------------");
+		log("--------------------------- Touch A -----------------------------------");
 		let dummy = A.name;
 		
 		assert.equal(isLoaded(persistent), false);
@@ -101,13 +105,13 @@ describe("loading, unloading & zombiefication", function () {
 		assert.equal(isLoaded(A), true);
 		assert.equal(isDead(A), false);
 		assert.equal(isZombie(A), true);
-
-		log(eternity.mockMongoDB.getAllRecordsParsed(), 3);
-		assert.equal(isLoaded(B), false);
 		
-		assert.equal(isLoaded(C), true);
+		assert.equal(isLoaded(B), false); // Blows
 		
-		// log("--------------------------- Touch persistent -----------------------------------");
+		assert.equal(isLoaded(C), true); // Ok!
+		
+		
+		log("--------------------------- Touch persistent -----------------------------------");
 		let persistentA = persistent.A;
 		
 		// Persistent becomes a zombie
@@ -130,7 +134,9 @@ describe("loading, unloading & zombiefication", function () {
 		
 		// Persistent is also a zombie, but A.persistent refers to its non-zombie version. 
 		assert.equal(A.persistent === persistent, false);  // Equality without const does not work anymore, becuase one of them is a zombie. 
-		assert.equal(A.persistent.const === A.persistent.const, true);
+		log(A.persistent.const);
+		log(persistent.const);
+		assert.equal(A.persistent.const === persistent.const, true);
 		
 		// log("--------------------------- Touch B -----------------------------------");
 		let bName = B.name;

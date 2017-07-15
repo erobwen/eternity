@@ -31,13 +31,13 @@
 		function postObjectPulseAction(events) {
 			// log("postObjectPulseAction: " + events.length + " events");
 			// logGroup();
-			if (events.length > 0) {
-				objectCausality.freezeActivityList(function() {
-					// log(events, 3);
-					transferChangesToImage(events);
-					unloadAndKillObjects();
-				});				
-			}
+			// if (events.length > 0) {
+			objectCausality.freezeActivityList(function() {
+				// log(events, 3);
+				transferChangesToImage(events);
+			});	
+			// }
+			unloadAndKillObjects();
 			
 			// logUngroup();
 		} 
