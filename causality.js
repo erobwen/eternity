@@ -71,7 +71,7 @@
 						stringBuffer.push(idExpressionPrefix + idMapper(parseInt(splitOnSuffix[0])) + idExpressionSuffix + splitOnSuffix[1]);
 					} else {
 						// Id expression syntax error
-						throw new Exception("Id expression syntax error");
+						throw new Error("Id expression syntax error");
 					}
 				}
 				return idExpressionPrefix + stringBuffer.join("") + idExpressionSuffix;
