@@ -406,22 +406,19 @@
 		 *-----------------------------------------------*/
 		
 		function getTmpDbId(dbImage) {
-			if (typeof(dbImage.const.serializedTmpDbId) === 'undefined') {
+			if (typeof(dbImage.const.tmpDbId) === 'undefined') {
 				createTemporaryDbId(dbImage);
 			}
-			return dbImage.const.serializedTmpDbId;
+			return dbImage.const.tmpDbId;
 		}
 		
 		function createTemporaryDbId(dbImage) {
-			let tmpDbId = nextTmpDbId++;
-			let serializedTmpDbId = tmpDbIdPrefix + tmpDbId;
-			// dbImage.const.tmpDbId = tmpDbId; 
-			dbImage.const.serializedTmpDbId = serializedTmpDbId;
-			tmpDbIdToDbImage[serializedTmpDbId] = dbImage;
-			return serializedTmpDbId;
+			let tmpDbId = tmpDbIdPrefix + nextTmpDbId++;
+			dbImage.const.tmpDbId = tmpDbId;
+			tmpDbIdToDbImage[tmpDbId] = dbImage;
+			return tmpDbId;
 		}
-		
-		
+				
 		function imageIdToDbIdOrTmpDbId(imageId) {
 			if (typeof(imageIdToImageMap[imageId]) !== 'undefined') {
 				let dbImage = imageIdToImageMap[imageId];
@@ -433,7 +430,6 @@
 			}
 			return "";
 		}
-
 		
 		function compileUpdate(events) {
 			log("compileUpdate:");
@@ -590,10 +586,11 @@
 			for (let id in pendingUpdate.imageUpdates) {
 				// log("update dbImage id:" + id + " keys: " + Object.keys(pendingImageUpdates[id]));
 				let updates = pendingUpdate.imageUpdates[id];
-				for (let property in updates) {
-					let value = updates[property];
-					value = replaceTmpDbIdsWithDbIds(value);
-					property = imageCausality.transformPossibleIdExpression(property, convertTmpDbIdToDbId);
+				let updatesWithoutDbIds = replaceTmpDbIdsWithDbIds(updates);
+				for (let property in updatesWithoutDbIds) {
+					let value = updatesWithoutDbIds[property];
+					// value = replaceTmpDbIdsWithDbIds(value);
+					// property = imageCausality.transformPossibleIdExpression(property, convertTmpDbIdToDbId);
 					mockMongoDB.updateRecordPath(id, [property], value);
 				}
 			}
@@ -612,13 +609,17 @@
 			
 			logUngroup();
 		}
-		
+
+		function removeTmpDbIdsFromProperty(property) {
+			imageCausality.transformPossibleIdExpression(property, convertTmpDbIdToDbId);
+			return property;
+		}
 		
 		function replaceTmpDbIdsWithDbIds(entity) {
 			log("replaceTmpDbIdsWithDbIds");
 			logGroup();
 			log(entity);
-			let result = replaceRecursivley(entity, isTmpDbId, convertTmpDbIdToDbId);
+			let result = replaceRecursivley(entity, isTmpDbId, convertTmpDbIdToDbIdExpression, removeTmpDbIdsFromProperty);
 			log(result);
 			logUngroup();
 			return result;
@@ -630,20 +631,29 @@
 		
 		function convertTmpDbIdToDbId(entity) {
 			if (isTmpDbId(entity)) {
+				return tmpDbIdToDbId[entity];
+			} else {
+				return entity;
+			}
+		}
+
+		function convertTmpDbIdToDbIdExpression(entity) {
+			if (isTmpDbId(entity)) {
 				return imageCausality.idExpression(tmpDbIdToDbId[entity]);
 			} else {
 				return entity;
 			}
 		}
 		
-		function replaceRecursivley(entity, pattern, replacer) {
+		function replaceRecursivley(entity, pattern, replacer, propertyConverter) {
 			if (pattern(entity)) {
 				return replacer(entity)
 			} else if (typeof(entity) === 'object') {
 				if (entity === null) return null;
 				let newObject = (entity instanceof Array) ? [] : {};
+				// TODO: what about the property? 
 				for (let property in entity) {
-					newObject[property] = replaceRecursivley(entity[property], pattern, replacer); 
+					newObject[propertyConverter(property)] = replaceRecursivley(entity[property], pattern, replacer, propertyConverter); 
 				}
 				return newObject;
 			} else {
