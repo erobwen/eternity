@@ -11,7 +11,9 @@
 	function createDatabase() {
 		// Neat logging
 		let objectlog = require('./objectlog.js');
-		let log = objectlog.log;
+		// let log = objectlog.log;
+		// let log = objectlog.log;
+		function log() {}
 		let logGroup = objectlog.enter;
 		let logUngroup = objectlog.exit;
 

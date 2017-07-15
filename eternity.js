@@ -15,8 +15,8 @@
 	
 	// Neat logging
 	let objectlog = require('./objectlog.js');
-	let log = objectlog.log;
-	// function log() {}
+	// let log = objectlog.log;
+	function log() {}
 	let logGroup = objectlog.enter;
 	let logUngroup = objectlog.exit;
 
@@ -593,7 +593,7 @@
 				for (let property in updates) {
 					let value = updates[property];
 					value = replaceTmpDbIdsWithDbIds(value);
-					property = imageCausality.transformPossibleIdExpression(property, tmpDbIdToDbId);
+					property = imageCausality.transformPossibleIdExpression(property, convertTmpDbIdToDbId);
 					mockMongoDB.updateRecordPath(id, [property], value);
 				}
 			}
