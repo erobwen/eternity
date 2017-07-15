@@ -2920,7 +2920,7 @@
 				if (!first) {
 					result += ", ";
 				}
-				result += current.const.object.name;
+				result += current.const.name;
 				// current = current.activityListPrevious;
 				current = current.activityListNext;
 				first = false;
@@ -2936,7 +2936,7 @@
 			if (activityListFrozen === 0 && activityListFirst !== handler &&(activityListFilter === null || activityListFilter(handler.const.object))) {
 				activityListFrozen++;
 				blockingInitialize++;
-				// log("<<< registerActivity: "  + handler.target.name + " >>>");
+				// log("<<< registerActivity: "  + handler.const.name + " >>>");
 				logGroup();
 				// log(handler.target);
 				// Init if not initialized
