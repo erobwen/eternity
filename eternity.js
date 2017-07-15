@@ -15,8 +15,8 @@
 	
 	// Neat logging
 	let objectlog = require('./objectlog.js');
-	// let log = objectlog.log;
-	function log() {}
+	let log = objectlog.log;
+	// function log() {}
 	let logGroup = objectlog.enter;
 	let logUngroup = objectlog.exit;
 
@@ -29,8 +29,8 @@
 		let unstableImages = [];
 
 		function postObjectPulseAction(events) {
-			log("postObjectPulseAction: " + events.length + " events");
-			logGroup();
+			// log("postObjectPulseAction: " + events.length + " events");
+			// logGroup();
 			if (events.length > 0) {
 				objectCausality.freezeActivityList(function() {
 					// log(events, 3);
@@ -39,7 +39,7 @@
 				});				
 			}
 			
-			logUngroup();
+			// logUngroup();
 		} 
 		
 		
@@ -376,13 +376,12 @@
 		
 
 		function postImagePulseAction(events) {
-			log("postImagePulseAction: " + events.length + " events");
-			logGroup();
+			// log("postImagePulseAction: " + events.length + " events");
+			// logGroup();
 			if (events.length > 0) {
 						
 				// Serialize changes in memory
 				compileUpdate(events);
-				
 				
 				// Push changes to database
 				twoPhaseComit();
@@ -394,10 +393,10 @@
 				pendingUpdate = null;
 			
 			} else {
-				log("no events...");
+				// log("no events...");
 				// throw new Error("a pulse with no events?");
 			}
-			logUngroup();
+			// logUngroup();
 		} 
 
 		
@@ -432,8 +431,8 @@
 		}
 		
 		function compileUpdate(events) {
-			log("compileUpdate:");
-			logGroup();
+			// log("compileUpdate:");
+			// logGroup();
 			imageCausality.disableIncomingRelations(function () { // All incoming structures fully visible!
 				
 				// Temporary ids for two phase comit to database.
@@ -488,8 +487,8 @@
 					}
 				});								
 			});
-			log(pendingUpdate, 3);
-			logUngroup();
+			// log(pendingUpdate, 3);
+			// logUngroup();
 		}
 		
 		
@@ -566,11 +565,11 @@
 		 *-----------------------------------------------*/
 
 		function twoPhaseComit() {
-			log("twoPhaseComit:");
-			logGroup();
+			// log("twoPhaseComit:");
+			// logGroup();
 
 			// First Phase, store transaction in database for transaction completion after failure (cannot rollback since previous values are not stored, could be future feature?). This write is atomic to MongoDb.
-			mockMongoDB.updateRecord(0, pendingUpdate);
+			mockMongoDB.updateRecord(updateDbId, pendingUpdate);
 			
 			// Create 
 			let imageCreations = pendingUpdate.imageCreations;
@@ -605,9 +604,9 @@
 			}
 			
 			// Finish, clean up transaction
-			mockMongoDB.updateRecord(0, {});
+			mockMongoDB.updateRecord(updateDbId, {});
 			
-			logUngroup();
+			// logUngroup();
 		}
 
 		function removeTmpDbIdsFromProperty(property) {
@@ -616,12 +615,12 @@
 		}
 		
 		function replaceTmpDbIdsWithDbIds(entity) {
-			log("replaceTmpDbIdsWithDbIds");
-			logGroup();
-			log(entity);
+			// log("replaceTmpDbIdsWithDbIds");
+			// logGroup();
+			// log(entity);
 			let result = replaceRecursivley(entity, isTmpDbId, convertTmpDbIdToDbIdExpression, removeTmpDbIdsFromProperty);
-			log(result);
-			logUngroup();
+			// log(result);
+			// logUngroup();
 			return result;
 		}
 		
@@ -1142,30 +1141,25 @@
 		 *           Setup database
 		 *-----------------------------------------------*/
 		
+		let persistentDbId;
+		let updateDbId;
+		
 		function setupDatabase() {
-			log("setupDatabase");
+			// log("setupDatabase");
 			logGroup();
 
 			// if (typeof(objectCausality.persistent) === 'undefined') {
 			if (mockMongoDB.getRecordsCount() === 0) {
-				log("setup from an empty database...");
+				// log("setup from an empty database...");
 				
-				// Note: image pulse should write here... 
-				log("----------- create db image ------------");
-				mockMongoDB.saveNewRecord({ isUpdatePlaceholder: true}); // placeholder for transaction. Always with object id 1.
-				// objectCausality.pulse(function() {
-				log("------------- create persistent object ----------");
-				objectCausality.persistent = objectCausality.create();
-				loadedObjects++;
+				// Update placeholder
+				updateDbId = mockMongoDB.saveNewRecord({ isUpdatePlaceholder: true});
 
-				log("----------- create db image ------------");
-				createEmptyDbImage(objectCausality.persistent, null, null);
-
-				// });
-			} else {
-				log("setup from a non-empty database");
-				objectCausality.persistent = createObjectPlaceholderFromDbId(1);
+				// Persistent root object
+				persistentDbId = mockMongoDB.saveNewRecord({ name : "persistent" });
 			}
+			objectCausality.persistent = createObjectPlaceholderFromDbId(persistentDbId);
+			
 			logUngroup();
 		}
 		
