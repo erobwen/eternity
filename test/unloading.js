@@ -102,6 +102,7 @@ describe("loading, unloading & zombiefication", function () {
 		assert.equal(isDead(A), false);
 		assert.equal(isZombie(A), true);
 
+		log(eternity.mockMongoDB.getAllRecordsParsed(), 3);
 		assert.equal(isLoaded(B), false);
 		
 		assert.equal(isLoaded(C), true);
