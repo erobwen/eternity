@@ -431,8 +431,8 @@
 		}
 		
 		function compileUpdate(events) {
-			// log("compileUpdate:");
-			// logGroup();
+			log("compileUpdate:");
+			logGroup();
 			imageCausality.disableIncomingRelations(function () { // All incoming structures fully visible!
 				
 				// Temporary ids for two phase comit to database.
@@ -487,8 +487,8 @@
 					}
 				});								
 			});
-			// log(pendingUpdate, 3);
-			// logUngroup();
+			log(pendingUpdate, 3);
+			logUngroup();
 		}
 		
 		
@@ -522,13 +522,13 @@
 		
 		
 		function convertReferencesToDbIdsOrTemporaryIds(entity) {
-			// log();
 			// log("convertReferencesToDbIdsOrTemporaryIds: ");
-			// log(entity, 2);
-			// log(imageCausality.isObject(entity));
+			// log();
 			if (imageCausality.isObject(entity)) {
+				// log("convertReferencesToDbIdsOrTemporaryIds: " + entity.const.name);
 				let dbImage = entity;
 				if (hasDbId(entity)) {
+					// log("has db id" + dbImage.const.serializedMongoDbId);
 					return dbImage.const.serializedMongoDbId;
 				} else {
 					return getTmpDbId(entity);
@@ -597,10 +597,13 @@
 			// Write dbIds back to the images. TODO: consider, how do they get back to the object? maybe not, so we need to move it there in the unload code. 
 			// Note: this stage can be ignored in recovery mode, as then there no previously loaded objects.
 			for (let tmpDbId in tmpDbIdToDbImage) {
+				// log("WRITING:");
 				let dbImage = tmpDbIdToDbImage[tmpDbId];
-				let dbId = tmpDbIdToDbId[tmpDbId];
+				// log(dbImage.const.name);
+				let dbId = tmpDbIdToDbId[tmpDbId];				
 				dbImage.const.dbId = dbId;
 				dbImage.const.serializedMongoDbId = imageCausality.idExpression(dbId);
+				// log(dbImage.const);
 			}
 			
 			// Finish, clean up transaction
@@ -689,7 +692,7 @@
 		let dbIdToDbImageMap = {};
 		
 		function getDbImage(dbId) {
-			// log("getDbImage: " + dbId);
+			log("getDbImage: " + dbId);
 			if (typeof(dbIdToDbImageMap[dbId]) === 'undefined') {
 				dbIdToDbImageMap[dbId] = createImagePlaceholderFromDbId(dbId);
 			}
@@ -699,11 +702,12 @@
 		}
 		
 		function createImagePlaceholderFromDbId(dbId) {
-			// log("createImagePlaceholderFromDbId: " + dbId);
+			log("createImagePlaceholderFromDbId: " + dbId);
 			let placeholder;
 			placeholder = imageCausality.create({});
 			placeholder.const.loadedIncomingReferenceCount = 0;
 			placeholder.const.dbId = dbId;
+			placeholder.const.serializedMongoDbId = imageCausality.idExpression(dbId);
 			imageIdToImageMap[placeholder.const.id] = placeholder;
 			placeholder.const.initializer = imageFromDbIdInitializer;
 			return placeholder;
@@ -986,7 +990,7 @@
 				logGroup();
 				// without emitting events.
 				
-				for (property in object) {
+				for (let property in object) {
 					if (property !== "incoming") {
 						delete object[property];					
 					}
@@ -1080,6 +1084,7 @@
 		}
 		
 		function zombieObjectInitializer(object) {
+			log("zombieObjectInitializer");
             delete object.const.isKilled;
             object.const.isZombie = true;
 			
@@ -1096,7 +1101,7 @@
 			// log("unloadImage");
 			// logGroup();
 			// without emitting events.
-			for (property in dbImage) {
+			for (let property in dbImage) {
 				imageCausality.disableIncomingRelations(function() {
 					// Incoming should be unloaded here also, since it can be recovered.
 					let value = dbImage[property];
@@ -1202,7 +1207,7 @@
 								if (typeof(relations[property]) !== 'undefined') {
 									let relation = relations[property];
 									let contents = relation.contents;
-									for (id in contents) {
+									for (let id in contents) {
 										let referer = getObjectFromImage(contents[id]);
 										callback(referer);
 									}
@@ -1210,7 +1215,7 @@
 									let currentChunk = relation.first
 									while (currentChunk !== null) {
 										let contents = currentChunk.contents;
-										for (id in contents) {
+										for (let id in contents) {
 											let referer = getObjectFromImage(contents[id]);
 											callback(referer);
 										}
