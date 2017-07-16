@@ -86,30 +86,30 @@ describe("loading, unloading & zombiefication", function () {
 		// log("-----");
 		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);
 		
-		// assert.equal(isLoaded(persistent), false);
-        // assert.equal(isDead(persistent), true);
+		assert.equal(isLoaded(persistent), false);
+        assert.equal(isDead(persistent), true);
 		
-		// assert.equal(isLoaded(A), false);
-        // assert.equal(isDead(A), true);
+		assert.equal(isLoaded(A), false);
+        assert.equal(isDead(A), true);
 		
-		// assert.equal(isLoaded(B), true);
+		assert.equal(isLoaded(B), true);
 		
-		// assert.equal(isLoaded(C), true);
+		assert.equal(isLoaded(C), true);
 		
-		// log("--------------------------- Touch A -----------------------------------");
-		// let dummy = A.name;
+		log("--------------------------- Touch A -----------------------------------");
+		let dummy = A.name;
 		
-		// assert.equal(isLoaded(persistent), false);
-        // assert.equal(isDead(persistent), true);
+		assert.equal(isLoaded(persistent), false);
+        assert.equal(isDead(persistent), true);
 		
-		// // A becomes a zombie
-		// assert.equal(isLoaded(A), true);
-		// assert.equal(isDead(A), false);
-		// assert.equal(isZombie(A), true);
+		// A becomes a zombie
+		assert.equal(isLoaded(A), true);
+		assert.equal(isDead(A), false);
+		assert.equal(isZombie(A), true);
 		
-		// assert.equal(isLoaded(B), false);
+		assert.equal(isLoaded(B), false);
 		
-		// assert.equal(isLoaded(C), true);
+		assert.equal(isLoaded(C), true);
 		
 		
 		// log("--------------------------- Touch persistent -----------------------------------");

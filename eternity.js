@@ -174,7 +174,7 @@
 				object.const.dbImage = dbImage;
 				dbImage.const.correspondingObject = object;
 				loadedObjects++;
-				objectCausality.pokeObject(object);
+				objectCausality.pokeObject(object); // poke all newly saved?
 			}	
 		}
 		
