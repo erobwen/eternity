@@ -12,16 +12,36 @@ let logUngroup = objectlog.exit;
 
 // Tests based on mobx test/array.js
 describe("basics", function () {
+	
+	function unloadAllAndClearMemory() {
+		eternity.unloadAllAndClearMemory();
+		persistent = eternity.persistent;
+	}
+	
+	function clearDatabaseAndClearMemory() {
+		eternity.clearDatabaseAndClearMemory();
+		persistent = eternity.persistent;
+	}
+	
 	it('should save persistent globals (non objects) + reset database', function() {
+		// log("Database contents:");
+		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
+
 		persistent.foo = 42;
 		assert.equal(42, persistent.foo);
-		assert.equal(1, eternity.mockMongoDB.getRecordsCount());
-		assert.equal(42, eternity.mockMongoDB.getRecord(0).foo);
 
-		eternity.unloadAllAndClearMemory();
+		// log("Database contents:");
+		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
+
+		// assert.equal(2, eternity.mockMongoDB.getRecordsCount());
+		// assert.equal(42, eternity.mockMongoDB.getRecord(1).foo);
+
+		unloadAllAndClearMemory();
 		
 		assert.equal(42, persistent.foo);		
-		eternity.clearDatabaseAndClearMemory();
+		
+		clearDatabaseAndClearMemory();
+		
 		assert.equal(true, typeof(persistent.foo) === 'undefined');
 	});
 	
@@ -29,15 +49,15 @@ describe("basics", function () {
 		let A = create({name : 'A'});
 		persistent.A = A;
 		
-		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
-		eternity.unloadAllAndClearMemory();
-
+		unloadAllAndClearMemory();
+		
 		assert.notEqual(A, persistent.A); // Should now be a different eternity object... freshly loaded.
 		A = persistent.A;
 		// log(persistent);
 		// log(persistent.A);
 		assert.equal("A", persistent.A.name);
-		eternity.clearDatabaseAndClearMemory();
+		
+		clearDatabaseAndClearMemory();
 	});
 	
     it('should save refered objects recursivley', function () {
@@ -48,11 +68,11 @@ describe("basics", function () {
 		persistent.A = A;		
 		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
 		
-		eternity.unloadAllAndClearMemory();
+		unloadAllAndClearMemory();
 		
 		assert.equal(256, persistent.A.B.bitsAndPieces);
 
-		eternity.clearDatabaseAndClearMemory();
+		clearDatabaseAndClearMemory();
 	});
 	
 	
@@ -64,11 +84,11 @@ describe("basics", function () {
 		
 		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
 		
-		eternity.unloadAllAndClearMemory();
+		unloadAllAndClearMemory();
 		
 		assert.equal("B", persistent.A.B.name);
 
-		eternity.clearDatabaseAndClearMemory();
+		clearDatabaseAndClearMemory();
 	});
 	
 	
@@ -76,8 +96,8 @@ describe("basics", function () {
 		let A = create({name : 'A'});
 		persistent.A = A;
 		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
-		
-		eternity.unloadAllAndClearMemory();
+				
+		unloadAllAndClearMemory();
 		// log("==================== CLEAR MEMORY ==========================");
 
 		A = persistent.A;
@@ -87,7 +107,7 @@ describe("basics", function () {
 		
 		assert.equal(256, persistent.A.B.bitsAndPieces);
 
-		eternity.clearDatabaseAndClearMemory(); // TODO: Cannot run in sequence with unloadAllAndClearMemory
+		clearDatabaseAndClearMemory(); // TODO: Cannot run in sequence with unloadAllAndClearMemory
 	});
 	
 	
@@ -101,7 +121,7 @@ describe("basics", function () {
 	
 		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
 
-		eternity.unloadAllAndClearMemory();
+		unloadAllAndClearMemory();
 		// log("==================== CLEAR MEMORY ==========================");
 		
 		referers = [];

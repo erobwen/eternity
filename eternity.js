@@ -16,6 +16,7 @@
 	// Neat logging
 	let objectlog = require('./objectlog.js');
 	let log = objectlog.log;
+	// function log() {}
 	let logGroup = objectlog.enter;
 	let logUngroup = objectlog.exit;
 
@@ -30,11 +31,13 @@
 		function postObjectPulseAction(events) {
 			// log("postObjectPulseAction: " + events.length + " events");
 			// logGroup();
+			// if (events.length > 0) {
 			objectCausality.freezeActivityList(function() {
 				// log(events, 3);
 				transferChangesToImage(events);
-				unloadAndKillObjects();
-			});
+			});	
+			// }
+			unloadAndKillObjects();
 			
 			// logUngroup();
 		} 
@@ -171,7 +174,7 @@
 				object.const.dbImage = dbImage;
 				dbImage.const.correspondingObject = object;
 				loadedObjects++;
-				objectCausality.pokeObject(object);
+				objectCausality.pokeObject(object); // poke all newly saved?
 			}	
 		}
 		
@@ -343,8 +346,7 @@
 		 
 		let imageIdToImageMap = {};
 		
-		let pendingImageCreations = {};
-		let pendingImageUpdates = {};
+		let pendingUpdate;
 
 		function valueToString(value) {
 			if (objectCausality.isObject(value) || imageCausality.isObject(value)) {
@@ -365,61 +367,130 @@
 			});
 		}				
 
+
+
+		let nextTmpDbId;
+		let tmpDbIdToDbImage;
+		let tmpDbIdToDbId;
+		let tmpDbIdPrefix = "_tmp_id_";
 		
+
 		function postImagePulseAction(events) {
+			// log("postImagePulseAction: " + events.length + " events");
+			// logGroup();
 			if (events.length > 0) {
-				// log("postImagePulseAction: " + events.length + " events");
-				// logGroup();
-				//log(" ... Image pulse complete, sort events according to object id and flush to database");
-				
-				// log(events, 3);
-				// Extract updates and creations to be done.
-				imageCausality.disableIncomingRelations(function () {
-					events.forEach(function(event) {
-						if (!isMacroEvent(event)) {
-							// logEvent(event);
 						
-							let dbImage = event.object;
-							// log("Considering " + event.type + " event with object:");
-							// log(dbImage, 2);
-							let imageId = dbImage.const.id;
-							// TODO: Consider if we allways have a dbId here? on new creation... 
-								
-							if (event.type === 'creation') {
-								pendingImageCreations[imageId] = dbImage;
-								
-								for (let property in dbImage) {
-									// increaseImageIncomingLoadedCounter(dbImage[property]);
-									increaseLoadedIncomingMacroReferenceCounters(dbImage, property);
-								}
-								// if (typeof(pendingImageUpdates[imageId]) !== 'undefined') {
-									// // We will do a full write of this image, no need to update after.				
-									// delete pendingImageUpdates[dbId];   // will never happen anymore?
-								// }
-							} else if (event.type === 'set') {
-								if (typeof(dbImage.const.dbId) !== 'undefined') { // && typeof(pendingImageCreations[imageId]) === 'undefined'
-									let dbId = dbImage.const.dbId;
-									// Only update if we will not do a full write on this image. 
-									if (typeof(pendingImageUpdates[dbId]) === 'undefined') {
-										pendingImageUpdates[dbId] = {};
-									}
-									let imageUpdates = pendingImageUpdates[dbId];
-									imageUpdates[event.property] = event.newValue;
-									// increaseImageIncomingLoadedCounter(event.newValue);
-									increaseLoadedIncomingMacroReferenceCounters(dbImage, property);
-								}
-							}				
-						}
-					});			
-					
-					flushToDatabase();
-				});
-				// log(mockMongoDB.getAllRecordsParsed(), 4);
+				// Serialize changes in memory
+				compileUpdate(events);
 				
-				// logUngroup();
+				// Push changes to database
+				twoPhaseComit();
+				
+				// Cleanup
+				tmpDbId = 0;
+				tmpDbIdToDbImage = null;
+				tmpDbIdToDbId = null;
+				pendingUpdate = null;
+			
+			} else {
+				// log("no events...");
+				// throw new Error("a pulse with no events?");
 			}
+			// logUngroup();
 		} 
 
+		
+		/*-----------------------------------------------
+		 *        First stage: Compile update 
+		 *-----------------------------------------------*/
+		
+		function getTmpDbId(dbImage) {
+			if (typeof(dbImage.const.tmpDbId) === 'undefined') {
+				createTemporaryDbId(dbImage);
+			}
+			return dbImage.const.tmpDbId;
+		}
+		
+		function createTemporaryDbId(dbImage) {
+			let tmpDbId = tmpDbIdPrefix + nextTmpDbId++;
+			dbImage.const.tmpDbId = tmpDbId;
+			tmpDbIdToDbImage[tmpDbId] = dbImage;
+			return tmpDbId;
+		}
+				
+		function imageIdToDbIdOrTmpDbId(imageId) {
+			if (typeof(imageIdToImageMap[imageId]) !== 'undefined') {
+				let dbImage = imageIdToImageMap[imageId];
+				if (typeof(dbImage.const.dbId) !== 'undefined') {
+					return dbImage.const.dbId;
+				} else {
+					return getTmpDbId(dbImage);
+				}
+			}
+			return "";
+		}
+		
+		function compileUpdate(events) {
+			log("compileUpdate:");
+			logGroup();
+			imageCausality.disableIncomingRelations(function () { // All incoming structures fully visible!
+				
+				// Temporary ids for two phase comit to database.
+				nextTmpDbId = 0;
+				tmpDbIdToDbImage = {};
+				tmpDbIdToDbId = {};
+				pendingUpdate = {
+					imageCreations : {},
+					imageUpdates : {}
+				}
+
+				// Extract updates and creations to be done.
+				events.forEach(function(event) {
+					if (!isMacroEvent(event)) {
+						let dbImage = event.object;
+						let imageId = dbImage.const.id;
+							
+						if (event.type === 'creation') {
+							// Maintain image structure
+							for (let property in dbImage) {
+								increaseLoadedIncomingMacroReferenceCounters(dbImage, property);
+							}
+							
+							// Serialized image creation, with temporary db ids. 
+							let tmpDbId = getTmpDbId(dbImage);
+							pendingUpdate.imageCreations[tmpDbId] = serializeDbImage(dbImage);
+							
+							// if (typeof(pendingUpdate.imageUpdates[imageId]) !== 'undefined') {
+								// // We will do a full write of this image, no need to update after.				
+								// delete pendingUpdate.imageUpdates[dbId];   // will never happen anymore?
+							// }
+						} else if (event.type === 'set') {
+							if (typeof(dbImage.const.dbId) !== 'undefined') { // && typeof(pendingUpdate.imageCreations[imageId]) === 'undefined'
+								// Maintain image structure
+								increaseLoadedIncomingMacroReferenceCounters(dbImage, event.property);
+								// decreaseLoadedIncomingMacroReferenceCounters(dbImage, event.); // TODO: Decrease counters here?
+								
+								// Only update if we will not do a full write on this image. 
+								let dbId = dbImage.const.dbId;
+								if (typeof(pendingUpdate.imageUpdates[dbId]) === 'undefined') {
+									pendingUpdate.imageUpdates[dbId] = {};
+								}
+								let imageUpdates = pendingUpdate.imageUpdates[dbId];
+								
+								// Serialized value with temporary db ids. 
+								let newValue = convertReferencesToDbIdsOrTemporaryIds(event.newValue);
+								let property = event.property;
+								property = imageCausality.transformPossibleIdExpression(property, imageIdToDbIdOrTmpDbId);
+								imageUpdates[event.property] = newValue;
+							}
+						}				
+					}
+				});								
+			});
+			log(pendingUpdate, 3);
+			logUngroup();
+		}
+		
 		
 		function isMacroEvent(event) {
 			return imageEventHasObjectValue(event) && !event.incomingStructureEvent;
@@ -430,49 +501,166 @@
 			return imageCausality.isObject(event.newValue) || imageCausality.isObject(event.oldValue);
 		}
 		
+	
+		// should disableIncomingRelations
+		function serializeDbImage(dbImage) {
+			// imageCausality.disableIncomingRelations(function() {
+			// log(dbImage, 2);
+			// log(imageCausality.isObject(dbImage));
+			let serialized = (dbImage instanceof Array) ? [] : {};
+			for (let property in dbImage) {
+				// TODO: convert idExpressions
+				if (property !== 'const') {
+					// && property != 'incoming'
+					let value = convertReferencesToDbIdsOrTemporaryIds(dbImage[property]);
+					property = imageCausality.transformPossibleIdExpression(property, imageIdToDbIdOrTmpDbId);
+					serialized[property] = value;
+				}
+			}
+			return serialized;			
+		}
 		
-		function hasAPlaceholder(dbImage) {
+		
+		function convertReferencesToDbIdsOrTemporaryIds(entity) {
+			// log("convertReferencesToDbIdsOrTemporaryIds: ");
+			// log();
+			if (imageCausality.isObject(entity)) {
+				// log("convertReferencesToDbIdsOrTemporaryIds: " + entity.const.name);
+				let dbImage = entity;
+				if (hasDbId(entity)) {
+					// log("has db id" + dbImage.const.serializedMongoDbId);
+					return dbImage.const.serializedMongoDbId;
+				} else {
+					return getTmpDbId(entity);
+				}
+			} else if (entity !== null && typeof(entity) === 'object') {
+				// log("===========");
+				// log(entity, 3);
+				// log("===========");
+				
+				// entity.foo.bar;
+				
+				let converted = (entity instanceof Array) ? [] : {};
+				for (let property in entity) {
+					if (property !== 'const') {
+						property = imageCausality.transformPossibleIdExpression(property, imageIdToDbIdOrTmpDbId);
+						converted[property] = convertReferencesToDbIdsOrTemporaryIds(entity[property]);
+					}
+				}
+				return converted;
+			} else {
+				return entity;
+			}
+		}
+		
+		
+		function hasDbId(dbImage) {
 			// log(dbImage);
 			return typeof(dbImage.const.dbId) !== 'undefined';
 		}
+		
+		
+		/*-----------------------------------------------
+		 *        Second stage: Write in two phases
+		 *-----------------------------------------------*/
 
-		function writePlaceholderForImageToDatabase(dbImage) {
-			let dbId = mockMongoDB.saveNewRecord({});
-			dbImage.const.dbId = dbId;
-			dbImage.const.serializedMongoDbId = imageCausality.idExpression(dbId);
-			return dbId;
-		}
-
-		function flushToDatabase() {
-			// log("flushToDatabase:");
+		function twoPhaseComit() {
+			// log("twoPhaseComit:");
 			// logGroup();
-			// log(pendingImageCreations, 2);
-			// log(pendingImageUpdates, 2);
-			// This one could do a stepwise execution to not block the server. 
-			// log("pendingImageCreations:" + Object.keys(pendingImageCreations).length);
-			for (let id in pendingImageCreations) {
-				// log("create dbImage id:" + pendingImageCreations[id].const.id);
-				writeImageToDatabase(pendingImageCreations[id]);
+
+			// First Phase, store transaction in database for transaction completion after failure (cannot rollback since previous values are not stored, could be future feature?). This write is atomic to MongoDb.
+			if (configuration.twoPhaseComit) mockMongoDB.updateRecord(updateDbId, pendingUpdate);
+			
+			// Create 
+			let imageCreations = pendingUpdate.imageCreations;
+			for (let tmpDbId in imageCreations) {
+				writePlaceholderToDatabase(tmpDbId); // sets up tmpDbIdToDbId
 			}
-			pendingImageCreations = {};
+			for (let tmpDbId in imageCreations) {
+				writeSerializedImageToDatabase(tmpDbIdToDbId[tmpDbId], replaceTmpDbIdsWithDbIds(imageCreations[tmpDbId]));
+			}
 			
 			// TODO: Update entire record if the number of updates are more than half of fields.
 			// log("pendingImageUpdates:" + Object.keys(pendingImageUpdates).length);
-			for (let id in pendingImageUpdates) {
+			for (let id in pendingUpdate.imageUpdates) {
 				// log("update dbImage id:" + id + " keys: " + Object.keys(pendingImageUpdates[id]));
-				let updates = pendingImageUpdates[id];
-				for (let property in updates) {
-					
-					// TODO: convert idExpressions
-					// log(updates[property]);
-					let newValue = convertReferencesToDbIds(updates[property]);
-					// log(newValue);
-					property = imageCausality.transformPossibleIdExpression(property, imageIdToDbId);
-					mockMongoDB.updateRecordPath(id, [property], newValue);
+				let updates = pendingUpdate.imageUpdates[id];
+				let updatesWithoutDbIds = replaceTmpDbIdsWithDbIds(updates);
+				for (let property in updatesWithoutDbIds) {
+					let value = updatesWithoutDbIds[property];
+					// value = replaceTmpDbIdsWithDbIds(value);
+					// property = imageCausality.transformPossibleIdExpression(property, convertTmpDbIdToDbId);
+					mockMongoDB.updateRecordPath(id, [property], value);
 				}
 			}
-			pendingImageUpdates = {};
+
+			// Write dbIds back to the images. TODO: consider, how do they get back to the object? maybe not, so we need to move it there in the unload code. 
+			// Note: this stage can be ignored in recovery mode, as then there no previously loaded objects.
+			for (let tmpDbId in tmpDbIdToDbImage) {
+				// log("WRITING:");
+				let dbImage = tmpDbIdToDbImage[tmpDbId];
+				// log(dbImage.const.name);
+				let dbId = tmpDbIdToDbId[tmpDbId];				
+				dbImage.const.dbId = dbId;
+				dbImage.const.serializedMongoDbId = imageCausality.idExpression(dbId);
+				// log(dbImage.const);
+			}
+			
+			// Finish, clean up transaction
+			if (configuration.twoPhaseComit) mockMongoDB.updateRecord(updateDbId, {});
+			
 			// logUngroup();
+		}
+
+		function removeTmpDbIdsFromProperty(property) {
+			imageCausality.transformPossibleIdExpression(property, convertTmpDbIdToDbId);
+			return property;
+		}
+		
+		function replaceTmpDbIdsWithDbIds(entity) {
+			// log("replaceTmpDbIdsWithDbIds");
+			// logGroup();
+			// log(entity);
+			let result = replaceRecursivley(entity, isTmpDbId, convertTmpDbIdToDbIdExpression, removeTmpDbIdsFromProperty);
+			// log(result);
+			// logUngroup();
+			return result;
+		}
+		
+		function isTmpDbId(entity) {
+			return (typeof(entity) === 'string') && entity.startsWith(tmpDbIdPrefix);
+		}
+		
+		function convertTmpDbIdToDbId(entity) {
+			if (isTmpDbId(entity)) {
+				return tmpDbIdToDbId[entity];
+			} else {
+				return entity;
+			}
+		}
+
+		function convertTmpDbIdToDbIdExpression(entity) {
+			if (isTmpDbId(entity)) {
+				return imageCausality.idExpression(tmpDbIdToDbId[entity]);
+			} else {
+				return entity;
+			}
+		}
+		
+		function replaceRecursivley(entity, pattern, replacer, propertyConverter) {
+			if (pattern(entity)) {
+				return replacer(entity)
+			} else if (typeof(entity) === 'object') {
+				if (entity === null) return null;
+				let newObject = (entity instanceof Array) ? [] : {};
+				// TODO: what about the property? 
+				for (let property in entity) {
+					newObject[propertyConverter(property)] = replaceRecursivley(entity[property], pattern, replacer, propertyConverter); 
+				}
+				return newObject;
+			} else {
+				return entity;
+			}
 		}
 		
 		function imageIdToDbId(imageId) {
@@ -484,60 +672,16 @@
 			}
 			return "";
 		}
+		
 
-		function writeImageToDatabase(dbImage) {
-			imageCausality.disableIncomingRelations(function() {
-				// log(dbImage, 2);
-				// log(imageCausality.isObject(dbImage));
-				let serialized = (dbImage instanceof Array) ? [] : {};
-				for (let property in dbImage) {
-					// TODO: convert idExpressions
-					if (property !== 'const') {
-						//  && property != 'incoming'
-						let value = convertReferencesToDbIds(dbImage[property]);
-						property = imageCausality.transformPossibleIdExpression(property, imageIdToDbId);
-						serialized[property] = value;
-					}
-				}
-				if (!hasAPlaceholder(dbImage)) {
-					let dbId = mockMongoDB.saveNewRecord(serialized);
-					dbImage.const.dbId = dbId;
-					dbImage.const.serializedMongoDbId = imageCausality.idExpression(dbId);
-				} else {
-					mockMongoDB.updateRecord(dbImage.const.dbId, serialized);
-				}			
-			});
+		function writeSerializedImageToDatabase(dbId, serializedDbImage) {	
+			mockMongoDB.updateRecord(dbId, serializedDbImage);			
 		}
 		
-		function convertReferencesToDbIds(entity) {
-			// log();
-			// log("convertReferencesToDbIds: ");
-			// log(entity, 2);
-			// log(imageCausality.isObject(entity));
-			if (imageCausality.isObject(entity)) {
-				let dbImage = entity;
-				if (!hasAPlaceholder(entity)) {
-					writePlaceholderForImageToDatabase(dbImage);
-				}
-				return dbImage.const.serializedMongoDbId;
-			} else if (entity !== null && typeof(entity) === 'object') {
-				// log("===========");
-				// log(entity, 3);
-				// log("===========");
-				
-				// entity.foo.bar;
-				
-				let converted = (entity instanceof Array) ? [] : {};
-				for (let property in entity) {
-					if (property !== 'const') {
-						// TODO: convert idExpressions here? 
-						converted[property] = convertReferencesToDbIds(entity[property]);
-					}
-				}
-				return converted;
-			} else {
-				return entity;
-			}
+		
+		function writePlaceholderToDatabase(tmpDbId) {
+			let dbId = mockMongoDB.saveNewRecord({_eternitySerializedTmpDbId : tmpDbId}); // A temporary id so we can trace it down in case of failure.
+			tmpDbIdToDbId[tmpDbId] = dbId; //imageCausality.idExpression(dbId); ? 
 		}
 		
 		
@@ -548,7 +692,7 @@
 		let dbIdToDbImageMap = {};
 		
 		function getDbImage(dbId) {
-			// log("getDbImage: " + dbId);
+			log("getDbImage: " + dbId);
 			if (typeof(dbIdToDbImageMap[dbId]) === 'undefined') {
 				dbIdToDbImageMap[dbId] = createImagePlaceholderFromDbId(dbId);
 			}
@@ -558,11 +702,12 @@
 		}
 		
 		function createImagePlaceholderFromDbId(dbId) {
-			// log("createImagePlaceholderFromDbId: " + dbId);
+			log("createImagePlaceholderFromDbId: " + dbId);
 			let placeholder;
 			placeholder = imageCausality.create({});
 			placeholder.const.loadedIncomingReferenceCount = 0;
 			placeholder.const.dbId = dbId;
+			placeholder.const.serializedMongoDbId = imageCausality.idExpression(dbId);
 			imageIdToImageMap[placeholder.const.id] = placeholder;
 			placeholder.const.initializer = imageFromDbIdInitializer;
 			return placeholder;
@@ -816,21 +961,23 @@
 				objectCausality.withoutEmittingEvents(function() {
 					imageCausality.withoutEmittingEvents(function() {
 						let leastActiveObject = objectCausality.getActivityListLast();
-						while (leastActiveObject !== null && loadedObjects > maxNumberOfLoadedObjects) {
-							// log("considering object for unload...");
-							while(leastActiveObject !== null && typeof(leastActiveObject.const.dbImage) === 'undefined') { // Warning! can this wake a killed object to life? ... no should not be here!
-								// log("skipping unsaved object (cannot unload something not saved)...");
-								objectCausality.removeFromActivityList(leastActiveObject); // Just remove them and make GC possible. Consider pre-filter for activity list.... 
-								leastActiveObject = objectCausality.getActivityListLast();
+						objectCausality.freezeActivityList(function() {
+							while (leastActiveObject !== null && loadedObjects > maxNumberOfLoadedObjects) {
+								// log("considering object for unload...");
+								while(leastActiveObject !== null && typeof(leastActiveObject.const.dbImage) === 'undefined') { // Warning! can this wake a killed object to life? ... no should not be here!
+									// log("skipping unsaved object (cannot unload something not saved)...");
+									objectCausality.removeFromActivityList(leastActiveObject); // Just remove them and make GC possible. Consider pre-filter for activity list.... 
+									leastActiveObject = objectCausality.getActivityListLast();
+								}
+								if (leastActiveObject !== null) {
+									// log("remove it!!");
+									objectCausality.removeFromActivityList(leastActiveObject);
+									unloadObject(leastActiveObject);
+								}
 							}
-							if (leastActiveObject !== null) {
-								// log("remove it!!");
-								objectCausality.removeFromActivityList(leastActiveObject);
-								unloadObject(leastActiveObject);
-							}
-						}
+						});
 					});
-				});				
+				});
 				logUngroup();
 			} else {
 				// log("... still room for all loaded... ");
@@ -839,12 +986,11 @@
 		
 		function unloadObject(object) {
 			objectCausality.freezeActivityList(function() {				
-				log("unloadObject");
-				log(object);
+				log("unloadObject " + object.const.name);
 				logGroup();
 				// without emitting events.
 				
-				for (property in object) {
+				for (let property in object) {
 					if (property !== "incoming") {
 						delete object[property];					
 					}
@@ -901,15 +1047,18 @@
 					let isPersistentlyStored = typeof(object.const.dbImage) !== 'undefined';
 					let isUnloaded = typeof(object.const.initializer) === 'function'
 					let hasNoIncoming = object.const.incomingReferencesCount  === 0;
-                    if (isPersistentlyStored && isUnloaded && hasNoIncoming) {
+                    
+					log("is unloaded: " + isUnloaded);
+					log("has incoming: " + !hasNoIncoming);
+					log("is persistently stored: " + isPersistentlyStored);
+					
+					if (isPersistentlyStored && isUnloaded && hasNoIncoming) {
 						log("kill it!");
                         killObject(object);
                     } else {
 						log("show mercy!");
 						
-						log("has incoming: " + !hasNoIncoming);
-						log("is persistently stored: " + isPersistentlyStored);
-						log("is unloaded: " + isUnloaded);
+
 						// log(object.const.ini);q
 					}
                 });
@@ -935,6 +1084,7 @@
 		}
 		
 		function zombieObjectInitializer(object) {
+			log("zombieObjectInitializer");
             delete object.const.isKilled;
             object.const.isZombie = true;
 			
@@ -951,7 +1101,7 @@
 			// log("unloadImage");
 			// logGroup();
 			// without emitting events.
-			for (property in dbImage) {
+			for (let property in dbImage) {
 				imageCausality.disableIncomingRelations(function() {
 					// Incoming should be unloaded here also, since it can be recovered.
 					let value = dbImage[property];
@@ -985,6 +1135,7 @@
 				// delete dbImage.const.correspondingObject;
 			// }
 			delete dbIdToDbImageMap[dbImage.const.dbId];
+			delete imageIdToImageMap[dbImage.const.id]; // This means all outgoing references to dbImage has to be removed first... ??? what does it mean??
 
 			// dbImage.const.initializer = zombieImageInitializer;
 		}
@@ -999,37 +1150,34 @@
 		 *           Setup database
 		 *-----------------------------------------------*/
 		
+		let persistentDbId;
+		let updateDbId;
+		
 		function setupDatabase() {
-			if (typeof(objectCausality.persistent) === 'undefined') {
-				if (mockMongoDB.getRecordsCount() === 0) {
-					// objectCausality.pulse(function() {
-						objectCausality.persistent = objectCausality.create();
-						loadedObjects++;
-						createEmptyDbImage(objectCausality.persistent);			
-					// });
-				} else {
-					objectCausality.persistent = createObjectPlaceholderFromDbId(0);
-				}
-			} else {
-				let target = objectCausality.persistent.const.target
-				for (let property in target) {
-					delete target[property];
-				}
-				if (mockMongoDB.getRecordsCount() === 0) {
-					createEmptyDbImage(objectCausality.persistent);
-				} else {
-					objectCausality.persistent.const.dbId = 0;
-					delete objectCausality.persistent.const.dbImage;
-					
-					objectCausality.persistent.const.initializer = objectFromIdInitializer;
-				} 
-				dbIdToDbImageMap = {};
-			}	
+			// log("setupDatabase");
+			logGroup();
+
+			// if (typeof(objectCausality.persistent) === 'undefined') {
+			if (mockMongoDB.getRecordsCount() === 0) {
+				// log("setup from an empty database...");
+				
+				// Persistent root object
+				persistentDbId = mockMongoDB.saveNewRecord({ name : "persistent" });
+
+				// Update placeholder
+				if (configuration.twoPhaseComit) updateDbId = mockMongoDB.saveNewRecord({ isUpdatePlaceholder: true});
+			}
+			objectCausality.persistent = createObjectPlaceholderFromDbId(persistentDbId);
+			
+			logUngroup();
 		}
 		
+		
+		// Note: causality.persistent is replace after an unload... 
 		function unloadAllAndClearMemory() {
 			objectCausality.resetObjectIds();
 			imageCausality.resetObjectIds();
+			delete objectCausality.persistent;
 			dbIdToDbImageMap = {};
 			setupDatabase();
 		}
@@ -1059,7 +1207,7 @@
 								if (typeof(relations[property]) !== 'undefined') {
 									let relation = relations[property];
 									let contents = relation.contents;
-									for (id in contents) {
+									for (let id in contents) {
 										let referer = getObjectFromImage(contents[id]);
 										callback(referer);
 									}
@@ -1067,7 +1215,7 @@
 									let currentChunk = relation.first
 									while (currentChunk !== null) {
 										let contents = currentChunk.contents;
-										for (id in contents) {
+										for (let id in contents) {
 											let referer = getObjectFromImage(contents[id]);
 											callback(referer);
 										}
@@ -1166,6 +1314,7 @@
 	function getDefaultConfiguration() {
 		return {
 			maxNumberOfLoadedObjects : 10000,
+			twoPhaseComit : false,
 			causalityConfiguration : {}
 		}
 	}
