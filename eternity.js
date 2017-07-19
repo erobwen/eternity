@@ -70,7 +70,7 @@
 									createDbImageForObject(object, null, null);
 								} else if (!event.newValue) {
 									// Had an image that becomes unstable
-									markUnstable(event.object.const.dbImage);
+									addUnstableOrigin(event.object.const.dbImage);
 								}
 								
 							} else if (typeof(object.const.dbImage) !== 'undefined'){
@@ -84,7 +84,7 @@
 										if (oldValueDbImage._eternityParent === objectDbImage 
 											&& oldValueDbImage._eternityParentProperty === event.property) {
 											
-											markUnstable(oldValueDbImage);
+											addUnstableOrigin(oldValueDbImage);
 										}
 									}
 								}
@@ -187,33 +187,6 @@
 				return entity;
 			}
 		} 
-		
-		function markUnstable(potentiallyUnstableImage) {
-			// objectCausality.disableIncomingRelations(function() {
-			// let persistentDbImage = objectCausality.persistent.const.dbImage;
-			
-			// if (typeof(persistentDbImage._eternityFirstUnstable)) {
-				
-			// }
-			// potentiallyUnstableImage._eternityPreviousUnstable = persistentDbImage._eternityFirstUnstable;
-			
-			// // Create a sub-pulse in the imageCausality.... 
-			// persistentDbImage._eternityFirstUnstable = potentiallyUnstableImage;
-				// // if (typeof(objectCausality.persistent.firstUnstable) === 'undefined') {
-					// // objectCausality.persistent.firstUnstable.
-				// // } 
-			// });
-		}
-		
-			// TODO: Do this asynchronously
-		function floodUnstable(potentiallyUnstableImage, parent, parentRelation) {
-			if (parent === null || (parent === potentiallyUnstableImage._eternityParent && parentRelation === potentiallyUnstableImage._eternityParentProperty)) {
-				unstableImages.push(potentiallyUnstableImage);
-				for (let property in potentiallyUnstableImage) {
-					floodUnstable(potentiallyUnstableImage[property], potentiallyUnstableImage, property);
-				}
-			}
-		}
 		
 
 		/*-----------------------------------------------
@@ -1147,11 +1120,206 @@
 		// }
 		
 		/*-----------------------------------------------
+		 *          Double Linked list helper
+		 *-----------------------------------------------*/
+		
+		function createListType(name, linkName) {
+			if (typeof(linkName) === 'undefined') linkName = name;
+			
+			let eternityTag = "_eternity";
+			{
+				first : eternityTag + "FirstOf" + name, 
+				last : eternityTag + "LastOf" + name, 
+				next : eternityTag + linkName + "Next", 
+				previous : eternityTag + linkName + "Previous",			
+			}
+		}
+		
+		function isEmptyList(head, listType) {
+			return head[listType.first] === null;
+		}
+		
+		function replaceEntireList(head, listType, firstElement, lastElement) {
+			head[listType.first] === firstElement;
+			head[listType.last] === lastElement;
+		}
+		
+		function initializeList(head, listType) {
+			head[listType.first] = null;
+			head[listType.last] = null;
+		}
+		
+		function addLastToList(head, listType, listElement) {
+			let first = listType.first;
+			let last = listType.last;
+			let next = listType.next;
+			let previous = listType.next;
+			
+			if (head[last] !== null) {
+				head[last][next] = listElement;
+				listElement[previous] = head[last];
+				listElement[next] = null;
+				head[last] = listElement;
+			} else {
+				head[first] = listElement;				
+				head[last] = listElement;				
+				listElement[previous] = null;
+				listElement[next] = null;
+			}
+		}
+		
+		function addFirstToList(head, listType, listElement) {
+			let first = listType.first;
+			let last = listType.last;
+			let next = listType.next;
+			let previous = listType.next;
+			
+			if (head[first] !== null) {
+				head[first][previous] = listElement;
+				listElement[next] = head[first];
+				listElement[previous] = null;
+				head[first] = listElement;
+			} else {
+				head[first] = listElement;				
+				head[last] = listElement;				
+				listElement[previous] = null;
+				listElement[next] = null;
+			}
+		}
+		
+		function removeLastFromList(head, listType) {
+			let lastElement = head[listType.last];
+			removeFromList(head, listType, lastElement);
+			return lastElement;
+		}
+
+		function removeFirstFromList(head, listType) {
+			let firstElement = head[listType.first];
+			removeFromList(head, listType, firstElement);
+			return firstElement;
+		}
+
+		
+		function removeFromList(head, listType, listElement) {
+			let first = listType.first;
+			let last = listType.last;
+			let next = listType.next;
+			let previous = listType.next;
+			
+			if(listElement[next] !== null) {
+				listElement[next][previous] = listElement[previous];
+			} 
+
+			if(listElement[previous] !== null) {
+				listElement[previous][next] = listElement[next];
+			}
+			
+			if(head[last] === listElement) {
+				head[last] = listElement[previous];
+			}
+			if(head[first] === listElement) {
+				head[first] = listElement[next];
+			}
+			
+			delete listElement[next];
+			delete listElement[previous];
+		}
+		
+		
+		
+		/*-----------------------------------------------
+		 *           Garbage collection
+		 *-----------------------------------------------*/
+		
+		// Main state-holder image
+		let gcState; 
+			
+		// List types
+		let pendingUnstableOrigins = createListType("PendingUnstableOrigin");
+		let pendingForReattatchment = createListType("PendingForReattatchment");
+		let unstableZone = createListType("UnstableZone");
+		let unexpandedUnstableZone = createListType("UnexpandedUnstableZone", "UnstableUnexpandedZone");
+		let nextUnexpandedUnstableZone = createListType("NextUnexpandedUnstableZone", "UnstableUnexpandedZone");
+	
+		function initializeGcState() {
+			initializeList(gcState, pendingUnstableOrigins);
+			initializeList(gcState, pendingForReattatchment);
+			initializeList(gcState, unstableZone);
+			initializeList(gcState, unexpandedUnstableZone);
+			initializeList(gcState, nextUnexpandedUnstableZone);
+		}
+		
+		function addUnstableOrigin(pendingUnstableOrigin) {
+			let pendingUnstableImage = pendingUnstableOrigin.const.dbImage;
+			imageCausality.disableIncomingRelations(function() {
+				if (typeof(pendingUnstableImage._entityDoNotAddToPendingUnstableOriginList) === 'undefined') {
+					pendingUnstableImage._entityDoNotAddToPendingUnstableOriginList = true;
+
+					addFirstToList(gcState, pendingUnstableImage, pendingUnstableOrigins);
+				}
+			});
+		}
+		
+		
+		function getFirstPendingUnstableObject() {
+			let firstImage = removeFirstFromList(gcState, pendingUnstableOrigins);			
+			return getObjectFromImage(firstImage);
+		}
+		
+		function collectAll() {
+			while(!oneStepCollection()) {}
+		}
+		
+		function oneStepCollection() {
+			// Save 
+			
+			// Expand unstable zone
+			if (!isEmptyList(gcState, unexpandedUnstableZone)) {
+				let expandableImage = removeFirstFromList(gcState, unexpandedUnstableZone);
+				let expandable = getObjectFromImage(expandableImage);
+				// Consider: Will this cause an object pulse???
+				for (let property in expandable) {
+					let value = expadable[property];
+					if (isObject(value)) {
+						let referedImage = value.const.dbImage;
+						if (referedImage._eternityParent === expandableImage && property === referedImage._eternityParentProperty) {
+							addLastToList(gcState, nextUnexpandedUnstableZone, referedImage);
+							addLastToList(gcState, unstableZone, referedImage);
+						}
+					}
+				}
+				
+				gcState.unstableUnexpandedZoneFirst.
+				return false;
+			};
+
+			
+			// Try to save unstable zone.
+			
+			
+			// Delete rest of unstable zone.
+			
+			// Start a new zone.
+			if (gcState.pendingUnstableOriginFirst !== null) {
+				// Start new unstable cycle.
+				let newUnstableZone = getFirstPendingUnstableObject();
+				addFirstToList(gcState, unstableZone, newUnstableZone.const.dbImage);
+				addFirstToList(gcState, unstable);
+				return false;
+			} else {
+				// Finally! everything is done
+				return true;
+			}
+		}
+		
+		
+		/*-----------------------------------------------
 		 *           Setup database
 		 *-----------------------------------------------*/
 		
 		let persistentDbId;
 		let updateDbId;
+		let collectionDbId;
 		
 		function setupDatabase() {
 			// log("setupDatabase");
@@ -1165,9 +1333,16 @@
 				persistentDbId = mockMongoDB.saveNewRecord({ name : "persistent" });
 
 				// Update placeholder
-				if (configuration.twoPhaseComit) updateDbId = mockMongoDB.saveNewRecord({ isUpdatePlaceholder: true});
+				if (configuration.twoPhaseComit) updateDbId = mockMongoDB.saveNewRecord({ name: "updatePlaceholder" });
+				
+				// Garbage collection state.
+				collectionDbId = mockMongoDB.saveNewRecord({ name : "garbageCollection" });
+			} else {
+				// Setup ids for basics.
+				// TODO
 			}
 			objectCausality.persistent = createObjectPlaceholderFromDbId(persistentDbId);
+			gcState = createImagePlaceholderFromDbId(collectionDbId);
 			
 			logUngroup();
 		}
@@ -1250,6 +1425,7 @@
 		});
 		imageCausality.addPostPulseAction(postImagePulseAction);
 		imageCausality.addRemovedLastIncomingRelationCallback(function(dbImage) {
+			//unload image first if not previously unloaded?
 			tryKillImage(dbImage);
 		});
 
