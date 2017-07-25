@@ -1127,16 +1127,21 @@
 			if (typeof(linkName) === 'undefined') linkName = name;
 			
 			let eternityTag = "_eternity";
-			{
+			return {
 				first : eternityTag + "FirstOf" + name, 
 				last : eternityTag + "LastOf" + name, 
 				next : eternityTag + linkName + "Next", 
-				previous : eternityTag + linkName + "Previous",			
-			}
+				previous : eternityTag + linkName + "Previous"	
+			};
 		}
 		
 		function isEmptyList(head, listType) {
 			return head[listType.first] === null;
+		}
+		
+		function detatchAllListElements(head, listType) {
+			head[listType.first] = null;
+			head[listType.last] = null;			
 		}
 		
 		function replaceEntireList(head, listType, firstElement, lastElement) {
@@ -1187,6 +1192,14 @@
 			}
 		}
 		
+		function getLastOfList(head, listType) {
+			return head[listType.last];
+		}
+
+		function getFirstOfList(head, listType) {
+			return head[listType.first];
+		}
+		
 		function removeLastFromList(head, listType) {
 			let lastElement = head[listType.last];
 			removeFromList(head, listType, lastElement);
@@ -1198,7 +1211,6 @@
 			removeFromList(head, listType, firstElement);
 			return firstElement;
 		}
-
 		
 		function removeFromList(head, listType, listElement) {
 			let first = listType.first;
@@ -1235,15 +1247,21 @@
 		let gcState; 
 			
 		// List types
+		let pendingForChildReattatchment = createListType("PendingForChildReattatchment");
+		
 		let pendingUnstableOrigins = createListType("PendingUnstableOrigin");
-		let pendingForReattatchment = createListType("PendingForReattatchment");
+		
 		let unstableZone = createListType("UnstableZone");
 		let unexpandedUnstableZone = createListType("UnexpandedUnstableZone", "UnstableUnexpandedZone");
 		let nextUnexpandedUnstableZone = createListType("NextUnexpandedUnstableZone", "UnstableUnexpandedZone");
 	
+		let destructionZone = createListType("DestructionZone");
+		
 		function initializeGcState() {
+			initializeList(gcState, pendingForChildReattatchment);
+			
 			initializeList(gcState, pendingUnstableOrigins);
-			initializeList(gcState, pendingForReattatchment);
+			
 			initializeList(gcState, unstableZone);
 			initializeList(gcState, unexpandedUnstableZone);
 			initializeList(gcState, nextUnexpandedUnstableZone);
@@ -1269,33 +1287,98 @@
 		function collectAll() {
 			while(!oneStepCollection()) {}
 		}
+				
+		function isUnstable(dbImage) {
+			return typeof(dbImage._eternityParent) === 'undefined';
+		}
+		
+		function removeFromAllGcLists(dbImage) {
+			removeFromList(gcState, pendingUnstableOrigins, dbImage);
+			removeFromList(gcState, pendingForChildReattatchment, dbImage);
+			removeFromList(gcState, unstableZone, dbImage);
+			removeFromList(gcState, unexpandedUnstableZone, dbImage);
+			removeFromList(gcState, nextUnexpandedUnstableZone, dbImage);
+		}
 		
 		function oneStepCollection() {
 			// Save 
+			if (!isEmptyList(gcState, pendingForChildReattatchment)) {
+				let current = removeFirstFromList(gcState, pendingForChildReattatchment);
+				let object = getObjectFromImage(current.dbImage);
+				
+				for (let property in current) {
+					let value = expadable[property];
+					if (objectCausality.isObject(value) && isUnstable(object)) {
+						let referedImage = value.const.dbImage;
+						referedImage._eternityParent = current.parent;
+						referedImage._eternityParentProperty = current.parentProperty;
+						addLastToList(gcState, pendingForChildReattatchment, referedImage);
+						removeFromAllGcLists(object);
+					}
+				}
+
+				return false;
+			}
+
+			// Move to next zone expansion
+			if (isEmptyList(gcState, unexpandedUnstableZone) && !isEmptyList(gcState, nextUnexpandedUnstableZone)) {
+				let first = getFirstOfList(gcState, nextUnexpandedUnstableZone);
+				let last = getLastOfList(gcState, nextUnexpandedUnstableZone);
+				detatchAllListElements(gcState, nextUnexpandedUnstableZone);
+				replaceEntireList(gcState, unexpandedUnstableZone, first, last);
+				return false;
+			}
 			
 			// Expand unstable zone
 			if (!isEmptyList(gcState, unexpandedUnstableZone)) {
-				let expandableImage = removeFirstFromList(gcState, unexpandedUnstableZone);
-				let expandable = getObjectFromImage(expandableImage);
+				let dbImage = removeFirstFromList(gcState, unexpandedUnstableZone);
+				let object = getObjectFromImage(dbImage);
 				// Consider: Will this cause an object pulse???
-				for (let property in expandable) {
-					let value = expadable[property];
-					if (isObject(value)) {
+				for (let property in object) {
+					let value = object[property];
+					if (objectCausality.isObject(value)) {
 						let referedImage = value.const.dbImage;
-						if (referedImage._eternityParent === expandableImage && property === referedImage._eternityParentProperty) {
+						if (referedImage._eternityParent === dbImage && property === referedImage._eternityParentProperty) {
 							addLastToList(gcState, nextUnexpandedUnstableZone, referedImage);
 							addLastToList(gcState, unstableZone, referedImage);
+							delete dbImage._eternityParent; // This signifies that an image (if connected to an object), is unstable. If set to null, it means it is a root.
+							delete dbImage._eternityParentProperty;
 						}
 					}
 				}
 				
-				gcState.unstableUnexpandedZoneFirst.
+				// gcState.unstableUnexpandedZoneFirst.
 				return false;
 			};
 
 			
 			// Try to save unstable zone.
-			
+			while(!isEmptyList(gcState, unstableZone)) {
+				let dbImage = removeFirstFromList(gcState, unstableZone);
+				let object = getObjectFromImage();
+				
+				if (typeof(object.incoming) !== 'undefined') {
+					for (let incomingProperty in object.incoming) {
+						let root = object.incoming[incomingProperty];
+						
+						gcState.currentIncoming = root;
+						
+						let value = object[property];
+						if (objectCausality.isObject(value)) {
+							let referedImage = value.const.dbImage;
+							if (referedImage._eternityParent === dbImage && property === referedImage._eternityParentProperty) {
+								addLastToList(gcState, nextUnexpandedUnstableZone, referedImage);
+								addLastToList(gcState, unstableZone, referedImage);
+								delete dbImage._eternityParent; // This signifies that an image (if connected to an object), is unstable. If set to null, it means it is a root.
+								delete dbImage._eternityParentProperty;
+							}
+						}
+					}					
+				}
+
+				destructionZone()
+				
+			}
 			
 			// Delete rest of unstable zone.
 			
