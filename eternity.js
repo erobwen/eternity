@@ -665,7 +665,7 @@
 		let dbIdToDbImageMap = {};
 		
 		function getDbImage(dbId) {
-			log("getDbImage: " + dbId);
+			// log("getDbImage: " + dbId);
 			if (typeof(dbIdToDbImageMap[dbId]) === 'undefined') {
 				dbIdToDbImageMap[dbId] = createImagePlaceholderFromDbId(dbId);
 			}
@@ -1486,6 +1486,33 @@
 				});
 			});
 		}
+	
+	
+		function isPersistable(action) {
+			return (typeof(action) !== 'function');
+		}
+		
+		function createObjectAction(object, functionName) {
+			return imageCausality.create({
+				type: "objectAction", 
+				object: object, 
+				functionName : functionName
+			});
+		}
+	
+	
+		function forAllPersistentIncoming(object, property, objectAction) {
+			objectCausality.assertNotRecording();
+			imageCausality.assertNotRecording();
+			
+			imageCausality.disableIncomingRelations(function() {	
+				if (typeof(objectCausality.persistent.iterations) === 'undefined') {
+					objectCausality.persistent.iterations = imageCausality.create([]);
+				}
+			
+				objectCausality.persistent.iterations;
+			});
+		} 
 		 
 		/*-----------------------------------------------
 		 *           Setup object causality

@@ -255,9 +255,11 @@
 		let incomingStructuresDisabled = 0;
 
 		function disableIncomingRelations(action) {
+			inPulse++;
 			incomingStructuresDisabled++;
 			action();
 			incomingStructuresDisabled--;
+			if(--inPulse === 0) postPulseCleanup();
 		}
 		
 		let removedLastIncomingRelationCallback = null;
@@ -2066,7 +2068,13 @@
 		}
 
 		let recordingPaused = 0;
-
+		
+		function assertNotRecording() {
+			if (inActiveRecording) {
+				throw new Error("Should not be in a recording right now...");
+			}
+		}
+		
 		function withoutRecording(action) {
 			recordingPaused++;
 			updateInActiveRecording();
@@ -2575,6 +2583,18 @@
 						let cacheRecord = functionCacher.deleteExistingRecord();
 						notifyChangeObservers(cacheRecord.contextObservers);
 					}.bind(this));
+
+					// Future design:
+				// let returnValue = uponChangeDo(
+					// function () {
+						// return callAction();
+					// }.bind(this),
+					// createImmutable({
+						// object: cacheRecord,
+						// method: "notifyObservers"
+					// })
+				// );	
+					
 				leaveContext();
 				cacheRecord.returnValue = returnValue;
 				getSpecifier(cacheRecord, "contextObservers").noMoreObserversCallback = function() {
@@ -3056,6 +3076,7 @@
 			
 			// Global modifiers
 			withoutSideEffects : withoutSideEffects,
+			assertNotRecording : assertNotRecording,
 			withoutRecording : withoutRecording,
 			withoutNotifyChange : nullifyObserverNotification,
 			withoutEmittingEvents : withoutEmittingEvents,
