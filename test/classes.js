@@ -40,7 +40,7 @@ describe("basics", function () {
 		// log("==================== CLEAR MEMORY ==========================");
 		unloadAllAndClearMemory();
 		
-		log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
+		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
 		
 		assert.equal("MyClass", Object.getPrototypeOf(persistent.x).constructor.name);
 		assert.equal(42, persistent.x.getFoobar());

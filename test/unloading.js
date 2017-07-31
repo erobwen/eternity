@@ -63,7 +63,7 @@ describe("loading, unloading & zombiefication", function () {
 					}
                 });
             });
-			log(result);
+			// log(result);
             // return result;
 		}
 
@@ -82,10 +82,10 @@ describe("loading, unloading & zombiefication", function () {
 		persistent.const.name = "persistent"
 		persistent.A = A;
 		A.persistent = persistent;
-		log(eternity.mockMongoDB.getAllRecordsParsed(), 3);
+		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);
 		
 		// Exceed the memory limit (3 objects loaded is too much)
-		log("---------------------------- A.B = B; ----------------------------------");
+		// log("---------------------------- A.B = B; ----------------------------------");
 		A.B = B;
 		assert.equal(isLoaded(persistent), false);
         assert.equal(isDead(persistent), false);
@@ -95,7 +95,7 @@ describe("loading, unloading & zombiefication", function () {
 		assert.equal(isLoaded(B), true);
 		
 		// Exceed the memory limit again, persistent and A no longer has any incoming references and will be killed
-		log("--------------------------- B.C = C; -----------------------------------");
+		// log("--------------------------- B.C = C; -----------------------------------");
 		// eternity.trace.basic++;
 		B.C = C;
 		// eternity.trace.basic--;
@@ -112,7 +112,7 @@ describe("loading, unloading & zombiefication", function () {
 		
 		assert.equal(isLoaded(C), true);
 		
-		log("--------------------------- Touch A -----------------------------------");
+		// log("--------------------------- Touch A -----------------------------------");
 		let dummy = A.name;
 		
 		assert.equal(isLoaded(persistent), false);
@@ -128,9 +128,9 @@ describe("loading, unloading & zombiefication", function () {
 		assert.equal(isLoaded(C), true);
 		
 		
-		log("--------------------------- Touch persistent -----------------------------------");
+		// log("--------------------------- Touch persistent -----------------------------------");
 		let persistentA = persistent.A;
-		log(eternity.mockMongoDB.getAllRecordsParsed(), 3);
+		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);
 		
 		// Persistent becomes a zombie
 		assert.equal(isLoaded(persistent), true);
@@ -154,9 +154,9 @@ describe("loading, unloading & zombiefication", function () {
 		logZombie(A);
 		logZombie(persistent);
 		assert.equal(A.persistent === persistent, false);  // Equality without const does not work anymore, becuase one of them is a zombie. 
-		log(A.persistent);
-		log(A.persistent.const);
-		log(persistent.const);
+		// log(A.persistent);
+		// log(A.persistent.const);
+		// log(persistent.const);
 		assert.equal(A.persistent.const === persistent.const, true);
 		
 		// log("--------------------------- Touch B -----------------------------------");

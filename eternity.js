@@ -15,8 +15,10 @@
 	
 	// Neat logging
 	let objectlog = require('./objectlog.js');
-	let log = objectlog.log;
-	// function log() {}
+	// let log = objectlog.log;
+	function log() {
+		throw new Error("quit talking");
+	}
 	let logGroup = objectlog.enter;
 	let logUngroup = objectlog.exit;
 
