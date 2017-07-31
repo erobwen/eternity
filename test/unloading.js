@@ -12,7 +12,7 @@ describe("loading, unloading & zombiefication", function () {
 
 
     it('should unload nodes as memory reaches limit', function () {
-		let eternity = require('../eternity')({name: "unloading", causalityConfiguration: {name: "unloading"}, maxNumberOfLoadedObjects : 2});  // Includes persistent root.
+		let eternity = require('../eternity')({name: "unloading.js", maxNumberOfLoadedObjects : 2});  // Includes persistent root.
 		let create = eternity.create;
 		let persistent = eternity.persistent;
 		

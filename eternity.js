@@ -15,14 +15,18 @@
 	
 	// Neat logging
 	let objectlog = require('./objectlog.js');
-	// let log = objectlog.log;
-	function log() {
-		throw new Error("quit talking");
-	}
+	let log = objectlog.log;
+	// function log() {
+		// throw new Error("quit talking");
+	// }
 	let logGroup = objectlog.enter;
 	let logUngroup = objectlog.exit;
 
 	function createEternityInstance(configuration) {
+		// log("createEternityInstance: " + configuration.name);
+		// logGroup();
+		// log(configuration,5);
+		// logUngroup();
 
 		/*-----------------------------------------------
 		 *          Object post pulse events

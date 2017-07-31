@@ -1,5 +1,5 @@
 const assert = require('assert');
-let eternity = require('../eternity')();
+let eternity = require('../eternity')({name: "basics.js"});
 let create = eternity.create;
 let persistent = eternity.persistent;
 // const log = console.log.bind(console);

@@ -12,11 +12,8 @@ describe("garbage-collection", function () {
 
 
     it('should garbage colledt', function () {
-		let eternity = require('../eternity')({name: "unloading", causalityConfiguration: {name: "unloading"}, maxNumberOfLoadedObjects : 2});  // Includes persistent root.
+		let eternity = require('../eternity')({name: "collecting.js", maxNumberOfLoadedObjects : 2});  // Includes persistent root.
 		let create = eternity.create;
 		let persistent = eternity.persistent;
-		
-		
-		
 	});
 });
