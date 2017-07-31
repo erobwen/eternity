@@ -8,7 +8,7 @@ MyClass.prototype.getFoobar = function() {
 let classRegistry = {MyClass : MyClass};
 
 const assert = require('assert');
-let eternity = require('../eternity')({classRegistry : classRegistry});
+let eternity = require('../eternity')({name: "testingClasses", classRegistry : classRegistry});
 let create = eternity.create;
 let persistent = eternity.persistent;
 // const log = console.log.bind(console);

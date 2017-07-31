@@ -406,7 +406,7 @@
 		}
 		
 		function compileUpdate(events) {
-			log("compileUpdate:");
+			// log("compileUpdate:");
 			logGroup();
 			imageCausality.disableIncomingRelations(function () { // All incoming structures fully visible!
 				
@@ -462,7 +462,7 @@
 					}
 				});								
 			});
-			log(pendingUpdate, 3);
+			// log(pendingUpdate, 3);
 			logUngroup();
 		}
 		
@@ -677,7 +677,7 @@
 		}
 		
 		function createImagePlaceholderFromDbId(dbId) {
-			log("createImagePlaceholderFromDbId: " + dbId);
+			// log("createImagePlaceholderFromDbId: " + dbId);
 			let placeholder;
 			placeholder = imageCausality.create(createTarget(peekAtRecord(dbId)._eternityImageClass));
 			placeholder.const.loadedIncomingReferenceCount = 0;
@@ -971,7 +971,7 @@
 		function unloadAndKillObjects() {
 			// log("unloadAndKillObjects");
 			if (loadedObjects > maxNumberOfLoadedObjects) {
-				log("Too many objects, unload some... ");
+				// log("Too many objects, unload some... ");
 				logGroup();
 				objectCausality.withoutEmittingEvents(function() {
 					imageCausality.withoutEmittingEvents(function() {
@@ -1001,7 +1001,7 @@
 		
 		function unloadObject(object) {
 			objectCausality.freezeActivityList(function() {				
-				log("unloadObject " + object.const.name);
+				// log("unloadObject " + object.const.name);
 				logGroup();
 				// without emitting events.
 				
@@ -1018,7 +1018,7 @@
 				
 				object.const.isUnloaded = true;
 				object.const.initializer = objectFromIdInitializer;
-				log("try to kill object just unloaded...");
+				// log("try to kill object just unloaded...");
 				tryKillObject(object);
 				// objectCausality.blockInitialize(function() {
 					// // log("Trying to kill object...");
@@ -1053,7 +1053,7 @@
 		}
 		
 		function tryKillObject(object) {
-            log("tryKillObject: " + objName(object));
+            // log("tryKillObject: " + objName(object));
 			logGroup();
 			// logObj(object);
             objectCausality.blockInitialize(function() {
@@ -1063,15 +1063,15 @@
 					let isUnloaded = typeof(object.const.initializer) === 'function'
 					let hasNoIncoming = object.const.incomingReferencesCount  === 0;
                     
-					log("is unloaded: " + isUnloaded);
-					log("has incoming: " + !hasNoIncoming);
-					log("is persistently stored: " + isPersistentlyStored);
+					// log("is unloaded: " + isUnloaded);
+					// log("has incoming: " + !hasNoIncoming);
+					// log("is persistently stored: " + isPersistentlyStored);
 					
 					if (isPersistentlyStored && isUnloaded && hasNoIncoming) {
-						log("kill it!");
+						// log("kill it!");
                         killObject(object);
                     } else {
-						log("show mercy!");
+						// log("show mercy!");
 						
 
 						// log(object.const.ini);q
@@ -1083,7 +1083,7 @@
 
 		
 		function killObject(object) {
-			log("killObject: " + objName(object));
+			// log("killObject: " + objName(object));
 			let dbImage = object.const.dbImage;
 
 			// log(object.const.target);
@@ -1099,7 +1099,7 @@
 		}
 		
 		function zombieObjectInitializer(object) {
-			log("zombieObjectInitializer");
+			// log("zombieObjectInitializer");
             delete object.const.isKilled;
             object.const.isZombie = true;
 			
@@ -1565,7 +1565,6 @@
 		 
 		// MongoDB
 		let mockMongoDB = require("./mockMongoDB.js")(JSON.stringify(configuration));	
-		
 			
 		// Image causality
 		// let imageCausality = requireUncached("causalityjs_advanced");
@@ -1613,7 +1612,7 @@
 		objectCausality.instance = objectCausality;
 		// TODO: install this... 
 		objectCausality.addRemovedLastIncomingRelationCallback(function(dbImage) {
-			log("incoming relations reaced zero...")
+			// log("incoming relations reaced zero...");
             tryKillObject(dbImage);
         });
 

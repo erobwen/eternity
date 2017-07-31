@@ -63,7 +63,7 @@ describe("basics", function () {
 	
     it('should save refered objects recursivley', function () {
 		// log("=============================");
-		log(eternity.mockMongoDB.getAllRecordsParsed(), 3);
+		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);
 		
 		let A = create({name : 'A'});
 		let B = create({name : 'B'});
