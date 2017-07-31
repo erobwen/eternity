@@ -731,7 +731,13 @@
 				} else if (className === 'Object') {
 					return {}; // Just in case of similar situations to above for some Javascript interpretors... 
 				} else {
-					return Object.create(eval(className).prototype);
+					if (typeof(configuration.classRegistry[className]) === 'function') {
+						return Object.create(configuration.classRegistry[className].prototype);
+					} else if (typeof(configuration.classRegistry[className]) === 'object') {
+						return Object.create(configuration.classRegistry[className]);
+					} else {
+						throw new Error("Cannot find class named " + className + ". Make sure to enter it in the eternity classRegistry configuration." );
+					}
 				}
 			} else {
 				return {};
@@ -1639,6 +1645,7 @@
 	function getDefaultConfiguration() {
 		return {
 			maxNumberOfLoadedObjects : 10000,
+			classRegistry : {},
 			twoPhaseComit : false,
 			causalityConfiguration : {}
 		}
