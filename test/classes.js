@@ -8,7 +8,7 @@ MyClass.prototype.getFoobar = function() {
 let classRegistry = {MyClass : MyClass};
 
 const assert = require('assert');
-let eternity = require('../eternity')({classRegistry : classRegistry}); //name: "classes.js", 
+let eternity = require('../eternity')({name: "classes.js", classRegistry : classRegistry}); // Note: name is necessary, since class registry will be invisible to configuration comparer....
 let create = eternity.create;
 let persistent = eternity.persistent;
 // const log = console.log.bind(console);
@@ -44,6 +44,20 @@ describe("basics", function () {
 		
 		assert.equal("MyClass", Object.getPrototypeOf(persistent.x).constructor.name);
 		assert.equal(42, persistent.x.getFoobar());
+		clearDatabaseAndClearMemory();
+	});	
+	
+	it('should persist arrays', function () {
+		persistent.x = create([42]); // Consider... maybe even causality need to create a new object and record all assignments... 
+		unloadAllAndClearMemory();
+		// log("==================== CLEAR MEMORY ==========================");
+		unloadAllAndClearMemory();
+		
+		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
+		
+		assert.equal("Array", Object.getPrototypeOf(persistent.x).constructor.name);
+		assert.equal(42, persistent.x.shift());
+		clearDatabaseAndClearMemory();
 	});	  
 });
 
