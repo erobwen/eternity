@@ -21,7 +21,7 @@ let logUngroup = objectlog.exit;
 
 
 // Tests based on mobx test/array.js
-describe("basics", function () {
+describe("classes", function () {
 	
 	function unloadAllAndClearMemory() {
 		eternity.unloadAllAndClearMemory();

@@ -360,7 +360,9 @@
 			// log("postImagePulseAction: " + events.length + " events");
 			// logGroup();
 			if (events.length > 0) {
-						
+				// Set the class of objects created... TODO: Do this in-pulse somehow instead?
+				addImageClassNames(events);
+				
 				// Serialize changes in memory
 				compileUpdate(events);
 				
@@ -380,6 +382,21 @@
 			// logUngroup();
 		} 
 
+		function addImageClassNames(events) {
+			imageCausality.assertNotRecording();
+			imageCausality.disableIncomingRelations(function() {
+				events.forEach(function(event) {
+					if (event.type === 'creation') { // Note: it only works 
+						event.object._eternityImageClass = Object.getPrototypeOf(event.object).constructor.name;
+						// log("className: " + event.object._eternityImageClass);
+						if (typeof(event.object._eternityImageClass) === 'unefined' || event.object._eternityImageClass === 'undefined') {
+							throw new Error("Could not set _eternityImageClass");
+						}
+					}
+				});				
+			});
+		}
+		
 		
 		/*-----------------------------------------------
 		 *        First stage: Compile update 
@@ -1511,22 +1528,27 @@
 							let dbImage = object.const.dbImage;
 							if (typeof(dbImage.incoming) !== 'undefined') {
 								let relations = dbImage.incoming;
-								// log(relations);
+								// log(relations, 3);
 								// log("here");
 								if (typeof(relations[property]) !== 'undefined') {
+									//without loading... 
 									let relation = relations[property];
 									let contents = relation.contents;
 									for (let id in contents) {
-										let referer = getObjectFromImage(contents[id]);
-										callback(referer);
+										if (!id.startsWith("_eternity")) {
+											let referer = getObjectFromImage(contents[id]);
+											callback(referer);											
+										}
 									}
 									// log(relation);
 									let currentChunk = relation.first
 									while (currentChunk !== null) {
 										let contents = currentChunk.contents;
 										for (let id in contents) {
-											let referer = getObjectFromImage(contents[id]);
-											callback(referer);
+											if (!id.startsWith("_eternity")) {
+												let referer = getObjectFromImage(contents[id]);
+												callback(referer);
+											}
 										}
 										currentChunk = currentChunk.next;
 									}
@@ -1552,18 +1574,22 @@
 		}
 	
 	
-		function forAllPersistentIncoming(object, property, objectAction) {
-			objectCausality.assertNotRecording();
-			imageCausality.assertNotRecording();
+		// function forAllPersistentIncoming(object, property, objectAction) {
+			// objectCausality.assertNotRecording();
+			// imageCausality.assertNotRecording();
 			
-			imageCausality.disableIncomingRelations(function() {	
-				if (typeof(objectCausality.persistent.iterations) === 'undefined') {
-					objectCausality.persistent.iterations = imageCausality.create([]);
-				}
+			// imageCausality.disableIncomingRelations(function() {	
+				// if (typeof(objectCausality.persistent.iterations) === 'undefined') {
+					// let iterations = imageCausality.create([]);
+					// // iterations._eternityImageClass = "Array"; // TODO: fix this automatic somehow... 
+					// objectCausality.persistent.iterations = iterations;
+				// }
 			
-				objectCausality.persistent.iterations;
-			});
-		} 
+				// objectCausality.persistent.iterations.push(imageCausality.create({
+					
+				// }));
+			// });
+		// } 
 		 
 		/*-----------------------------------------------
 		 *           Setup object causality
