@@ -127,6 +127,8 @@
 			// log(object);
 			let imageContents = {
 				_eternityParent : potentialParentImage,
+				_eternityObjectClass : Object.getPrototypeOf(object).constructor.name,
+				_eternityImageClass : (object instanceof Array) ? "Array" : "Object", 
 				_eternityParentProperty : potentialParentProperty
 			};
 			// for (let property in object) {
@@ -143,7 +145,7 @@
 			if (typeof(contents) === 'undefined') {
 				contents = {};
 			}
-			let dbImage = imageCausality.create(contents);
+			let dbImage = imageCausality.create(contents); // Only Object image here... 
 			imageIdToImageMap[dbImage.const.id] = dbImage;
 			connectObjectWithDbImage(object, dbImage);
 			return dbImage;		
@@ -677,7 +679,7 @@
 		function createImagePlaceholderFromDbId(dbId) {
 			log("createImagePlaceholderFromDbId: " + dbId);
 			let placeholder;
-			placeholder = imageCausality.create({});
+			placeholder = imageCausality.create(createTarget(peekAtRecord(dbId)._eternityImageClass));
 			placeholder.const.loadedIncomingReferenceCount = 0;
 			placeholder.const.dbId = dbId;
 			placeholder.const.serializedMongoDbId = imageCausality.idExpression(dbId);
@@ -705,7 +707,7 @@
 		function createObjectPlaceholderFromDbImage(dbImage) {
 			// log("createObjectPlaceholderFromDbImage " + dbImage.const.id);
 			// connectObjectWithDbImage(placeholder, dbImage);
-			let placeholder = objectCausality.create();
+			let placeholder = objectCausality.create(createTarget(peekAtRecord(dbImage.const.dbId)._eternityObjectClass));
 			placeholder.const.dbId = dbImage.const.dbId;
 			placeholder.const.initializer = objectFromIdInitializer;
 			return placeholder;
@@ -722,9 +724,23 @@
 			// // logUngroup();
 		// }
 		
+		function createTarget(className) {
+			if (typeof(className) !== 'undefined') {
+				if (className === 'Array') {
+					return []; // On Node.js this is different from Object.create(eval("Array").prototype) for some reason... 
+				} else if (className === 'Object') {
+					return {}; // Just in case of similar situations to above for some Javascript interpretors... 
+				} else {
+					return Object.create(eval(className).prototype);
+				}
+			} else {
+				return {};
+			}
+		}
+		
 		function createObjectPlaceholderFromDbId(dbId) {
 			// log("createObjectPlaceholderFromDbId: " + dbId);
-			let placeholder = objectCausality.create();
+			let placeholder = objectCausality.create(createTarget(peekAtRecord(dbId)._eternityObjectClass));
 			placeholder.const.dbId = dbId;
 			placeholder.const.initializer = objectFromIdInitializer;
 			return placeholder;
@@ -751,13 +767,33 @@
 			}
 		}
 		
+		let peekedAtDbRecords = {};
+		function peekAtRecord(dbId) {
+			if (typeof(peekedAtDbRecords[dbId]) === 'undefined') {
+				peekedAtDbRecords[dbId] = mockMongoDB.getRecord(dbId);
+			}
+			return peekedAtDbRecords[dbId];
+		}
+		
+		function getDbRecord(dbId) {
+			if (typeof(peekedAtDbRecords[dbId]) === 'undefined') {
+				// No previous peeking, just get it
+				return mockMongoDB.getRecord(dbId);
+			} else {
+				// Already stored for peeking, get and remove
+				let record = peekedAtDbRecords[dbId];
+				delete peekedAtDbRecords[dbId];
+				return record;
+			}
+		}
+		
 		function loadFromDbIdToImage(dbImage) {
 			// log("loadFromDbIdToImage dbId: " + dbImage.const.dbId + " dbImage:" + dbImage.const.id);
 			imageCausality.disableIncomingRelations(function() {			
 				let dbId = dbImage.const.dbId;
 				
 				// log("loadFromDbIdToImage, dbId: " + dbId);
-				let dbRecord = mockMongoDB.getRecord(dbId);
+				let dbRecord = getDbRecord(dbId);
 				// log(dbRecord);
 				for (let property in dbRecord) {
 					// printKeys(dbImage);
@@ -1408,6 +1444,9 @@
 			// log("setupDatabase");
 			logGroup();
 
+			// Clear peek at cache
+			peekedAtDbRecords = {};
+			
 			// if (typeof(objectCausality.persistent) === 'undefined') {
 			if (mockMongoDB.getRecordsCount() === 0) {
 				// log("setup from an empty database...");

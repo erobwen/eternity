@@ -46,6 +46,7 @@ describe("basics", function () {
 	});
 	
     it('should save persistent globals', function () {
+		// log("=============================");
 		let A = create({name : 'A'});
 		persistent.A = A;
 		
@@ -61,12 +62,14 @@ describe("basics", function () {
 	});
 	
     it('should save refered objects recursivley', function () {
+		// log("=============================");
+		log(eternity.mockMongoDB.getAllRecordsParsed(), 3);
+		
 		let A = create({name : 'A'});
 		let B = create({name : 'B'});
 		B.bitsAndPieces = 256;
 		A.B = B;
 		persistent.A = A;		
-		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
 		
 		unloadAllAndClearMemory();
 		
