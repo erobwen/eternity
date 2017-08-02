@@ -112,29 +112,7 @@ describe("basics", function () {
 
 		clearDatabaseAndClearMemory(); // TODO: Cannot run in sequence with unloadAllAndClearMemory
 	});
-	
-	
-	it('should save multiple incoming relations, iterate persistent incoming', function () {
-		persistent.A = create({name : 'A'});
-		persistent.B = create({name : 'B'});
-		
-		let D = create({name : 'D'});
-		persistent.A.D = D;
-		persistent.B.D = D;
-	
-		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
-
-		unloadAllAndClearMemory();
-		// log("==================== CLEAR MEMORY ==========================");
-		
-		referers = [];
-		eternity.forAllPersistentIncomingNow(persistent.A.D, "D", function(referer) {
-			referers.push(referer);
-		});
-		assert.equal(2, referers.length);
-		assert.equal(persistent.A, referers[0]);		
-		assert.equal(persistent.B, referers[1]);		
-	});
+	 
 	
 	
     // it('should garbage collect persistent structures no longer reachable', function () {
