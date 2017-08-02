@@ -1517,47 +1517,13 @@
 		 *           Incoming relations
 		 *-----------------------------------------------*/
 		 
+		// The "Now" version is mostly for debugging/development
 		function forAllPersistentIncomingNow(object, property, callback) {
-			// No observation, cannot observe on asynchronous functions. The "Now" version is mostly for debugging/development
-			// registerAnyChangeObserver(getSpecifier(getSpecifier(object.const, "incomingObservers"), property));
-
-			objectCausality.withoutRecording(function() { // This is needed for setups where incoming structures are made out of causality objects. 
-				imageCausality.withoutRecording(function() { // This is needed for setups where incoming structures are made out of causality objects. 
-					imageCausality.disableIncomingRelations(function() {						
-						if (typeof(object.const.dbImage) !== 'undefined') {
-							let dbImage = object.const.dbImage;
-							if (typeof(dbImage.incoming) !== 'undefined') {
-								let relations = dbImage.incoming;
-								// log(relations, 3);
-								// log("here");
-								if (typeof(relations[property]) !== 'undefined') {
-									//without loading... 
-									let relation = relations[property];
-									let contents = relation.contents;
-									for (let id in contents) {
-										if (!id.startsWith("_eternity")) {
-											let referer = getObjectFromImage(contents[id]);
-											callback(referer);											
-										}
-									}
-									// log(relation);
-									let currentChunk = relation.first
-									while (currentChunk !== null) {
-										let contents = currentChunk.contents;
-										for (let id in contents) {
-											if (!id.startsWith("_eternity")) {
-												let referer = getObjectFromImage(contents[id]);
-												callback(referer);
-											}
-										}
-										currentChunk = currentChunk.next;
-									}
-								}
-							}
-						}
-					});
-				});
-			});
+			forAllPersistentIncoming(object, property, callback);
+			processAllVolatileIterations();
+			// processAllPersistentIterations();
+			
+			// registerAnyChangeObserver(getSpecifier(getSpecifier(object.const, "incomingObservers"), property)); // Consider: could this be a ligit way to setup observing.... 
 		}
 	
 	
@@ -1572,25 +1538,102 @@
 				functionName : functionName
 			});
 		}
-	
-	
-		// function forAllPersistentIncoming(object, property, objectAction) {
-			// objectCausality.assertNotRecording();
-			// imageCausality.assertNotRecording();
+		
+		
+		function forAllPersistentIncoming(object, property, objectAction) {
+			objectCausality.assertNotRecording();
+			imageCausality.assertNotRecording();
+			if (isPersistable(objectAction)) {
+				forAllPersistentIncomingPersistentIteration(object, property, objectAction);
+			} else {
+				forAllPersistentIncomingVolatileIteration(object, property, objectAction);
+			}
+		}
+		
+		
+		function forAllPersistentIncomingPersistentIteration(object, property, objectAction) {
+			imageCausality.disableIncomingRelations(function() {	
+				if (typeof(objectCausality.persistent.iterations) === 'undefined') {
+					let iterations = imageCausality.create([]);
+					// iterations._eternityImageClass = "Array"; // TODO: fix this automatic somehow... 
+					objectCausality.persistent.iterations = iterations;
+				}
 			
-			// imageCausality.disableIncomingRelations(function() {	
-				// if (typeof(objectCausality.persistent.iterations) === 'undefined') {
-					// let iterations = imageCausality.create([]);
-					// // iterations._eternityImageClass = "Array"; // TODO: fix this automatic somehow... 
-					// objectCausality.persistent.iterations = iterations;
-				// }
-			
-				// objectCausality.persistent.iterations.push(imageCausality.create({
-					
-				// }));
-			// });
-		// } 
-		 
+				objectCausality.persistent.iterations.push(imageCausality.create({
+					target : object.const.dbImage, 
+					property : property,
+					action : objectAction,
+					state : null
+				}));
+			});
+		}
+		
+		
+		let volatileIterations = [];
+		
+		function forAllPersistentIncomingVolatileIteration(object, property, objectAction) {
+			// log("forAllPersistentIncomingVolatileIteration");
+			imageCausality.disableIncomingRelations(function() {
+				if (typeof(object.const.dbImage) !== 'undefined') {
+					let dbImage = object.const.dbImage;
+					if (typeof(dbImage.incoming) !== 'undefined') {
+						let relations = dbImage.incoming;
+						// log(relations, 3);
+						// log("here");
+						if (typeof(relations[property]) !== 'undefined') {
+							// Start of with all in current chunk... 
+							let relation = relations[property];
+							// log(relation);
+							let contents = relation.contents;
+							// log(contents);
+							for (let id in contents) {
+								if (!id.startsWith("_eternity")) {
+									let referer = getObjectFromImage(contents[id]);
+									// log("Should object iterate!!");
+									objectAction(referer);											
+								}
+							}
+							// log(relation);
+							let currentChunk = relation.first
+							if (typeof(currentChunk) !== 'undefined' && currentChunk !== null) {
+								volatileIterations.push({
+									currentChunk : currentChunk,
+									objectAction : objectAction
+									// Object and property not needed here?
+								});
+							}
+						}
+					}
+				}				
+			});
+		}
+
+		
+		function processAllVolatileIterations() {
+			while(!processVolatileIterationsOneStep()) {}
+		}
+		
+
+		function processVolatileIterationsOneStep() {
+			let newIterations = [];
+			volatileIterations.forEach(function(iteration) {
+				let currentChunk = iteration.currentChunk;
+				let contents = currentChunk.contents;
+				for (let id in contents) {
+					if (!id.startsWith("_eternity")) {
+						let referer = getObjectFromImage(contents[id]);
+						iteration.objectAction(referer);
+					}
+				}
+				if (typeof(currentChunk.next) !== 'undefined' && currentChunk.next !== null) {
+					iteration.currentChunk = currentChunk.next;
+					newIterations.push(iteration);
+				}
+			});
+			volatileIterations = newIterations;
+			return volatileIterations.length === 0;
+		}		
+		
 		/*-----------------------------------------------
 		 *           Setup object causality
 		 *-----------------------------------------------*/

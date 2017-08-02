@@ -198,8 +198,6 @@
 		 *
 		 ***************************************************************/
 
-		let incomingStructureChunkSize = 500;
-
 		function forAllIncoming(object, property, callback) {
 			registerAnyChangeObserver(getSpecifier(getSpecifier(object.const, "incomingObservers"), property));
 			withoutRecording(function() { // This is needed for setups where incoming structures are made out of causality objects. 
@@ -515,7 +513,7 @@
 			}
 
 			// Move on to new chunk?
-			if (incomingIncomingRelation.contentsCounter === incomingStructureChunkSize) {
+			if (incomingIncomingRelation.contentsCounter === configuration.incomingStructureChunkSize) {
 				let newChunk = {
 					referredObject : incomingIncomingRelation.referredObject,
 					isRoot : false,
@@ -3169,9 +3167,10 @@
 		return {
 			// Main feature switch, turn off for performance! This property will be set automatically depending on the other settings.
 			activateSpecialFeatures : false, 
-			
+						
 			// Special features
 			useIncomingStructures : false,
+			incomingStructureChunkSize: 500,
 			incomingStructuresAsCausalityObjects: false,
 			incomingReferenceCounters : false, 
 			blockInitializeForIncomingStructures: false, 
@@ -3195,7 +3194,7 @@
 		Object.assign(defaultConfiguration, requestedConfiguration);
 		let anySet = false;
 		for (property in defaultConfiguration) {
-			anySet = defaultConfiguration[property] || anySet;
+			anySet = (defaultConfiguration[property] === true) || anySet;
 		}
 		if (anySet) {
 			defaultConfiguration.activateSpecialFeatures = true;
