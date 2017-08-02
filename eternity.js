@@ -1572,7 +1572,7 @@
 		let volatileIterations = [];
 		
 		function forAllPersistentIncomingVolatileIteration(object, property, objectAction) {
-			// log("forAllPersistentIncomingVolatileIteration");
+			log("forAllPersistentIncomingVolatileIteration");
 			imageCausality.disableIncomingRelations(function() {
 				if (typeof(object.const.dbImage) !== 'undefined') {
 					let dbImage = object.const.dbImage;
@@ -1589,13 +1589,14 @@
 							for (let id in contents) {
 								if (!id.startsWith("_eternity")) {
 									let referer = getObjectFromImage(contents[id]);
-									// log("Should object iterate!!");
+									log("Iterate object in chunk...");
 									objectAction(referer);											
 								}
 							}
 							// log(relation);
 							let currentChunk = relation.first
 							if (typeof(currentChunk) !== 'undefined' && currentChunk !== null) {
+								log("push chunk!");
 								volatileIterations.push({
 									currentChunk : currentChunk,
 									objectAction : objectAction
@@ -1615,22 +1616,28 @@
 		
 
 		function processVolatileIterationsOneStep() {
-			let newIterations = [];
-			volatileIterations.forEach(function(iteration) {
-				let currentChunk = iteration.currentChunk;
-				let contents = currentChunk.contents;
-				for (let id in contents) {
-					if (!id.startsWith("_eternity")) {
-						let referer = getObjectFromImage(contents[id]);
-						iteration.objectAction(referer);
+			log("processVolatileIterationsOneStep");
+			imageCausality.disableIncomingRelations(function() {
+				let newIterations = [];
+				volatileIterations.forEach(function(iteration) {
+					let currentChunk = iteration.currentChunk;
+					let contents = currentChunk.contents;
+					log("process chunk...");
+					for (let id in contents) {
+						if (!id.startsWith("_eternity")) {
+							let referer = getObjectFromImage(contents[id]);
+							iteration.objectAction(referer);
+						}
 					}
-				}
-				if (typeof(currentChunk.next) !== 'undefined' && currentChunk.next !== null) {
-					iteration.currentChunk = currentChunk.next;
-					newIterations.push(iteration);
-				}
+					log("Here!!!")
+					log(currentChunk);
+					if (typeof(currentChunk.next) !== 'undefined' && currentChunk.next !== null) {
+						iteration.currentChunk = currentChunk.next;
+						newIterations.push(iteration);
+					}
+				});
+				volatileIterations = newIterations;
 			});
-			volatileIterations = newIterations;
 			return volatileIterations.length === 0;
 		}		
 		
@@ -1646,7 +1653,7 @@
 		let imageCausality = require("./causality.js")({ 
 			name : 'imageCausality:' + JSON.stringify(configuration),
 			recordPulseEvents : true, 
-			
+			incomingStructureChunkSize : configuration.persistentIncomingChunkSize,
 			useIncomingStructures: true,
 			incomingReferenceCounters : true, 
 			incomingStructuresAsCausalityObjects : true,
@@ -1719,8 +1726,9 @@
 	function getDefaultConfiguration() {
 		return {
 			maxNumberOfLoadedObjects : 10000,
+			persistentIncomingChunkSize : 500,
 			classRegistry : {},
-			twoPhaseComit : false,
+			twoPhaseComit : true,
 			causalityConfiguration : {}
 		}
 	}

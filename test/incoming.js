@@ -1,5 +1,5 @@
 const assert = require('assert');
-let eternity = require('../eternity')({name: "incoming.js", causalityConfiguration: {incomingStructureChunkSize: 1}});
+let eternity = require('../eternity')({name: "incoming.js", persistentIncomingChunkSize: 1});
 let create = eternity.create;
 let persistent = eternity.persistent;
 // const log = console.log.bind(console);
@@ -26,12 +26,15 @@ describe("incoming", function () {
 	it('should save multiple incoming relations, iterate persistent incoming', function () {
 		persistent.A = create({name : 'A'});
 		persistent.B = create({name : 'B'});
+		persistent.C = create({name : 'C'});
 		
 		let D = create({name : 'D'});
+		log("----now only assigning D---");
 		persistent.A.D = D;
 		persistent.B.D = D;
+		persistent.C.D = D;
 	
-		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
+		log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
 
 		unloadAllAndClearMemory();
 		// log("==================== CLEAR MEMORY ==========================");
@@ -40,8 +43,9 @@ describe("incoming", function () {
 		eternity.forAllPersistentIncomingNow(persistent.A.D, "D", function(referer) {
 			referers.push(referer);
 		});
-		assert.equal(2, referers.length);
+		assert.equal(3, referers.length);
 		assert.equal(persistent.A, referers[0]);		
 		assert.equal(persistent.B, referers[1]);		
+		assert.equal(persistent.C, referers[2]);		
 	});
 });
