@@ -1521,25 +1521,10 @@
 		function forAllPersistentIncomingNow(object, property, callback) {
 			forAllPersistentIncoming(object, property, callback);
 			processAllVolatileIterations();
-			// processAllPersistentIterations();
-			
-			// registerAnyChangeObserver(getSpecifier(getSpecifier(object.const, "incomingObservers"), property)); // Consider: could this be a ligit way to setup observing.... 
+			processAllPersistentIterations();
+			// Consider: What if we should add add/remove observers on the input directly? 
 		}
 	
-	
-		function isPersistable(action) {
-			return (typeof(action) !== 'function');
-		}
-		
-		function createObjectAction(object, functionName) {
-			return imageCausality.create({
-				type: "objectAction", 
-				object: object, 
-				functionName : functionName
-			});
-		}
-		
-		
 		function forAllPersistentIncoming(object, property, objectAction) {
 			objectCausality.assertNotRecording();
 			imageCausality.assertNotRecording();
@@ -1550,6 +1535,19 @@
 			}
 		}
 		
+		function isPersistable(action) {
+			return (typeof(action) !== 'function');
+		}
+		
+		// function createObjectAction(object, functionName) {
+		function createAction(object, functionName) {
+			// TODO: should be objectCausality
+			return objectCausality.create({
+				type: "objectAction", 
+				object: object,
+				functionName : functionName
+			});
+		}
 		
 		function forAllPersistentIncomingPersistentIteration(object, property, objectAction) {
 			imageCausality.disableIncomingRelations(function() {
@@ -1575,7 +1573,7 @@
 							// Ensure iteration structure in db
 							let iterations;
 							if (typeof(objectCausality.persistent.iterations) === 'undefined') {
-								iterations = imageCausality.create([]);
+								iterations = objectCausality.create([]);
 								objectCausality.persistent.iterations = iterations;
 							} else {
 								iterations = objectCausality.persistent.iterations;
@@ -1601,7 +1599,7 @@
 		
 
 		function processPersistentOneStep() {
-			log("processVolatileIterationsOneStep");
+			// log("processPersistentOneStep");
 			imageCausality.disableIncomingRelations(function() {
 				if (typeof(objectCausality.persistent.iterations) !== 'undefined' && objectCausality.persistent.iterations.length > 0) {
 					let iterations = objectCausality.persistent.iterations;
@@ -1627,7 +1625,8 @@
 					}); 
 					// Reuse the old array object, as not to clutter down the database and require deletion
 					// Will this work with causality? 
-					Array.prototype.splice.apply(iterations, [0, newIterations.length].concat(newIterations));
+					// Array.prototype.splice.apply(iterations, [0, newIterations.length].concat(newIterations));
+					iterations.splice.apply(iterations, [0, newIterations.length].concat(newIterations));
 				}
 			});
 			return typeof(objectCausality.persistent.iterations) === 'undefined' || objectCausality.persistent.iterations.length === 0;
@@ -1636,7 +1635,7 @@
 		let volatileIterations = [];
 		
 		function forAllPersistentIncomingVolatileIteration(object, property, objectAction) {
-			log("forAllPersistentIncomingVolatileIteration");
+			// log("forAllPersistentIncomingVolatileIteration");
 			imageCausality.disableIncomingRelations(function() {
 				if (typeof(object.const.dbImage) !== 'undefined') {
 					let dbImage = object.const.dbImage;
@@ -1680,21 +1679,21 @@
 		
 
 		function processVolatileIterationsOneStep() {
-			log("processVolatileIterationsOneStep");
+			// log("processVolatileIterationsOneStep");
 			imageCausality.disableIncomingRelations(function() {
 				let newIterations = [];
 				volatileIterations.forEach(function(iteration) {
 					let currentChunk = iteration.currentChunk;
 					let contents = currentChunk.contents;
-					log("process chunk...");
+					// log("process chunk...");
 					for (let id in contents) {
 						if (!id.startsWith("_eternity")) {
 							let referer = getObjectFromImage(contents[id]);
 							iteration.objectAction(referer);
 						}
 					}
-					log("Here!!!")
-					log(currentChunk);
+					// log("Here!!!")
+					// log(currentChunk);
 					if (typeof(currentChunk.next) !== 'undefined' && currentChunk.next !== null) {
 						iteration.currentChunk = currentChunk.next;
 						newIterations.push(iteration);
@@ -1754,6 +1753,7 @@
 		objectCausality.unloadAllAndClearMemory = unloadAllAndClearMemory;
 		objectCausality.clearDatabaseAndClearMemory = clearDatabaseAndClearMemory;
 		objectCausality.forAllPersistentIncomingNow = forAllPersistentIncomingNow;
+		objectCausality.createAction = createAction;
 		objectCausality.imageCausality = imageCausality;
 		objectCausality.instance = objectCausality;
 		// TODO: install this... 
