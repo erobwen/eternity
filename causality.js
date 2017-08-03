@@ -516,7 +516,7 @@
 			let finalIncomingStructure;			
 			if (incomingStructureRoot.contentsCounter === configuration.incomingStructureChunkSize) {
 				// Root node is full
-				log("Root node is full...")
+				// log("Root node is full...")
 				
 				// Move on to new chunk?
 				if (incomingStructureRoot.last !== null && incomingStructureRoot.contentsCounter !== configuration.incomingStructureChunkSize) {
@@ -524,7 +524,7 @@
 					finalIncomingStructure = incomingStructureRoot.last;
 				} else {
 					// Last chunk is either full or nonexistent....
-					log("newChunk!!!");
+					// log("newChunk!!!");
 					let newChunk = {
 						referredObject : incomingStructureRoot.referredObject,
 						isRoot : false,
@@ -539,12 +539,12 @@
 						newChunk = create(newChunk);
 					}
 					if (incomingStructureRoot.first === null) {
-						log("creting a lonley child...");
+						// log("creting a lonley child...");
 						newChunk.parent = incomingStructureRoot;
 						incomingStructureRoot.first = newChunk;
 						incomingStructureRoot.last = newChunk;
 					} else {
-						log("appending sibling...");
+						// log("appending sibling...");
 						let last = incomingStructureRoot.last;
 						last.next = newChunk;
 						newChunk.previous = last;
@@ -561,7 +561,7 @@
 			// Add repeater on object beeing observed, if not already added before
 			let incomingStructureContents = finalIncomingStructure.contents;
 			if (typeof(incomingStructureContents[refererId]) === 'undefined') {
-				log("here increasing counter... ");
+				// log("here increasing counter... ");
 				finalIncomingStructure.contentsCounter = finalIncomingStructure.contentsCounter + 1;
 				incomingStructureContents[refererId] = referingObject;
 

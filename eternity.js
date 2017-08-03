@@ -1552,22 +1552,86 @@
 		
 		
 		function forAllPersistentIncomingPersistentIteration(object, property, objectAction) {
-			imageCausality.disableIncomingRelations(function() {	
-				if (typeof(objectCausality.persistent.iterations) === 'undefined') {
-					let iterations = imageCausality.create([]);
-					// iterations._eternityImageClass = "Array"; // TODO: fix this automatic somehow... 
-					objectCausality.persistent.iterations = iterations;
-				}
+			imageCausality.disableIncomingRelations(function() {
+				if (typeof(object.const.dbImage) !== 'undefined') {
+					let dbImage = object.const.dbImage;
+					if (typeof(dbImage.incoming) !== 'undefined') {
+						let relations = dbImage.incoming;
+						// log(relations, 3);
+						// log("here");
+						if (typeof(relations[property]) !== 'undefined') {
+							let relation = relations[property];
+							
+							// Iterate root
+							let contents = relation.contents;
+							for (let id in contents) {
+								if (!id.startsWith("_eternity")) {
+									let referer = getObjectFromImage(contents[id]);
+									log("Iterate object in chunk...");
+									objectAction.object[objectAction.functionName](referer);											
+								}
+							}
 			
-				objectCausality.persistent.iterations.push(imageCausality.create({
-					target : object.const.dbImage, 
-					property : property,
-					action : objectAction,
-					state : null
-				}));
+							// Ensure iteration structure in db
+							let iterations;
+							if (typeof(objectCausality.persistent.iterations) === 'undefined') {
+								iterations = imageCausality.create([]);
+								objectCausality.persistent.iterations = iterations;
+							} else {
+								iterations = objectCausality.persistent.iterations;
+							}
+
+							// Setup the rest for iteration
+							let currentChunk = relation.first
+							if (typeof(currentChunk) !== 'undefined' && currentChunk !== null) {
+								iterations.push(imageCausality.create({
+									currentChunk : currentChunk,
+									objectAction : objectAction
+								}));
+							}
+						}
+					}
+				}
 			});
 		}
 		
+		function processAllPersistentIterations() {
+			while(!processPersistentOneStep()) {}
+		}
+		
+
+		function processPersistentOneStep() {
+			log("processVolatileIterationsOneStep");
+			imageCausality.disableIncomingRelations(function() {
+				if (typeof(objectCausality.persistent.iterations) !== 'undefined' && objectCausality.persistent.iterations.length > 0) {
+					let iterations = objectCausality.persistent.iterations;
+					let newIterations = [];
+				
+					objectCausality.persistent.iterations.forEach(function(iteration) {
+						let currentChunk = iteration.currentChunk;
+						let contents = currentChunk.contents;
+						for (let id in contents) {
+							if (!id.startsWith("_eternity")) {
+								let referer = getObjectFromImage(contents[id]);
+								let objectAction = iteration.objectAction;
+								objectAction.object[objectAction.functionName](referer);
+							}
+						}
+						
+						// log("Here!!!")
+						// log(currentChunk);
+						if (typeof(currentChunk.next) !== 'undefined' && currentChunk.next !== null) {
+							iteration.currentChunk = currentChunk.next;
+							newIterations.push(iteration);
+						}
+					}); 
+					// Reuse the old array object, as not to clutter down the database and require deletion
+					// Will this work with causality? 
+					Array.prototype.splice.apply(iterations, [0, newIterations.length].concat(newIterations));
+				}
+			});
+			return typeof(objectCausality.persistent.iterations) === 'undefined' || objectCausality.persistent.iterations.length === 0;
+		}		
 		
 		let volatileIterations = [];
 		
@@ -1581,22 +1645,22 @@
 						// log(relations, 3);
 						// log("here");
 						if (typeof(relations[property]) !== 'undefined') {
-							// Start of with all in current chunk... 
 							let relation = relations[property];
-							// log(relation);
+														
+							// Iterate the root
 							let contents = relation.contents;
-							// log(contents);
 							for (let id in contents) {
 								if (!id.startsWith("_eternity")) {
 									let referer = getObjectFromImage(contents[id]);
-									log("Iterate object in chunk...");
+									// log("Iterate object in chunk...");
 									objectAction(referer);											
 								}
 							}
-							// log(relation);
+
+							// Setup the rest for iteration
 							let currentChunk = relation.first
 							if (typeof(currentChunk) !== 'undefined' && currentChunk !== null) {
-								log("push chunk!");
+								// log("push chunk!");
 								volatileIterations.push({
 									currentChunk : currentChunk,
 									objectAction : objectAction
