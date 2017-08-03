@@ -46,37 +46,37 @@ describe("incoming", function () {
 		assert.equal(3, referers.length);
 		assert.equal(persistent.A, referers[0]);		
 		assert.equal(persistent.B, referers[1]);		
-		assert.equal(persistent.C, referers[2]);		
+		assert.equal(persistent.C, referers[2]);
+		clearDatabaseAndClearMemory();		
 	});	
 	
 	
-	// it('should save multiple incoming relations, iterate persistent incoming, persistently', function () {
-		// persistent.A = create({name : 'A'});
-		// persistent.B = create({name : 'B'});
-		// persistent.C = create({name : 'C'});
+	it('should save multiple incoming relations, iterate persistent incoming, persistently', function () {
+		persistent.A = create({name : 'A'});
+		persistent.B = create({name : 'B'});
+		persistent.C = create({name : 'C'});
 		
-		// let D = create({name : 'D'});
+		let D = create({name : 'D'});
 		// log("----now only assigning D---");
-		// persistent.A.D = D;
-		// persistent.B.D = D;
-		// persistent.C.D = D;
+		persistent.A.D = D;
+		persistent.B.D = D;
+		persistent.C.D = D;
 	
 		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
 
-		// unloadAllAndClearMemory();
-		// // log("==================== CLEAR MEMORY ==========================");
+		unloadAllAndClearMemory();
+		// log("==================== CLEAR MEMORY ==========================");
 		
-		// referers = [];
-		// let collector = create({ iterate : function(referer) {
-			// referers.push(referer);
-		// }});
+		referers = [];
+		let collector = create({ iterate : function(referer) {
+			referers.push(referer);
+		}});
 		
-		// eternity.createPersistentAction();
-		
-		// eternity.forAllPersistentIncomingNow(persistent.A.D, "D", eternity.createAction(collector, "iterate"));
-		// assert.equal(3, referers.length);
-		// assert.equal(persistent.A, referers[0]);		
-		// assert.equal(persistent.B, referers[1]);		
-		// assert.equal(persistent.C, referers[2]);		
-	// });
+		eternity.forAllPersistentIncomingNow(persistent.A.D, "D", eternity.createAction(collector, "iterate"));
+		assert.equal(3, referers.length);
+		assert.equal(persistent.A, referers[0]);		
+		assert.equal(persistent.B, referers[1]);		
+		assert.equal(persistent.C, referers[2]);		
+		clearDatabaseAndClearMemory();		
+	});
 });

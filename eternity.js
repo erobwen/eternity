@@ -1562,10 +1562,11 @@
 							
 							// Iterate root
 							let contents = relation.contents;
+							// log("processing root contents");
 							for (let id in contents) {
 								if (!id.startsWith("_eternity")) {
 									let referer = getObjectFromImage(contents[id]);
-									log("Iterate object in chunk...");
+									// log("Iterate object in chunk...");
 									objectAction.object[objectAction.functionName](referer);											
 								}
 							}
@@ -1608,6 +1609,7 @@
 					objectCausality.persistent.iterations.forEach(function(iteration) {
 						let currentChunk = iteration.currentChunk;
 						let contents = currentChunk.contents;
+						// log("processing contents");
 						for (let id in contents) {
 							if (!id.startsWith("_eternity")) {
 								let referer = getObjectFromImage(contents[id]);
@@ -1625,10 +1627,17 @@
 					}); 
 					// Reuse the old array object, as not to clutter down the database and require deletion
 					// Will this work with causality? 
-					// Array.prototype.splice.apply(iterations, [0, newIterations.length].concat(newIterations));
-					iterations.splice.apply(iterations, [0, newIterations.length].concat(newIterations));
+					// Array.prototype.splice.apply(iterations, [0, newIterations.length].concat(newIterations)); // did not work! TODO: figure out why... 
+					// iterations.splice.apply(iterations, [0, newIterations.length].concat(newIterations)); // did not work!
+					// log("newIterations:");
+					// log(newIterations);
+					iterations.length = 0;
+					newIterations.forEach(function(iteration) {
+						iterations.push(iteration);
+					})
 				}
 			});
+			// log(objectCausality.persistent.iterations, 2);
 			return typeof(objectCausality.persistent.iterations) === 'undefined' || objectCausality.persistent.iterations.length === 0;
 		}		
 		
