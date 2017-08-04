@@ -34,6 +34,7 @@
 		let deallocatedIds = [];
 		
 		function deallocate(id) {
+			// throw new Error("should not deallocate: " + id);
 			dataRecords[id] = "[deallocated]";
 			deallocatedIds.push(id);
 		}

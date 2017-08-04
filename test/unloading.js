@@ -86,6 +86,8 @@ describe("loading, unloading & zombiefication", function () {
 		
 		// Exceed the memory limit (3 objects loaded is too much)
 		// log("---------------------------- A.B = B; ----------------------------------");
+		
+		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
 		A.B = B;
 		assert.equal(isLoaded(persistent), false);
         assert.equal(isDead(persistent), false);

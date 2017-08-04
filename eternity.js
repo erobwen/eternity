@@ -135,7 +135,8 @@
 				_eternityParent : potentialParentImage,
 				_eternityObjectClass : Object.getPrototypeOf(object).constructor.name,
 				_eternityImageClass : (object instanceof Array) ? "Array" : "Object", 
-				_eternityParentProperty : potentialParentProperty
+				_eternityParentProperty : potentialParentProperty,
+				_eternityIsObjectImage : true
 			};
 			// for (let property in object) {
 				// let value = object[property];
@@ -152,6 +153,7 @@
 				contents = {};
 			}
 			let dbImage = imageCausality.create(contents); // Only Object image here... 
+			
 			imageIdToImageMap[dbImage.const.id] = dbImage;
 			connectObjectWithDbImage(object, dbImage);
 			return dbImage;		
@@ -160,7 +162,8 @@
 		function connectObjectWithDbImage(object, dbImage) {
 			imageCausality.blockInitialize(function() {
 				// log("connectObjectWithDbImage: " + dbImage.const.dbId);
-				dbImage.const.correspondingObject = object;					
+				dbImage.const.correspondingObject = object;	
+				dbImage.const.isObjectImage = true;				
 			});
 			objectCausality.blockInitialize(function() {
 				object.const.dbImage = dbImage;
@@ -700,9 +703,12 @@
 		}
 		
 		function createImagePlaceholderFromDbId(dbId) {
+			// log("NOT HERESSSSS!");
 			// log("createImagePlaceholderFromDbId: " + dbId);
 			let placeholder;
-			placeholder = imageCausality.create(createTarget(peekAtRecord(dbId)._eternityImageClass));
+			let record = peekAtRecord(dbId);
+			placeholder = imageCausality.create(createTarget(record._eternityImageClass));
+			placeholder.const.isObjectImage = record._eternityIsObjectImage;
 			placeholder.const.loadedIncomingReferenceCount = 0;
 			placeholder.const.dbId = dbId;
 			placeholder.const.serializedMongoDbId = imageCausality.idExpression(dbId);
@@ -1139,15 +1145,15 @@
 			// log("unloadImage");
 			// logGroup();
 			// without emitting events.
-			for (let property in dbImage) {
-				imageCausality.disableIncomingRelations(function() {
+			imageCausality.disableIncomingRelations(function() {
+				for (let property in dbImage) {
 					// Incoming should be unloaded here also, since it can be recovered.
 					let value = dbImage[property];
 					decreaseLoadedIncomingMacroReferenceCounters(dbImage, property);
 					// decreaseImageIncomingLoadedCounter(value);
 					delete dbImage[property]; 
-				});
-			}
+				}
+			});
 			dbImage.const.initializer = imageFromDbIdInitializer;
 			
 			// log(dbImage.const.incomingReferencesCount)
@@ -1742,10 +1748,19 @@
 		imageCausality.addPostPulseAction(postImagePulseAction);
 		imageCausality.addRemovedLastIncomingRelationCallback(function(dbImage) {
 			//unload image first if not previously unloaded?
-			
-			if (tryKillImage(dbImage)) {
-				// deallocateInDatabase(dbImage);
-			};
+			// log(dbImage.const.isObjectImage);
+			// log(dbImage.const.dbId);
+			if (dbImage.const.isObjectImage) {
+				tryKillImage(dbImage);
+			} else {
+				if (!dbImage.isIncomingStructures) {
+					// log("killing spree");
+					if (tryKillImage(dbImage)) {
+						deallocateInDatabase(dbImage);
+						// TODO: check if this part of iteration, move iteration if so... 
+					}
+				}
+			}
 		});
 
 
