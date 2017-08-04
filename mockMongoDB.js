@@ -31,10 +31,17 @@
 			return parsedRecords;
 		}
 		
+		let deallocatedIds = [];
+		
+		function deallocate(id) {
+			dataRecords[id] = "[deallocated]";
+			deallocatedIds.push(id);
+		}
+		
 		function saveNewRecord(dataRecord) {
 			log("saveNewRecord:");
 			logGroup();
-			let id = dataRecords.length;
+			let id = (deallocatedIds.length === 0) ? dataRecords.length : deallocatedIds.shift();
 			// dataRecord.id = "_id_" + id + "_di_"; // debug
 			
 			let copy = { id : "_id_" + id + "_di_" };
@@ -43,10 +50,10 @@
 			
 			// console.log("saveNewRecord");
 			log(dataRecord);
-			dataRecords.push(JSON.stringify(dataRecord));
+			dataRecords[id] = JSON.stringify(dataRecord); // Will this work for normal..?
 			log(dataRecords, 3);
 			logUngroup();
-			return id;
+			return id;				
 		}
 
 		function updateRecord(id, contents) {
@@ -108,7 +115,8 @@
 			deleteRecord : deleteRecord,
 			getAllRecordsParsed : getAllRecordsParsed,
 			getRecordsCount : getRecordsCount,
-			clearDatabase : clearDatabase
+			clearDatabase : clearDatabase,
+			deallocate : deallocate
 		};		
 	}
 	

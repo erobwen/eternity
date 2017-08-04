@@ -1158,11 +1158,14 @@
 		
 		function tryKillImage(dbImage) {
 			// log("Trying to kill image...");
+			let result = false;
 			imageCausality.blockInitialize(function() {
 				if (dbImage.const.incomingReferencesCount === 0 && typeof(dbImage.const.correspondingObject) === 'undefined') {
-					killDbImage(dbImage)
+					killDbImage(dbImage);
+					result = true;
 				}
 			});
+			return result;
 		}
 		
 		function killDbImage(dbImage) {
@@ -1307,6 +1310,11 @@
 		/*-----------------------------------------------
 		 *           Garbage collection
 		 *-----------------------------------------------*/
+		
+		function deallocateInDatabase(dbImage) {
+			mockMongoDB.deallocate(dbImage.const.dbId);
+			delete dbImage.const.dbId;
+		}
 		
 		// Main state-holder image
 		let gcState; 
@@ -1581,6 +1589,7 @@
 							}
 
 							// Setup the rest for iteration
+							// TODO: Ensure that this iteration is not lost as incoming references are removed...
 							let currentChunk = relation.first
 							if (typeof(currentChunk) !== 'undefined' && currentChunk !== null) {
 								iterations.push(imageCausality.create({
@@ -1686,7 +1695,6 @@
 			while(!processVolatileIterationsOneStep()) {}
 		}
 		
-
 		function processVolatileIterationsOneStep() {
 			// log("processVolatileIterationsOneStep");
 			imageCausality.disableIncomingRelations(function() {
@@ -1734,7 +1742,10 @@
 		imageCausality.addPostPulseAction(postImagePulseAction);
 		imageCausality.addRemovedLastIncomingRelationCallback(function(dbImage) {
 			//unload image first if not previously unloaded?
-			tryKillImage(dbImage);
+			
+			if (tryKillImage(dbImage)) {
+				// deallocateInDatabase(dbImage);
+			};
 		});
 
 

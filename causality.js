@@ -477,7 +477,11 @@
 						incomingRelation.previous = null;
 						incomingRelation.next = null;
 
-						if (incomingRelation.parent.first === null && incomingRelation.parent.last === null) {
+						// Send dissconnected event...
+						//incomingRelation.... redirect to next in event...
+
+						let root = incomingRelation.parent;
+						if (root.first === null && root.last === null && root.contentsCounter === 0) {
 							noMoreObservers = true;
 						}
 					}
