@@ -1614,6 +1614,26 @@
 		}
 		
 
+		function incomingChunkRemovedForImage(incomingChunk) {
+			let newIterations = []; 
+			let iterations = objectCausality.persistent.iterations;
+			iterations.forEach(function(iteration) {
+				if (iteration.currentChunk === incomingChunk) {
+					if (incomingChunk.next !== null) {
+						iteration.currentChunk = incomingChunk.next;
+						newIterations.push(iteration);
+					}
+				} else {
+					newIterations.push(iteration);
+				}				
+			});
+			
+			iterations.length = 0; // TODO can we improve the new iterations transitions somehow.. this could cause rewrite of the entire array... 
+			newIterations.forEach(function(iteration) {
+				iterations.push(iteration);
+			});
+		}
+		
 		function processPersistentOneStep() {
 			// log("processPersistentOneStep");
 			imageCausality.disableIncomingRelations(function() {
@@ -1649,7 +1669,7 @@
 					iterations.length = 0;
 					newIterations.forEach(function(iteration) {
 						iterations.push(iteration);
-					})
+					});
 				}
 			});
 			// log(objectCausality.persistent.iterations, 2);
@@ -1740,6 +1760,7 @@
 			name : 'imageCausality:' + JSON.stringify(configuration),
 			recordPulseEvents : true, 
 			incomingStructureChunkSize : configuration.persistentIncomingChunkSize,
+			incomingChunkRemovedCallback : incomingChunkRemovedForImage,
 			useIncomingStructures: true,
 			incomingReferenceCounters : true, 
 			incomingStructuresAsCausalityObjects : true,
@@ -1750,10 +1771,8 @@
 			//unload image first if not previously unloaded?
 			// log(dbImage.const.isObjectImage);
 			// log(dbImage.const.dbId);
-			if (dbImage.const.isObjectImage) {
-				tryKillImage(dbImage);
-			} else {
-				if (!dbImage.isIncomingStructures) {
+			if (!dbImage.const.isObjectImage) {
+				if (!dbImage.isIncomingStructures && !dbImage.isIncomingStructure) {
 					// log("killing spree");
 					if (tryKillImage(dbImage)) {
 						deallocateInDatabase(dbImage);
@@ -1762,6 +1781,7 @@
 				}
 			}
 		});
+		
 
 
 
