@@ -410,7 +410,7 @@
 		} 
 		
 		
-		function getIncomingRelationStructure(referencedObject, relationName) {
+		function getIncomingRelationStructure(referencedObject, property) {
 			// Sanity test TODO: remove 
 			if (incomingStructuresDisabled === 0) {
 				referencedObject.foo.bar;
@@ -419,7 +419,7 @@
 			// Create incoming structure
 			let incomingStructures;
 			if (typeof(referencedObject.incoming) === 'undefined') {
-				incomingStructures = { isIncomingStructures : true, referredObject: referencedObject };
+				incomingStructures = { isIncomingStructures : true, referredObject: referencedObject, last: null, first: null };
 				if (configuration.incomingStructuresAsCausalityObjects) {
 					incomingStructures = create(incomingStructures);
 				}
@@ -429,16 +429,24 @@
 			}
 			
 			// Create incoming for this particular property
-			if (typeof(incomingStructures[relationName]) === 'undefined') {
-				let incomingStructure = { relationName : relationName, isIncomingStructure : true, referredObject: referencedObject, incomingStructures : incomingStructures };
+			if (typeof(incomingStructures[property]) === 'undefined') {
+				let incomingStructure = { property : property, isIncomingStructure : true, referredObject: referencedObject, incomingStructures : incomingStructures, next: null, previous: incomingStructures.last };
+				if (incomingStructures.first === null) {
+					incomingStructures.first = incomingStructure;
+					incomingStructures.last = incomingStructure;
+				} else {					
+					incomingStructures.last.next = incomingStructure;
+					incomingStructures.last = incomingStructure;
+				}
+				
 				if (configuration.incomingStructuresAsCausalityObjects) {
 					// Disable incoming relations here? otherwise we might end up with incoming structures between 
 					incomingStructure = create(incomingStructure);
 				}
-				incomingStructures[relationName] = incomingStructure;
+				incomingStructures[property] = incomingStructure;
 			}
 			
-			return incomingStructures[relationName];
+			return incomingStructures[property];
 		}
 		
 		

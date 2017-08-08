@@ -1202,11 +1202,16 @@
 			
 			let eternityTag = "_eternity";
 			return {
+				memberTag : eternityTag + "IsMemberOf" + linkName,
 				first : eternityTag + "FirstOf" + name, 
 				last : eternityTag + "LastOf" + name, 
 				next : eternityTag + linkName + "Next", 
 				previous : eternityTag + linkName + "Previous"	
 			};
+		}
+		
+		function inList(listType, listElement) {
+			return typeof(listElement[listType.memberTag]) !== 'undefined' && listElement[listType.memberTag] === true;
 		}
 		
 		function isEmptyList(head, listType) {
@@ -1233,6 +1238,8 @@
 			let last = listType.last;
 			let next = listType.next;
 			let previous = listType.next;
+
+			listElement[listType.memberTag] = true; 
 			
 			if (head[last] !== null) {
 				head[last][next] = listElement;
@@ -1252,6 +1259,8 @@
 			let last = listType.last;
 			let next = listType.next;
 			let previous = listType.next;
+			
+			listElement[listType.memberTag] = true; 
 			
 			if (head[first] !== null) {
 				head[first][previous] = listElement;
@@ -1276,13 +1285,19 @@
 		
 		function removeLastFromList(head, listType) {
 			let lastElement = head[listType.last];
+			
+			delete lastElement[listType.memberTag]; 
 			removeFromList(head, listType, lastElement);
+			
 			return lastElement;
 		}
 
 		function removeFirstFromList(head, listType) {
 			let firstElement = head[listType.first];
+			
+			delete firstElement[listType.memberTag]; 
 			removeFromList(head, listType, firstElement);
+			
 			return firstElement;
 		}
 		
@@ -1291,6 +1306,8 @@
 			let last = listType.last;
 			let next = listType.next;
 			let previous = listType.next;
+			
+			delete listElement[listType.memberTag]; 
 			
 			if(listElement[next] !== null) {
 				listElement[next][previous] = listElement[previous];
@@ -1325,34 +1342,46 @@
 		// Main state-holder image
 		let gcState; 
 			
-		// List types
+		// Saving list
 		let pendingForChildReattatchment = createListType("PendingForChildReattatchment");
 		
+		// Unstable origins
 		let pendingUnstableOrigins = createListType("PendingUnstableOrigin");
 		
+		// Unstable zone
 		let unstableZone = createListType("UnstableZone");
 		let unexpandedUnstableZone = createListType("UnexpandedUnstableZone", "UnstableUnexpandedZone");
 		let nextUnexpandedUnstableZone = createListType("NextUnexpandedUnstableZone", "UnstableUnexpandedZone");
 	
+		// Destruction zone
 		let destructionZone = createListType("DestructionZone");
 		
-		function initializeGcState() {
-			initializeList(gcState, pendingForChildReattatchment);
-			
+		function initializeGcState() {			
+			// Pending unstable origins
 			initializeList(gcState, pendingUnstableOrigins);
 			
+			// Unstable zone
 			initializeList(gcState, unstableZone);
 			initializeList(gcState, unexpandedUnstableZone);
 			initializeList(gcState, nextUnexpandedUnstableZone);
+
+			// Incoming iteration
+			gcState.scanningIncomingFor = null;
+			gcState.currentIncomingStructure = null;
+			gcState.currentIncomingChunk = null;
+
+			// Reattatching
+			initializeList(gcState, pendingForChildReattatchment);
+			
+			// Destruction zone
+			initializeList(gcState, destructionZone);	
 		}
 		
 		function addUnstableOrigin(pendingUnstableOrigin) {
 			let pendingUnstableImage = pendingUnstableOrigin.const.dbImage;
 			imageCausality.disableIncomingRelations(function() {
-				if (typeof(pendingUnstableImage._entityDoNotAddToPendingUnstableOriginList) === 'undefined') {
-					pendingUnstableImage._entityDoNotAddToPendingUnstableOriginList = true;
-
-					addFirstToList(gcState, pendingUnstableImage, pendingUnstableOrigins);
+				if (!inList(pendingUnstableOrigins, pendingUnstableImage)) {
+					addFirstToList(gcState, pendingUnstableOrigins, pendingUnstableImage);					
 				}
 			});
 		}
@@ -1377,28 +1406,34 @@
 			removeFromList(gcState, unstableZone, dbImage);
 			removeFromList(gcState, unexpandedUnstableZone, dbImage);
 			removeFromList(gcState, nextUnexpandedUnstableZone, dbImage);
+			removeFromList(gcState, destructionZone, dbImage);
 		}
 		
-		function oneStepCollection() {
-			// Save 
-			if (!isEmptyList(gcState, pendingForChildReattatchment)) {
-				let current = removeFirstFromList(gcState, pendingForChildReattatchment);
-				let object = getObjectFromImage(current.dbImage);
-				
-				for (let property in current) {
-					let value = expadable[property];
-					if (objectCausality.isObject(value) && isUnstable(object)) {
-						let referedImage = value.const.dbImage;
-						referedImage._eternityParent = current.parent;
-						referedImage._eternityParentProperty = current.parentProperty;
-						addLastToList(gcState, pendingForChildReattatchment, referedImage);
-						removeFromAllGcLists(object);
+		
+		function tryReconnectFromIncomingContents(contents) {
+			for(id in contents) {
+				if (!id.startsWith("_eternity")) {
+					let referer = contents[id];
+					if (typeof(referer._eternityParent) !== 'undefined') { // && !inList(destructionZone, referer) && !inList(unstableZone, referer)
+						gcState.scanningIncomingFor._eternityParent = referer; // TODO: disable incoming relations
+						gcState.scanningIncomingFor._eternityParentProperty = gcState.currentIncomingStructureRoot.property;
+						addFirstToList(gcState, pendingForChildReattatchment, currentImage);
+						
+						// End scanning incoming.
+						gcState.scanningIncomingFor = null;
+						gcState.currentIncomingStructures = null;
+						gcState.currentIncomingStructureRoot = null;
+						gcState.currentIncomingStructureChunk = null;
+						return true;
 					}
 				}
-
-				return false;
 			}
-
+			return false; // could not reconnect
+		}
+		
+		
+		function oneStepCollection() {
+			
 			// Move to next zone expansion
 			if (isEmptyList(gcState, unexpandedUnstableZone) && !isEmptyList(gcState, nextUnexpandedUnstableZone)) {
 				let first = getFirstOfList(gcState, nextUnexpandedUnstableZone);
@@ -1412,7 +1447,7 @@
 			if (!isEmptyList(gcState, unexpandedUnstableZone)) {
 				let dbImage = removeFirstFromList(gcState, unexpandedUnstableZone);
 				let object = getObjectFromImage(dbImage);
-				// Consider: Will this cause an object pulse???
+				// Consider: Will this cause an object pulse??? No... just reading starts no pulse...
 				for (let property in object) {
 					let value = object[property];
 					if (objectCausality.isObject(value)) {
@@ -1420,7 +1455,7 @@
 						if (referedImage._eternityParent === dbImage && property === referedImage._eternityParentProperty) {
 							addLastToList(gcState, nextUnexpandedUnstableZone, referedImage);
 							addLastToList(gcState, unstableZone, referedImage);
-							delete dbImage._eternityParent; // This signifies that an image (if connected to an object), is unstable. If set to null, it means it is a root.
+							delete dbImage._eternityParent; // This signifies that an image (if connected to an object), is unstable. If set to > 0, it means it is a root.
 							delete dbImage._eternityParentProperty;
 						}
 					}
@@ -1429,38 +1464,88 @@
 				// gcState.unstableUnexpandedZoneFirst.
 				return false;
 			};
-
 			
-			// Try to save unstable zone.
-			while(!isEmptyList(gcState, unstableZone)) {
-				let dbImage = removeFirstFromList(gcState, unstableZone);
-				let object = getObjectFromImage();
+			
+			// Reattatch 
+			if (!isEmptyList(gcState, pendingForChildReattatchment)) {
+				let current = removeFirstFromList(gcState, pendingForChildReattatchment);
 				
-				if (typeof(object.incoming) !== 'undefined') {
-					for (let incomingProperty in object.incoming) {
-						let root = object.incoming[incomingProperty];
-						
-						gcState.currentIncoming = root;
-						
-						let value = object[property];
-						if (objectCausality.isObject(value)) {
-							let referedImage = value.const.dbImage;
-							if (referedImage._eternityParent === dbImage && property === referedImage._eternityParentProperty) {
-								addLastToList(gcState, nextUnexpandedUnstableZone, referedImage);
-								addLastToList(gcState, unstableZone, referedImage);
-								delete dbImage._eternityParent; // This signifies that an image (if connected to an object), is unstable. If set to null, it means it is a root.
-								delete dbImage._eternityParentProperty;
-							}
-						}
-					}					
+				for (let property in current) {
+					let value = current[property];
+					if (imageCausality.isObject(value) && isUnstable(value)) { // Has to exists!
+						let referedImage = value;
+						referedImage._eternityParent = current;
+						referedImage._eternityParentProperty = property;
+						addLastToList(gcState, pendingForChildReattatchment, referedImage);
+						removeFromAllGcLists(referedImage);
+					}
 				}
 
-				destructionZone()
+				return false;
+			}	
+
+			// Iterate incoming, get a new one
+			if(gcState.scanningIncomingFor === null && !isEmptyList(gcState, unstableZone)) {
+				let currentImage = removeFirstFromList(gcState, unstableZone);
+				if (typeof(currentImage.incoming) !== 'undefined') {
+					gcState.scanningIncomingFor = currentImage;
+					gcState.currentIncomingStructures = currentImage.incoming;
+					gcState.currentIncomingStructureRoot = currentImage.incoming.first;
+					gcState.currentIncomingStructureChunk = null;
+					
+					if (tryReconnectFromIncomingContents(gcState.currentIncomingStructureRoot.contents)) {
+						return false;
+					}
+					
+					gcState.currentIncomingStructureChunk = gcState.currentIncomingStructureRoot.first;
+					return false;
+				}
+			}
+
+
+			// Scan incoming in progress, continue with it
+			if (gcState.scanningIncomingFor !== null) {
 				
+				// Scan in chunk
+				if (gcState.currentIncomingStructureChunk !== null) {
+					// Check in the contents directly, see if we find incoming.
+					if (tryReconnectFromIncomingContents(gcState.currentIncomingStructureChunk.contents)) {
+						return false;
+					}
+					gcState.currentIncomingStructureChunk = gcState.currentIncomingStructureChunk.next;
+					return false;
+				}
+				
+				// Swap to a new incoming property
+				if (gcState.currentIncomingStructureRoot !== null) {
+					gcState.currentIncomingStructureRoot = gcState.currentIncomingStructureRoot.next;
+					if(gcState.currentIncomingStructureRoot === null) {
+						addLastToList(destructionZone, gcState.scanningIncomingFor);
+					} else {
+						if (tryReconnectFromIncomingContents(gcState.currentIncomingStructureRoot.contents)) {
+							return false;
+						}						
+						gcState.currentIncomingStructureChunk = gcState.currentIncomingStructureRoot.first;
+						return false;
+					}
+				}
 			}
 			
-			// Delete rest of unstable zone.
-			
+			// Destroy those left in the destruction list. 
+			if (!isEmptyList(gcState, destructionZone)) {
+				let toDestroy = getFirstOfList(gcState, destructionZone);
+				
+				// TODO: load to object before detatching... 
+				
+				// delete toDestroy.const.correspondingObject.const.dbImage;
+				// delete toDestroy.const.correspondingObject;
+				
+				for(property in toDestroy) {
+					delete toDestroy[property]; 
+				}
+				toDestroy._eternityDismanteled = true;
+			}
+						
 			// Start a new zone.
 			if (gcState.pendingUnstableOriginFirst !== null) {
 				// Start new unstable cycle.
@@ -1502,12 +1587,18 @@
 				
 				// Garbage collection state.
 				collectionDbId = mockMongoDB.saveNewRecord({ name : "garbageCollection" });
+				gcState = createImagePlaceholderFromDbId(collectionDbId);
+				initializeGcState();
 			} else {
 				// Setup ids for basics.
-				// TODO
+				let counter = 0;
+				persistentDbId = counter++;
+				if (configuration.twoPhaseComit) updateDbId = counter++;
+				collectionDbId = counter++;
+				
+				gcState = createImagePlaceholderFromDbId(collectionDbId);
 			}
 			objectCausality.persistent = createObjectPlaceholderFromDbId(persistentDbId);
-			gcState = createImagePlaceholderFromDbId(collectionDbId);
 			
 			logUngroup();
 		}
