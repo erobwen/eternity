@@ -109,7 +109,16 @@
 				let newValue = objectValue;
 				// Get existing or create new image. 
 				if (typeof(newValue.const.dbImage) === 'object') {
-					newValue = newValue.const.dbImage;
+					let referedDbImage = newValue.const.dbImage;
+					if (inList(deallocationZone, referedDbImage)) {
+						// log("here...filling");
+						fillDbImageFromCorrespondingObject(newValue);
+					} else {
+						// log("say what...");
+						// log(referedDbImage);
+						newValue = referedDbImage;
+					}
+					removeFromAllGcLists(referedDbImage);
 				} else {
 					createDbImageForObject(newValue, dbImage, property);					
 					newValue = newValue.const.dbImage;
@@ -176,17 +185,21 @@
 			// log(object);
 			// log(object.const);
 			// log("foo");
-			
 			if (typeof(object.const.dbImage) === 'undefined') {
 				let dbImage = createEmptyDbImage(object, potentialParentImage, potentialParentProperty);
-				for (let property in object) { 
-					setPropertyOfImage(dbImage, property, object[property]);
-				}
 				object.const.dbImage = dbImage;
 				dbImage.const.correspondingObject = object;
-				loadedObjects++;
-				objectCausality.pokeObject(object); // poke all newly saved?
+				fillDbImageFromCorrespondingObject(object);
 			}	
+		}
+		
+		function fillDbImageFromCorrespondingObject(object) {
+			let dbImage = object.const.dbImage;
+			for (let property in object) { 
+				setPropertyOfImage(dbImage, property, object[property]);
+			}			
+			loadedObjects++;
+			objectCausality.pokeObject(object); // poke all newly saved?
 		}
 		
 		function createDbImageRecursivley(entity, potentialParentImage, potentialParentProperty) {
@@ -1302,30 +1315,36 @@
 		}
 		
 		function removeFromList(head, listType, listElement) {
-			let first = listType.first;
-			let last = listType.last;
-			let next = listType.next;
-			let previous = listType.next;
-			
-			delete listElement[listType.memberTag]; 
-			
-			if(listElement[next] !== null) {
-				listElement[next][previous] = listElement[previous];
-			} 
+			if (inList(listType, listElement)) {
+				// log("removeFromList");
+				// log(listType);
+				// log(listElement);
+				let first = listType.first;
+				let last = listType.last;
+				let next = listType.next;
+				let previous = listType.next;
+				
+				delete listElement[listType.memberTag]; 
+				
+				if(listElement[next] !== null) {
+					// log(listElement);
+					listElement[next][previous] = listElement[previous];
+				} 
 
-			if(listElement[previous] !== null) {
-				listElement[previous][next] = listElement[next];
+				if(listElement[previous] !== null) {
+					listElement[previous][next] = listElement[next];
+				}
+				
+				if(head[last] === listElement) {
+					head[last] = listElement[previous];
+				}
+				if(head[first] === listElement) {
+					head[first] = listElement[next];
+				}
+				
+				delete listElement[next];
+				delete listElement[previous];				
 			}
-			
-			if(head[last] === listElement) {
-				head[last] = listElement[previous];
-			}
-			if(head[first] === listElement) {
-				head[first] = listElement[next];
-			}
-			
-			delete listElement[next];
-			delete listElement[previous];
 		}
 		
 		
@@ -1355,7 +1374,7 @@
 	
 		// Destruction zone
 		let destructionZone = createListType("DestructionZone");
-		// let deallocationZone = createListType("DeallocationZone");
+		let deallocationZone = createListType("DeallocationZone");
 		
 		function initializeGcState() {			
 			// Pending unstable origins
@@ -1376,7 +1395,7 @@
 			
 			// Destruction zone
 			initializeList(gcState, destructionZone);	
-			// initializeList(gcState, deallocationZone);	
+			initializeList(gcState, deallocationZone);	
 		}
 		
 		function addUnstableOrigin(pendingUnstableOrigin) {
@@ -1409,7 +1428,7 @@
 			removeFromList(gcState, unexpandedUnstableZone, dbImage);
 			removeFromList(gcState, nextUnexpandedUnstableZone, dbImage);
 			removeFromList(gcState, destructionZone, dbImage);
-			// removeFromList(gcState, deallocationZone, dbImage);
+			removeFromList(gcState, deallocationZone, dbImage);
 		}
 		
 		
@@ -1538,15 +1557,16 @@
 				if (!isEmptyList(gcState, destructionZone)) {
 					let toDestroy = getFirstOfList(gcState, destructionZone);
 					
-					// TODO: load to object before detatching... 
-					
-					// delete toDestroy.const.correspondingObject.const.dbImage;
-					// delete toDestroy.const.correspondingObject;
+					// Make sure that object beeing destroyed is loaded.
+					toDestroy.const.correspondingObject.poke;
 					
 					for(property in toDestroy) {
 						delete toDestroy[property]; 
 					}
-					toDestroy._eternityDismanteled = true;
+					addFirstToList(gcState, deallocationZone, toDestroy);
+					loadedObjects--;
+					    // toDestroy._eternityDismanteled = true;
+					return false;
 				}
 							
 				// Start a new zone.
@@ -1875,7 +1895,9 @@
 					}
 				}
 			} else {
-				if (typeof(dbImage._eternityDismanteled) !== 'undefined' && dbImage._eternityDismanteled === true) {
+				if (inList(deallocationZone, dbImage)) {
+					removeFirstFromList(gcState, deallocationZone, dbImage);
+				// if (typeof(dbImage._eternityDismanteled) !== 'undefined' && dbImage._eternityDismanteled === true) {
 					unpersistObjectOfImage(dbImage);
 				}
 			}
