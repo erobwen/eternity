@@ -110,9 +110,14 @@
 				// Get existing or create new image. 
 				if (typeof(newValue.const.dbImage) === 'object') {
 					let referedDbImage = newValue.const.dbImage;
-					if (inList(deallocationZone, referedDbImage)) {
+					if (unstableOrBeeingKilledInGcProcess(referedDbImage)) {
 						// log("here...filling");
-						fillDbImageFromCorrespondingObject(newValue);
+						referedDbImage._eternityParent = dbImage;
+						referedDbImage._eternityParentProperty = property;
+						if (inList(deallocationZone, referedDbImage)) {
+							fillDbImageFromCorrespondingObject(newValue); 							
+						}
+						addFirstToList(gcState, pendingForChildReattatchment, referedDbImage);
 					} else {
 						// log("say what...");
 						// log(referedDbImage);
@@ -1421,6 +1426,15 @@
 			return typeof(dbImage._eternityParent) === 'undefined';
 		}
 		
+		function unstableOrBeeingKilledInGcProcess(dbImage) {
+			let result = false;
+			result = result || inList(pendingUnstableOrigins, dbImage);
+			result = result || inList(unstableZone, dbImage);
+			result = result || inList(destructionZone, dbImage);
+			result = result || inList(deallocationZone, dbImage);
+			return result;
+		}
+		
 		function removeFromAllGcLists(dbImage) {
 			removeFromList(gcState, pendingUnstableOrigins, dbImage);
 			removeFromList(gcState, pendingForChildReattatchment, dbImage);
@@ -1456,6 +1470,24 @@
 		
 		function oneStepCollection() {
 			imageCausality.pulse(function() {
+				// Reattatch 
+				if (!isEmptyList(gcState, pendingForChildReattatchment)) {
+					let current = removeFirstFromList(gcState, pendingForChildReattatchment);
+					
+					for (let property in current) {
+						let value = current[property];
+						if (imageCausality.isObject(value) && isUnstable(value)) { // Has to exists!
+							let referedImage = value;
+							referedImage._eternityParent = current;
+							referedImage._eternityParentProperty = property;
+							addLastToList(gcState, pendingForChildReattatchment, referedImage);
+							removeFromAllGcLists(referedImage);
+						}
+					}
+
+					return false;
+				}
+				
 				// Move to next zone expansion
 				if (isEmptyList(gcState, unexpandedUnstableZone) && !isEmptyList(gcState, nextUnexpandedUnstableZone)) {
 					let first = getFirstOfList(gcState, nextUnexpandedUnstableZone);
@@ -1486,27 +1518,8 @@
 					// gcState.unstableUnexpandedZoneFirst.
 					return false;
 				};
-				
-				
-				// Reattatch 
-				if (!isEmptyList(gcState, pendingForChildReattatchment)) {
-					let current = removeFirstFromList(gcState, pendingForChildReattatchment);
-					
-					for (let property in current) {
-						let value = current[property];
-						if (imageCausality.isObject(value) && isUnstable(value)) { // Has to exists!
-							let referedImage = value;
-							referedImage._eternityParent = current;
-							referedImage._eternityParentProperty = property;
-							addLastToList(gcState, pendingForChildReattatchment, referedImage);
-							removeFromAllGcLists(referedImage);
-						}
-					}
 
-					return false;
-				}	
-
-				// Iterate incoming, get a new one
+				// Iterate incoming, try to stabilize...
 				if(gcState.scanningIncomingFor === null && !isEmptyList(gcState, unstableZone)) {
 					let currentImage = removeFirstFromList(gcState, unstableZone);
 					if (typeof(currentImage.incoming) !== 'undefined') {
