@@ -186,7 +186,7 @@
 		
 		function createDbImageForObject(object, potentialParentImage, potentialParentProperty) {
 			// let object = entity;
-			log("createDbImageForObject: " + object.const.name);
+			// log("createDbImageForObject: " + object.const.name);
 			// log(object);
 			// log(object.const);
 			// log("foo");
@@ -205,7 +205,7 @@
 				setPropertyOfImage(dbImage, property, object[property]);
 			}			
 			loadedObjects++;
-			log("fillDbImageFromCorrespondingObject, and poking...");
+			// log("fillDbImageFromCorrespondingObject, and poking...");
 			objectCausality.pokeObject(object); // poke all newly saved?
 		}
 		
@@ -764,7 +764,7 @@
 		}
 		
 		function objectFromImageInitializer(object) {
-			log("initialize object " + object.const.id + " from dbImage " + object.const.dbImage.const.id + ", dbId:" + object.const.dbId);
+			// log("initialize object " + object.const.id + " from dbImage " + object.const.dbImage.const.id + ", dbId:" + object.const.dbId);
 			logGroup();
 			objectCausality.withoutEmittingEvents(function() {
 				imageCausality.withoutEmittingEvents(function() {
@@ -798,7 +798,7 @@
 			let placeholder = objectCausality.create(createTarget(peekAtRecord(dbId)._eternityObjectClass));
 			placeholder.const.dbId = dbId;
 			placeholder.const.name = peekAtRecord(dbId).name;
-			log("createObjectPlaceholderFromDbId: " + dbId + ", " + placeholder.const.name);
+			// log("createObjectPlaceholderFromDbId: " + dbId + ", " + placeholder.const.name);
 			placeholder.const.initializer = objectFromIdInitializer;
 			return placeholder;
 		}
@@ -1135,7 +1135,7 @@
 
 		
 		function killObject(object) {
-			log("killObject: " + objName(object));
+			// log("killObject: " + objName(object));
 			let dbImage = object.const.dbImage;
 
 			// log(object.const.target);
@@ -1151,7 +1151,7 @@
 		}
 		
 		function zombieObjectInitializer(object) {
-			log("zombieObjectInitializer: " + objName(object));
+			// log("zombieObjectInitializer: " + objName(object));
 			logGroup();
 			// log("zombieObjectInitializer");
             delete object.const.isKilled;
@@ -1160,11 +1160,11 @@
 			// log("zombieObjectInitializer");
 			let dbId = object.const.dbId;
 			let dbImage = getDbImage(dbId);
-			log("Set forward to..." + dbId);
+			// log("Set forward to..." + dbId);
 			// object.const.isZombie = true; // Access this by object.nonForwardConst.isZombie
 			object.const.forwardsTo = getObjectFromImage(dbImage); // note: the dbImage might become a zombie as well...
-			log("Finished setting forward too....");
-			log(object === object.nonForwardConst.forwardsTo);
+			// log("Finished setting forward too....");
+			// log(object === object.nonForwardConst.forwardsTo);
 			logUngroup();
 		}
 		
@@ -1983,12 +1983,12 @@
                 });
             });
 			if (isZombie) {
-				log("isZombie");
+				// log("isZombie");
 				return false;				
 			}
 			
 			if (typeof(object.const.dbImage) === 'undefined') {
-				log("noDbImage: " + object.const.name);
+				// log("noDbImage: " + object.const.name);
 				// log(object.const);
 				return false;				
 			}

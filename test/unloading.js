@@ -96,13 +96,13 @@ describe("loading, unloading & zombiefication", function () {
 		// Start building a structure
 		persistent.name = "persistent";
 		persistent.const.name = "persistent"
-		log("---------------------------- persistent.A = A; ----------------------------------");
+		// log("---------------------------- persistent.A = A; ----------------------------------");
 		persistent.A = A;
-		log("---------------------------- A.persistent = persistent; ----------------------------------");		
+		// log("---------------------------- A.persistent = persistent; ----------------------------------");		
 		A.persistent = persistent;
 		
 		// Exceed the memory limit (3 objects loaded is too much)
-		log("---------------------------- A.B = B; ----------------------------------");
+		// log("---------------------------- A.B = B; ----------------------------------");
 		
 		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
 		A.B = B;
@@ -182,9 +182,9 @@ describe("loading, unloading & zombiefication", function () {
 		// log("--------------------------- Touch B -----------------------------------");
 		dummy = B.name;
 		// log("--------------------------- Touch C -----------------------------------");
-		eternity.trace.basic++;
+		// eternity.trace.basic++;
 		dummy = C.name;
-		eternity.trace.basic--;
+		// eternity.trace.basic--;
 		// log("----------------------------------");
 		
 		// Persistent becomes a zombie
