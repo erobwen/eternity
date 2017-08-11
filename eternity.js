@@ -1031,16 +1031,16 @@
 						objectCausality.freezeActivityList(function() {
 							while (leastActiveObject !== null && loadedObjects > maxNumberOfLoadedObjects) {
 								// log("considering object for unload...");
-								while(leastActiveObject !== null && typeof(leastActiveObject.const.dbImage) === 'undefined') { // Warning! can this wake a killed object to life? ... no should not be here!
-									// log("skipping unsaved object (cannot unload something not saved)...");
-									objectCausality.removeFromActivityList(leastActiveObject); // Just remove them and make GC possible. Consider pre-filter for activity list.... 
-									leastActiveObject = objectCausality.getActivityListLast();
-								}
-								if (leastActiveObject !== null) {
+								// while(leastActiveObject !== null && typeof(leastActiveObject.const.dbImage) === 'undefined') { // Warning! can this wake a killed object to life? ... no should not be here!
+									// // log("skipping unsaved object (cannot unload something not saved)...");
+									// objectCausality.removeFromActivityList(leastActiveObject); // Just remove them and make GC possible. Consider pre-filter for activity list.... 
+									// leastActiveObject = objectCausality.getActivityListLast();
+								// }
+								// if (leastActiveObject !== null) {
 									// log("remove it!!");
 									objectCausality.removeFromActivityList(leastActiveObject);
 									unloadObject(leastActiveObject);
-								}
+								// }
 							}
 						});
 					});
@@ -1930,6 +1930,7 @@
 		function unpersistObjectOfImage(dbImage) {
 			// Dissconnect from object and deallocate.
 			delete dbImage.const.correspondingObject.const.dbImage;
+			objectCausality.removeFromActivityList(dbImage.const.correspondingObject);
 			delete dbImage.const.correspondingObject;
 
 			if (killImageIfDissconnectedAndNonReferred(dbImage)) {						
