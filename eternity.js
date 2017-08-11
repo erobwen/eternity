@@ -186,13 +186,14 @@
 		
 		function createDbImageForObject(object, potentialParentImage, potentialParentProperty) {
 			// let object = entity;
-			// log("foo");
+			log("createDbImageForObject: " + object.const.name);
 			// log(object);
 			// log(object.const);
 			// log("foo");
 			if (typeof(object.const.dbImage) === 'undefined') {
 				let dbImage = createEmptyDbImage(object, potentialParentImage, potentialParentProperty);
 				object.const.dbImage = dbImage;
+				dbImage.const.name = object.const.name;
 				dbImage.const.correspondingObject = object;
 				fillDbImageFromCorrespondingObject(object);
 			}	
@@ -204,6 +205,7 @@
 				setPropertyOfImage(dbImage, property, object[property]);
 			}			
 			loadedObjects++;
+			log("fillDbImageFromCorrespondingObject, and poking...");
 			objectCausality.pokeObject(object); // poke all newly saved?
 		}
 		
@@ -753,23 +755,24 @@
 		
 		function createObjectPlaceholderFromDbImage(dbImage) {
 			// log("createObjectPlaceholderFromDbImage " + dbImage.const.id);
-			// connectObjectWithDbImage(placeholder, dbImage);
 			let placeholder = objectCausality.create(createTarget(peekAtRecord(dbImage.const.dbId)._eternityObjectClass));
+			connectObjectWithDbImage(placeholder, dbImage);
 			placeholder.const.dbId = dbImage.const.dbId;
-			placeholder.const.initializer = objectFromIdInitializer;
+			placeholder.const.name = dbImage.const.name; // TODO: remove? 
+			placeholder.const.initializer = objectFromImageInitializer;
 			return placeholder;
 		}
 		
-		// function objectFromImageInitializer(object) {
-			// // log("initialize object " + object.const.id + " from dbImage " + object.const.dbImage.const.id + ", dbId:" + object.const.dbId);
-			// // logGroup();
-			// objectCausality.withoutEmittingEvents(function() {
-				// imageCausality.withoutEmittingEvents(function() {
-					// loadFromDbImageToObject(object);
-				// });
-			// });
-			// // logUngroup();
-		// }
+		function objectFromImageInitializer(object) {
+			log("initialize object " + object.const.id + " from dbImage " + object.const.dbImage.const.id + ", dbId:" + object.const.dbId);
+			logGroup();
+			objectCausality.withoutEmittingEvents(function() {
+				imageCausality.withoutEmittingEvents(function() {
+					loadFromDbImageToObject(object);
+				});
+			});
+			logUngroup();
+		}
 		
 		function createTarget(className) {
 			if (typeof(className) !== 'undefined') {
@@ -792,12 +795,14 @@
 		}
 		
 		function createObjectPlaceholderFromDbId(dbId) {
-			// log("createObjectPlaceholderFromDbId: " + dbId);
 			let placeholder = objectCausality.create(createTarget(peekAtRecord(dbId)._eternityObjectClass));
 			placeholder.const.dbId = dbId;
+			placeholder.const.name = peekAtRecord(dbId).name;
+			log("createObjectPlaceholderFromDbId: " + dbId + ", " + placeholder.const.name);
 			placeholder.const.initializer = objectFromIdInitializer;
 			return placeholder;
 		}
+	
 		
 		function objectFromIdInitializer(object) {
 			// log("initialize object " + object.const.id + " from dbId: " + object.const.dbId);
@@ -1130,7 +1135,7 @@
 
 		
 		function killObject(object) {
-			// log("killObject: " + objName(object));
+			log("killObject: " + objName(object));
 			let dbImage = object.const.dbImage;
 
 			// log(object.const.target);
@@ -1146,6 +1151,8 @@
 		}
 		
 		function zombieObjectInitializer(object) {
+			log("zombieObjectInitializer: " + objName(object));
+			logGroup();
 			// log("zombieObjectInitializer");
             delete object.const.isKilled;
             object.const.isZombie = true;
@@ -1153,8 +1160,12 @@
 			// log("zombieObjectInitializer");
 			let dbId = object.const.dbId;
 			let dbImage = getDbImage(dbId);
+			log("Set forward to..." + dbId);
 			// object.const.isZombie = true; // Access this by object.nonForwardConst.isZombie
 			object.const.forwardsTo = getObjectFromImage(dbImage); // note: the dbImage might become a zombie as well...
+			log("Finished setting forward too....");
+			log(object === object.nonForwardConst.forwardsTo);
+			logUngroup();
 		}
 		
 		
@@ -1571,7 +1582,7 @@
 					let toDestroy = getFirstOfList(gcState, destructionZone);
 					
 					// Make sure that object beeing destroyed is loaded.
-					toDestroy.const.correspondingObject.poke;
+					objectCausality.pokeObject(toDestroy.const.correspondingObject);
 					
 					for(property in toDestroy) {
 						delete toDestroy[property]; 
@@ -1958,6 +1969,31 @@
 			// log("incoming relations reaced zero...");
             tryKillObject(dbImage);
         });
+		objectCausality.setActivityListFilter(function(object) {
+			
+			
+			// throw new Error("Here!"); 
+			let isZombie = false;
+            objectCausality.blockInitialize(function() {
+                objectCausality.freezeActivityList(function() {
+                    // log("ASDFASDFASDFASDFASDFASDFASFDASDFASDFASDFASFASDFASDF");
+                    isZombie = typeof(object.nonForwardConst.isZombie) !== 'undefined';
+                    // log("isZombie: " + isZombie);
+                });
+            });
+			if (isZombie) {
+				log("isZombie");
+				return false;				
+			}
+			
+			if (typeof(object.const.dbImage) === 'undefined') {
+				log("noDbImage: " + object.const.name);
+				// log(object.const);
+				return false;				
+			}
+			return true;
+			// TODO: Add and remove to activity list as we persist/unpersist this object....
+		});
 
 		
 		// Setup database
