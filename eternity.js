@@ -1975,13 +1975,13 @@
 			
 			// throw new Error("Here!"); 
 			let isZombie = false;
-            objectCausality.blockInitialize(function() {
-                objectCausality.freezeActivityList(function() {
+            // objectCausality.blockInitialize(function() {
+                // objectCausality.freezeActivityList(function() {
                     // log("ASDFASDFASDFASDFASDFASDFASFDASDFASDFASDFASFASDFASDF");
                     isZombie = typeof(object.nonForwardConst.isZombie) !== 'undefined';
                     // log("isZombie: " + isZombie);
-                });
-            });
+                // });
+            // });
 			if (isZombie) {
 				// log("isZombie");
 				return false;				
