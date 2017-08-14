@@ -452,8 +452,12 @@
 		}
 		
 		function compileUpdate(events) {
-			// log("compileUpdate:");
+			if (trace.eternity) log("compileUpdate:");			
 			logGroup();
+			if (trace.eternity) {
+				log("events:");
+				log(events, 2);				
+			}
 			imageCausality.disableIncomingRelations(function () { // All incoming structures fully visible!
 				
 				// Temporary ids for two phase comit to database.
@@ -467,6 +471,9 @@
 
 				// Extract updates and creations to be done.
 				events.forEach(function(event) {
+					if (trace.eternity) {
+						log("events.forEach(function(event)) { ..."); 
+					}
 					if (!isMacroEvent(event)) {
 						let dbImage = event.object;
 						let imageId = dbImage.const.id;
@@ -499,6 +506,7 @@
 								let imageUpdates = pendingUpdate.imageUpdates[dbId];
 								
 								// Serialized value with temporary db ids. 
+								recursiveCounter = 0;
 								let newValue = convertReferencesToDbIdsOrTemporaryIds(event.newValue);
 								let property = event.property;
 								property = imageCausality.transformPossibleIdExpression(property, imageIdToDbIdOrTmpDbId);
@@ -513,8 +521,9 @@
 		}
 		
 		
+		let noneIsMacroEvent = false;
 		function isMacroEvent(event) {
-			return imageEventHasObjectValue(event) && !event.incomingStructureEvent;
+			return noneIsMacroEvent || imageEventHasObjectValue(event) && !event.incomingStructureEvent;
 		}
 		
 		
@@ -525,6 +534,7 @@
 	
 		// should disableIncomingRelations
 		function serializeDbImage(dbImage) {
+			
 			// imageCausality.disableIncomingRelations(function() {
 			// log(dbImage, 2);
 			// log(imageCausality.isObject(dbImage));
@@ -533,6 +543,7 @@
 				// TODO: convert idExpressions
 				if (property !== 'const') {
 					// && property != 'incoming'
+					recursiveCounter = 0;
 					let value = convertReferencesToDbIdsOrTemporaryIds(dbImage[property]);
 					property = imageCausality.transformPossibleIdExpression(property, imageIdToDbIdOrTmpDbId);
 					serialized[property] = value;
@@ -541,8 +552,18 @@
 			return serialized;			
 		}
 		
+		let recursiveCounter = 0;
 		
 		function convertReferencesToDbIdsOrTemporaryIds(entity) {
+			if (trace.eternity) {
+				if (recursiveCounter++ > 10) { 
+					log("LIMITING")
+					return "limit"; 
+				}
+				log("convertReferencesToDbIdsOrTemporaryIds");
+				// log(entity);				
+			}
+  			
 			// log("convertReferencesToDbIdsOrTemporaryIds: ");
 			// log();
 			if (imageCausality.isObject(entity)) {
@@ -1483,10 +1504,15 @@
 		
 		function oneStepCollection() {
 			log("oneStepCollection");
+			log(gcState);
+			noneIsMacroEvent = true;
 			imageCausality.pulse(function() {
-				log(gcState);
+				
 				// Reattatch 
 				if (!isEmptyList(gcState, pendingForChildReattatchment)) {
+					log("<<<<           >>>>>");
+					log("<<<< reattatch >>>>>");
+					log("<<<<           >>>>>");
 					let current = removeFirstFromList(gcState, pendingForChildReattatchment);
 					
 					for (let property in current) {
@@ -1505,6 +1531,9 @@
 				
 				// Move to next zone expansion
 				if (isEmptyList(gcState, unexpandedUnstableZone) && !isEmptyList(gcState, nextUnexpandedUnstableZone)) {
+					log("<<<<                                    >>>>>");
+					log("<<<< Move to nextUnexpandedUnstableZone >>>>>");
+					log("<<<<                                    >>>>>");
 					let first = getFirstOfList(gcState, nextUnexpandedUnstableZone);
 					let last = getLastOfList(gcState, nextUnexpandedUnstableZone);
 					detatchAllListElements(gcState, nextUnexpandedUnstableZone);
@@ -1514,6 +1543,9 @@
 				
 				// Expand unstable zone
 				if (!isEmptyList(gcState, unexpandedUnstableZone)) {
+					log("<<<<                        >>>>>");
+					log("<<<< expand unstable zone   >>>>>");
+					log("<<<<                        >>>>>");
 					let dbImage = removeFirstFromList(gcState, unexpandedUnstableZone);
 					let object = getObjectFromImage(dbImage);
 					// Consider: Will this cause an object pulse??? No... just reading starts no pulse...
@@ -1536,6 +1568,9 @@
 
 				// Iterate incoming, try to stabilize...
 				if(gcState.scanningIncomingFor === null && !isEmptyList(gcState, unstableZone)) {
+					log("<<<<                        >>>>>");
+					log("<<<< Iterate incoming       >>>>>");
+					log("<<<<                        >>>>>");
 					let currentImage = removeFirstFromList(gcState, unstableZone);
 					if (typeof(currentImage.incoming) !== 'undefined') {
 						gcState.scanningIncomingFor = currentImage;
@@ -1555,6 +1590,9 @@
 
 				// Scan incoming in progress, continue with it
 				if (gcState.scanningIncomingFor !== null) {
+					log("<<<<                        >>>>>");
+					log("<<<< Scan in progress...... >>>>>");
+					log("<<<<                        >>>>>");
 					
 					// Scan in chunk
 					if (gcState.currentIncomingStructureChunk !== null) {
@@ -1583,13 +1621,20 @@
 				
 				// Destroy those left in the destruction list. 
 				if (!isEmptyList(gcState, destructionZone)) {
+					log("<<<<                 >>>>>");
+					log("<<<< Destroy ......  >>>>>");
+					log("<<<<                 >>>>>");
+					
 					let toDestroy = getFirstOfList(gcState, destructionZone);
 					
 					// Make sure that object beeing destroyed is loaded.
 					objectCausality.pokeObject(toDestroy.const.correspondingObject);
 					
 					for(property in toDestroy) {
-						delete toDestroy[property]; 
+						// TODO: These should be macro events!!! 
+						noneIsMacroEvent = false; // Sort of... but this will not work as the assessment will be at the end of the pulse... 
+						delete toDestroy[property];
+						noneIsMacroEvent = true;						
 					}
 					addFirstToList(gcState, deallocationZone, toDestroy);
 					loadedObjects--;
@@ -1599,6 +1644,10 @@
 							
 				// Start a new zone.
 				if (gcState.pendingUnstableOriginFirst !== null) {
+					log("<<<<                        >>>>>");
+					log("<<<< Start new zone ......  >>>>>");
+					log("<<<<                        >>>>>");
+
 					// Start new unstable cycle.
 					let newUnstableZone = getFirstOfList(gcState, pendingUnstableOrigins);
 					addFirstToList(gcState, unstableZone, newUnstableZone);
@@ -1609,6 +1658,7 @@
 					return true;
 				}
 			});
+			noneIsMacroEvent = false;
 		}
 		
 		
@@ -1891,7 +1941,7 @@
 		}		
 		
 		/*-----------------------------------------------
-		 *           Setup object causality
+		 *           Setup image causality
 		 *-----------------------------------------------*/
 		 
 		// MongoDB
@@ -1943,6 +1993,9 @@
 		}
 
 
+		/*-----------------------------------------------
+		 *           Setup object causality
+		 *-----------------------------------------------*/
 		
 		// Primary causality object space
 		let objectCausalityConfiguration = {};
@@ -1970,6 +2023,7 @@
 		objectCausality.imageCausality = imageCausality;
 		objectCausality.instance = objectCausality;
 		objectCausality.collectAll = collectAll;
+		objectCausality.oneStepCollection = oneStepCollection;
 		// TODO: install this... 
 		objectCausality.addRemovedLastIncomingRelationCallback(function(dbImage) {
 			// log("incoming relations reaced zero...");
@@ -2000,6 +2054,7 @@
 			return true;
 			// TODO: Add and remove to activity list as we persist/unpersist this object....
 		});
+		let trace = objectCausality.trace;
 
 		
 		// Setup database

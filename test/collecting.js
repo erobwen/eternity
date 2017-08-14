@@ -20,23 +20,27 @@ describe("garbage-collection", function () {
 		persistent = eternity.persistent;
 	}
 	
-    // it('should garbage collect one thing', function () {
-		// let eternity = require('../eternity')({name: "collecting.js", maxNumberOfLoadedObjects : 200});  // Includes persistent root.
-		// let create = eternity.create;
-		// let persistent = eternity.persistent;
+    it('should garbage collect one thing', function () {
+		let eternity = require('../eternity')({name: "collecting.js", maxNumberOfLoadedObjects : 200});  // Includes persistent root.
+		let create = eternity.create;
+		let persistent = eternity.persistent;
 		
-		// let a = create({name: "a"});
-		// persistent.a = a;
+		let a = create({name: "a"});
+		persistent.a = a;
 
-		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);
 		
 		// log(a.const);
-		// assert.equal(typeof(a.const.dbImage) !== 'undefined', true);
+		assert.equal(typeof(a.const.dbImage) !== 'undefined', true);
 		
-		// // delete persistent.a;
-		// persistent.a = null;
+		// delete persistent.a;
+		persistent.a = null;
 		
-		// eternity.collectAll();
-		// assert.equal(typeof(a.const.dbImage) === 'undefined', true);
-	// });
+		log(eternity.mockMongoDB.getAllRecordsParsed(), 3);
+		log("-----------------------------------------------------");
+		eternity.trace.eternity = true;
+		// eternity.oneStepCollection();
+		eternity.collectAll();
+		delete eternity.trace.eternity;
+		assert.equal(typeof(a.const.dbImage) === 'undefined', true);
+	});
 });
