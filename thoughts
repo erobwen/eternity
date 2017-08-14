@@ -1,3 +1,16 @@
+TODO:
+
+* Shakedown of GC
+* Create an index class
+* Convert old Liquid
+* Store reactive primitives persistently
+	* Modify causality to use methods rather than functions
+	* Store observers persistently
+* Create a state object
+* Optimization of GC
+
+
+
 
 
 Thoughts:

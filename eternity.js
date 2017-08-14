@@ -41,8 +41,8 @@
 			objectCausality.freezeActivityList(function() {
 				// log(events, 3);
 				transferChangesToImage(events);
-			});	
-			// }
+			});
+			// }state
 			unloadAndKillObjects();
 			
 			// logUngroup();
@@ -1244,6 +1244,7 @@
 		}
 		
 		function isEmptyList(head, listType) {
+			// log()
 			return head[listType.first] === null;
 		}
 		
@@ -1414,8 +1415,9 @@
 			initializeList(gcState, deallocationZone);	
 		}
 		
-		function addUnstableOrigin(pendingUnstableOrigin) {
-			let pendingUnstableImage = pendingUnstableOrigin.const.dbImage;
+		function addUnstableOrigin(pendingUnstableImage) {
+			// log("addUnstableOrigin");
+			// log(pendingUnstableImage);
 			imageCausality.disableIncomingRelations(function() {
 				if (!inList(pendingUnstableOrigins, pendingUnstableImage)) {
 					addFirstToList(gcState, pendingUnstableOrigins, pendingUnstableImage);					
@@ -1480,7 +1482,9 @@
 		
 		
 		function oneStepCollection() {
+			log("oneStepCollection");
 			imageCausality.pulse(function() {
+				log(gcState);
 				// Reattatch 
 				if (!isEmptyList(gcState, pendingForChildReattatchment)) {
 					let current = removeFirstFromList(gcState, pendingForChildReattatchment);
@@ -1596,9 +1600,9 @@
 				// Start a new zone.
 				if (gcState.pendingUnstableOriginFirst !== null) {
 					// Start new unstable cycle.
-					let newUnstableZone = getFirstPendingUnstableObject();
-					addFirstToList(gcState, unstableZone, newUnstableZone.const.dbImage);
-					addFirstToList(gcState, unstable);
+					let newUnstableZone = getFirstOfList(gcState, pendingUnstableOrigins);
+					addFirstToList(gcState, unstableZone, newUnstableZone);
+					addFirstToList(gcState, nextUnexpandedUnstableZone, newUnstableZone);
 					return false;
 				} else {
 					// Finally! everything is done
@@ -1965,6 +1969,7 @@
 		objectCausality.createAction = createAction;
 		objectCausality.imageCausality = imageCausality;
 		objectCausality.instance = objectCausality;
+		objectCausality.collectAll = collectAll;
 		// TODO: install this... 
 		objectCausality.addRemovedLastIncomingRelationCallback(function(dbImage) {
 			// log("incoming relations reaced zero...");
