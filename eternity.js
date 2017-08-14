@@ -564,8 +564,8 @@
 				let converted = (entity instanceof Array) ? [] : {};
 				for (let property in entity) {
 					if (property !== 'const') {
-						property = imageCausality.transformPossibleIdExpression(property, imageIdToDbIdOrTmpDbId);
-						converted[property] = convertReferencesToDbIdsOrTemporaryIds(entity[property]);
+						transformedProperty = imageCausality.transformPossibleIdExpression(property, imageIdToDbIdOrTmpDbId);
+						converted[transformedProperty] = convertReferencesToDbIdsOrTemporaryIds(entity[property]);
 					}
 				}
 				return converted;
