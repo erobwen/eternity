@@ -521,9 +521,8 @@
 		}
 		
 		
-		let noneIsMacroEvent = false;
 		function isMacroEvent(event) {
-			return noneIsMacroEvent || imageEventHasObjectValue(event) && !event.incomingStructureEvent;
+			return imageEventHasObjectValue(event) && !event.incomingStructureEvent;
 		}
 		
 		
@@ -1288,7 +1287,7 @@
 			let first = listType.first;
 			let last = listType.last;
 			let next = listType.next;
-			let previous = listType.next;
+			let previous = listType.previous;
 
 			listElement[listType.memberTag] = true; 
 			
@@ -1306,10 +1305,12 @@
 		}
 		
 		function addFirstToList(head, listType, listElement) {
+			// if (trace.eternity) log("addFirstToList:");
+			// logGroup();
 			let first = listType.first;
 			let last = listType.last;
 			let next = listType.next;
-			let previous = listType.next;
+			let previous = listType.previous;
 			
 			listElement[listType.memberTag] = true; 
 			
@@ -1321,9 +1322,12 @@
 			} else {
 				head[first] = listElement;				
 				head[last] = listElement;				
+				// imageCausality.trace.basic = true;
 				listElement[previous] = null;
 				listElement[next] = null;
+				// imageCausality.trace.basic = false;
 			}
+			logUngroup();
 		}
 		
 		function getLastOfList(head, listType) {
@@ -1504,8 +1508,8 @@
 		
 		function oneStepCollection() {
 			log("oneStepCollection");
-			log(gcState);
-			noneIsMacroEvent = true;
+			logGroup();
+			imageCausality.state.useIncomingStructures = false;
 			imageCausality.pulse(function() {
 				
 				// Reattatch 
@@ -1632,9 +1636,9 @@
 					
 					for(property in toDestroy) {
 						// TODO: These should be macro events!!! 
-						noneIsMacroEvent = false; // Sort of... but this will not work as the assessment will be at the end of the pulse... 
+						imageCausality.state.useIncomingStructures = true;
 						delete toDestroy[property];
-						noneIsMacroEvent = true;						
+						imageCausality.state.useIncomingStructures = false;
 					}
 					addFirstToList(gcState, deallocationZone, toDestroy);
 					loadedObjects--;
@@ -1658,7 +1662,8 @@
 					return true;
 				}
 			});
-			noneIsMacroEvent = false;
+			logUngroup();
+			imageCausality.state.useIncomingStructures = true;
 		}
 		
 		
