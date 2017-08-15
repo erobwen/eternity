@@ -118,12 +118,13 @@
 							fillDbImageFromCorrespondingObject(newValue); 							
 						}
 						addFirstToList(gcState, pendingForChildReattatchment, referedDbImage);
+						
+						removeFromAllGcLists(referedDbImage);
 					} else {
 						// log("say what...");
 						// log(referedDbImage);
 						newValue = referedDbImage;
 					}
-					removeFromAllGcLists(referedDbImage);
 				} else {
 					createDbImageForObject(newValue, dbImage, property);					
 					newValue = newValue.const.dbImage;
@@ -1386,6 +1387,7 @@
 				delete listElement[next];
 				delete listElement[previous];				
 			} else {
+				// throw new Error("WTF");
 				log("not in list!");
 			}
 		}
@@ -1482,8 +1484,9 @@
 		}
 		
 		function removeFromAllGcLists(dbImage) {
-			removeFromList(gcState, pendingUnstableOrigins, dbImage);
 			removeFromList(gcState, pendingForChildReattatchment, dbImage);
+			
+			removeFromList(gcState, pendingUnstableOrigins, dbImage);
 			removeFromList(gcState, unstableZone, dbImage);
 			removeFromList(gcState, unexpandedUnstableZone, dbImage);
 			// removeFromList(gcState, nextUnexpandedUnstableZone, dbImage);
