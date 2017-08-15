@@ -50,7 +50,10 @@
 		
 		
 		function transferChangesToImage(events) {
-			// log("transferChangesToImage");
+			if (trace.eternity) {
+				log("transferChangesToImage");
+				logGroup();
+			}
 			if (events.length > 0) {
 				// log("... Model pulse complete, update image and flood create images & flood unstable ");
 				// log("events.length = " + events.length);
@@ -65,7 +68,7 @@
 						
 						// Catch togging of independently persistent
 						if (event.type === 'set') {
-							// log("set event");
+							if (trace.eternity) log("set event");
 							let object = event.object;
 
 							if (event.property === '_independentlyPersistent') {
@@ -80,16 +83,19 @@
 								}
 								
 							} else if (typeof(object.const.dbImage) !== 'undefined'){
+								if (trace.eternity) log("has a dbImage... transfer...");
 								let objectDbImage = object.const.dbImage;
 								
 								// Mark old value as unstable if another object with dbImage
 								let oldValue = event.oldValue;
 								if (objectCausality.isObject(oldValue)) {
 									if (typeof(oldValue.const.dbImage) !== 'undefined') {
+										if (trace.eternity) log("old value is object...");
 										let oldValueDbImage = oldValue.const.dbImage;
 										if (oldValueDbImage._eternityParent === objectDbImage 
 											&& oldValueDbImage._eternityParentProperty === event.property) {
 											
+											if (trace.eternity) log("add unstabe origin...");
 											addUnstableOrigin(oldValueDbImage);
 										}
 									}
@@ -105,6 +111,12 @@
 		}
 		
 		function setPropertyOfImage(dbImage, property, objectValue) {
+			if (trace.eternity) {
+				log("setPropertyOfImage: " + property + " = ...");
+				log(objectCausality.state);
+				log(imageCausality.state);
+			}
+			
 			if (objectCausality.isObject(objectValue)) {
 				let newValue = objectValue;
 				// Get existing or create new image. 
@@ -139,7 +151,12 @@
 					dbImage[property] = newValue; 
 				}
 			} else {
+				if (trace.eternity) log("wtf...");
+				logGroup();
+				imageCausality.trace.basic = true;
 				dbImage[property] = objectValue;
+				delete imageCausality.trace.basic;
+				logUngroup();
 			}
 		}
 
@@ -520,7 +537,7 @@
 					}
 				});								
 			});
-			// log(pendingUpdate, 3);
+			if(trace.eternity) log(pendingUpdate, 3);
 			logUngroup();
 		}
 		
