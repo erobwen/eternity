@@ -476,25 +476,28 @@
 						// log("events.forEach(function(event)) { ..."); 
 					}
 					if (!isMacroEvent(event)) {
-						let dbImage = event.object;
-						let imageId = dbImage.const.id;
-							
+							let dbImage = event.object;
+							let imageId = dbImage.const.id;
+								
 						if (event.type === 'creation') {
-							// Maintain image structure
-							for (let property in dbImage) {
-								increaseLoadedIncomingMacroReferenceCounters(dbImage, property);
+							if (typeof(dbImage.const.dbId) === 'undefined') {
+								// Maintain image structure
+								for (let property in dbImage) {
+									increaseLoadedIncomingMacroReferenceCounters(dbImage, property);
+								}
+								
+								// Serialized image creation, with temporary db ids. 
+								let tmpDbId = getTmpDbId(dbImage);
+								pendingUpdate.imageCreations[tmpDbId] = serializeDbImage(dbImage);
+								
+								// if (typeof(pendingUpdate.imageUpdates[imageId]) !== 'undefined') {
+									// // We will do a full write of this image, no need to update after.				
+									// delete pendingUpdate.imageUpdates[dbId];   // will never happen anymore?
+								// }
+							
 							}
-							
-							// Serialized image creation, with temporary db ids. 
-							let tmpDbId = getTmpDbId(dbImage);
-							pendingUpdate.imageCreations[tmpDbId] = serializeDbImage(dbImage);
-							
-							// if (typeof(pendingUpdate.imageUpdates[imageId]) !== 'undefined') {
-								// // We will do a full write of this image, no need to update after.				
-								// delete pendingUpdate.imageUpdates[dbId];   // will never happen anymore?
-							// }
 						} else if (event.type === 'set') {
-							if (typeof(dbImage.const.dbId) !== 'undefined') { // && typeof(pendingUpdate.imageCreations[imageId]) === 'undefined'
+							if (typeof(dbImage.const.dbId) !== 'undefined' && dbImage.const.dbId !== null) { // 
 								// Maintain image structure
 								increaseLoadedIncomingMacroReferenceCounters(dbImage, event.property);
 								// decreaseLoadedIncomingMacroReferenceCounters(dbImage, event.); // TODO: Decrease counters here?
@@ -517,7 +520,7 @@
 					}
 				});								
 			});
-			log(pendingUpdate, 3);
+			// log(pendingUpdate, 3);
 			logUngroup();
 		}
 		
@@ -649,7 +652,7 @@
 			}
 			
 			// Finish, clean up transaction
-			if (configuration.twoPhaseComit) mockMongoDB.updateRecord(updateDbId, {});
+			if (configuration.twoPhaseComit) mockMongoDB.updateRecord(updateDbId, { name: "updatePlaceholder" });
 			
 			// logUngroup();
 		}
@@ -747,14 +750,16 @@
 			// log("NOT HERESSSSS!");
 			// log("createImagePlaceholderFromDbId: " + dbId);
 			let placeholder;
-			let record = peekAtRecord(dbId);
-			placeholder = imageCausality.create(createTarget(record._eternityImageClass));
-			placeholder.const.isObjectImage = record._eternityIsObjectImage;
-			placeholder.const.loadedIncomingReferenceCount = 0;
-			placeholder.const.dbId = dbId;
-			placeholder.const.serializedMongoDbId = imageCausality.idExpression(dbId);
-			imageIdToImageMap[placeholder.const.id] = placeholder;
-			placeholder.const.initializer = imageFromDbIdInitializer;
+			imageCausality.pulse(function() { // Pulse here to make sure that dbId is set before post image pulse comence.
+				let record = peekAtRecord(dbId);
+				placeholder = imageCausality.create(createTarget(typeof(record._eternityImageClass) !== 'undefined' ? record._eternityImageClass : 'Object'));
+				placeholder.const.isObjectImage = typeof(record._eternityIsObjectImage) !== 'undefined' ? record._eternityIsObjectImage : false;
+				placeholder.const.loadedIncomingReferenceCount = 0;
+				placeholder.const.dbId = dbId;
+				placeholder.const.serializedMongoDbId = imageCausality.idExpression(dbId);
+				imageIdToImageMap[placeholder.const.id] = placeholder;
+				placeholder.const.initializer = imageFromDbIdInitializer;
+			});
 			return placeholder;
 		}
 		
@@ -1422,7 +1427,7 @@
 		let destructionZone = createListType("DestructionZone");
 		let deallocationZone = createListType("DeallocationZone");
 		
-		function initializeGcState() {			
+		function initializeGcState(gcState) {			
 			// Pending unstable origins
 			initializeList(gcState, pendingUnstableOrigins);
 			
@@ -1496,10 +1501,13 @@
 		
 		
 		function tryReconnectFromIncomingContents(contents) {
+			log("tryReconnectFromIncomingContents");
 			for(id in contents) {
 				if (!id.startsWith("_eternity")) {
 					let referer = contents[id];
-					if (typeof(referer._eternityParent) !== 'undefined') { // && !inList(destructionZone, referer) && !inList(unstableZone, referer)
+					log(referer.const.name);
+					if (typeof(referer._eternityParent) !== 'undefined' || referer === objectCausality.persistent.const.dbImage) { // && !inList(destructionZone, referer) && !inList(unstableZone, referer)
+						log("Connecting!!!!");
 						gcState.scanningIncomingFor._eternityParent = referer; // TODO: disable incoming relations
 						gcState.scanningIncomingFor._eternityParentProperty = gcState.currentIncomingStructureRoot.property;
 						addFirstToList(gcState, pendingForChildReattatchment, currentImage);
@@ -1599,12 +1607,17 @@
 						gcState.currentIncomingStructureChunk = null;
 						
 						if (tryReconnectFromIncomingContents(gcState.currentIncomingStructureRoot.contents)) {
+							gcState.scanningIncomingFor = null;
+							gcState.currentIncomingStructures = null;
+							gcState.currentIncomingStructureRoot = null;
+							gcState.currentIncomingStructureChunk = null;
 							return false;
 						}
 						
 						gcState.currentIncomingStructureChunk = gcState.currentIncomingStructureRoot.first;
 						return false;
 					}
+					return false;
 				}
 
 
@@ -1613,6 +1626,7 @@
 					log("<<<<                        >>>>>");
 					log("<<<< Scan in progress...... >>>>>");
 					log("<<<<                        >>>>>");
+					log(gcState.currentIncomingStructureChunk);
 					
 					// Scan in chunk
 					if (gcState.currentIncomingStructureChunk !== null) {
@@ -1645,7 +1659,7 @@
 					log("<<<< Destroy ......  >>>>>");
 					log("<<<<                 >>>>>");
 					
-					let toDestroy = removeFirstOfList(gcState, destructionZone);
+					let toDestroy = removeFirstFromList(gcState, destructionZone);
 					
 					// Make sure that object beeing destroyed is loaded.
 					objectCausality.pokeObject(toDestroy.const.correspondingObject);
@@ -1702,35 +1716,39 @@
 		function setupDatabase() {
 			// log("setupDatabase");
 			logGroup();
+			imageCausality.pulse(function() {					
 
-			// Clear peek at cache
-			peekedAtDbRecords = {};
-			
-			// if (typeof(objectCausality.persistent) === 'undefined') {
-			if (mockMongoDB.getRecordsCount() === 0) {
-				// log("setup from an empty database...");
+				// Clear peek at cache
+				peekedAtDbRecords = {};
 				
-				// Persistent root object
-				persistentDbId = mockMongoDB.saveNewRecord({ name : "persistent" });
+				// if (typeof(objectCausality.persistent) === 'undefined') {
+				if (mockMongoDB.getRecordsCount() === 0) {
+					// log("setup from an empty database...");
+					
+					// Persistent root object
+					persistentDbId = mockMongoDB.saveNewRecord({ name : "persistent" });
 
-				// Update placeholder
-				if (configuration.twoPhaseComit) updateDbId = mockMongoDB.saveNewRecord({ name: "updatePlaceholder" });
-				
-				// Garbage collection state.
-				collectionDbId = mockMongoDB.saveNewRecord({ name : "garbageCollection" });
-				gcState = createImagePlaceholderFromDbId(collectionDbId);
-				initializeGcState();
-			} else {
-				// Setup ids for basics.
-				let counter = 0;
-				persistentDbId = counter++;
-				if (configuration.twoPhaseComit) updateDbId = counter++;
-				collectionDbId = counter++;
-				
-				gcState = createImagePlaceholderFromDbId(collectionDbId);
-			}
-			objectCausality.persistent = createObjectPlaceholderFromDbId(persistentDbId);
-			
+					// Update placeholder
+					if (configuration.twoPhaseComit) updateDbId = mockMongoDB.saveNewRecord({ name: "updatePlaceholder" });
+					
+					// Garbage collection state.
+					collectionDbId = mockMongoDB.saveNewRecord({ name : "garbageCollection"});
+					trace.eternity = true;
+					gcState = createImagePlaceholderFromDbId(collectionDbId);
+					trace.eternity = false;
+					// throw new Error("foo");
+					initializeGcState(gcState);
+				} else {
+					// // Setup ids for basics.
+					// let counter = 0;
+					// persistentDbId = counter++;
+					// if (configuration.twoPhaseComit) updateDbId = counter++;
+					// collectionDbId = counter++;
+					
+					// gcState = createImagePlaceholderFromDbId(collectionDbId);
+				}
+				objectCausality.persistent = createObjectPlaceholderFromDbId(persistentDbId);
+			});
 			logUngroup();
 		}
 		

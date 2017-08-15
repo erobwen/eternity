@@ -20,32 +20,34 @@ describe("garbage-collection", function () {
 		persistent = eternity.persistent;
 	}
 	
-    it('should garbage collect one thing', function () {
-		let eternity = require('../eternity')({name: "collecting.js", maxNumberOfLoadedObjects : 200});  // Includes persistent root.
-		let create = eternity.create;
-		let persistent = eternity.persistent;
-		
-		let a = create({name: "a"});
-		persistent.a = a;
-
-		
-		// log(a.const);
-		assert.equal(typeof(a.const.dbImage) !== 'undefined', true);
-		
-		// delete persistent.a;
-		persistent.a = null;
-		
+    // it('should garbage collect one thing', function () {
+		// let eternity = require('../eternity')({name: "collecting.js", maxNumberOfLoadedObjects : 200});  // Includes persistent root.
+		// let create = eternity.create;
+		// let persistent = eternity.persistent;
 		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);
-		log("=======================================================");
-		eternity.trace.eternity = true;
-		eternity.oneStepCollection();
-		log("-------------------------------------------------------");
-		eternity.oneStepCollection();
-		log("-------------------------------------------------------");
-		eternity.oneStepCollection();
-		log("-------------------------------------------------------");
-		eternity.collectAll();
-		delete eternity.trace.eternity;
-		assert.equal(typeof(a.const.dbImage) === 'undefined', true);
-	});
+		// return;
+		
+		// let a = create({name: "a"});
+		// persistent.a = a;
+
+		// // log(a.const);
+		// assert.equal(typeof(a.const.dbImage) !== 'undefined', true);
+		
+		// // delete persistent.a;
+		// log(a.const.incoming);
+		// persistent.a = null;
+		// return;
+		
+		// log("=======================================================");
+		// eternity.trace.eternity = true;
+		// eternity.oneStepCollection();
+		// log("-------------------------------------------------------");
+		// eternity.oneStepCollection();
+		// log("-------------------------------------------------------");
+		// eternity.oneStepCollection();
+		// log("-------------------------------------------------------");
+		// eternity.collectAll();
+		// delete eternity.trace.eternity;
+		// assert.equal(typeof(a.const.dbImage) === 'undefined', true);
+	// });
 });
