@@ -1549,6 +1549,7 @@
 				initializer : initializer,
 				causalityInstance : causalityInstance,
 				id: id,
+				name: createdTarget.name,
 				cacheId : cacheId,
 				forwardsTo : null,
 				target: createdTarget,

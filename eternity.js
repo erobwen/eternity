@@ -455,8 +455,8 @@
 			if (trace.eternity) log("compileUpdate:");			
 			logGroup();
 			if (trace.eternity) {
-				log("events:");
-				log(events, 2);				
+				// log("events:");
+				// log(events, 2);				
 			}
 			imageCausality.disableIncomingRelations(function () { // All incoming structures fully visible!
 				
@@ -472,7 +472,7 @@
 				// Extract updates and creations to be done.
 				events.forEach(function(event) {
 					if (trace.eternity) {
-						log("events.forEach(function(event)) { ..."); 
+						// log("events.forEach(function(event)) { ..."); 
 					}
 					if (!isMacroEvent(event)) {
 						let dbImage = event.object;
@@ -506,7 +506,7 @@
 								let imageUpdates = pendingUpdate.imageUpdates[dbId];
 								
 								// Serialized value with temporary db ids. 
-								recursiveCounter = 0;
+								// recursiveCounter = 0;
 								let newValue = convertReferencesToDbIdsOrTemporaryIds(event.newValue);
 								let property = event.property;
 								property = imageCausality.transformPossibleIdExpression(property, imageIdToDbIdOrTmpDbId);
@@ -516,7 +516,7 @@
 					}
 				});								
 			});
-			// log(pendingUpdate, 3);
+			log(pendingUpdate, 3);
 			logUngroup();
 		}
 		
@@ -542,7 +542,7 @@
 				// TODO: convert idExpressions
 				if (property !== 'const') {
 					// && property != 'incoming'
-					recursiveCounter = 0;
+					// recursiveCounter = 0;
 					let value = convertReferencesToDbIdsOrTemporaryIds(dbImage[property]);
 					property = imageCausality.transformPossibleIdExpression(property, imageIdToDbIdOrTmpDbId);
 					serialized[property] = value;
@@ -551,15 +551,15 @@
 			return serialized;			
 		}
 		
-		let recursiveCounter = 0;
+		// let recursiveCounter = 0;
 		
 		function convertReferencesToDbIdsOrTemporaryIds(entity) {
 			if (trace.eternity) {
-				if (recursiveCounter++ > 10) { 
-					log("LIMITING")
-					return "limit"; 
-				}
-				log("convertReferencesToDbIdsOrTemporaryIds");
+				// if (recursiveCounter++ > 10) { 
+					// log("LIMITING")
+					// return "limit"; 
+				// }
+				// log("convertReferencesToDbIdsOrTemporaryIds");
 				// log(entity);				
 			}
   			
@@ -1246,20 +1246,22 @@
 		 *          Double Linked list helper
 		 *-----------------------------------------------*/
 		
-		function createListType(name, linkName) {
-			if (typeof(linkName) === 'undefined') linkName = name;
-			
-			let eternityTag = "_eternity";
+		let eternityTag = "_eternity";
+		
+		function createListType(name) {
 			return {
-				memberTag : eternityTag + "IsMemberOf" + linkName,
 				first : eternityTag + "FirstOf" + name, 
 				last : eternityTag + "LastOf" + name, 
-				next : eternityTag + linkName + "Next", 
-				previous : eternityTag + linkName + "Previous"	
+				
+				memberTag : eternityTag + name + "Member",
+				next : eternityTag + name + "Next", 
+				previous : eternityTag + name + "Previous"	
 			};
 		}
 		
 		function inList(listType, listElement) {
+			// log("inList");
+			// log(listType.memberTag);
 			return typeof(listElement[listType.memberTag]) !== 'undefined' && listElement[listType.memberTag] === true;
 		}
 		
@@ -1268,15 +1270,15 @@
 			return head[listType.first] === null;
 		}
 		
-		function detatchAllListElements(head, listType) {
-			head[listType.first] = null;
-			head[listType.last] = null;			
-		}
+		// function detatchAllListElements(head, listType) {
+			// head[listType.first] = null;
+			// head[listType.last] = null;			
+		// }
 		
-		function replaceEntireList(head, listType, firstElement, lastElement) {
-			head[listType.first] === firstElement;
-			head[listType.last] === lastElement;
-		}
+		// function replaceEntireList(head, listType, firstElement, lastElement) {
+			// head[listType.first] === firstElement;
+			// head[listType.last] === lastElement;
+		// }
 		
 		function initializeList(head, listType) {
 			head[listType.first] = null;
@@ -1327,7 +1329,7 @@
 				listElement[next] = null;
 				// imageCausality.trace.basic = false;
 			}
-			logUngroup();
+			// logUngroup();
 		}
 		
 		function getLastOfList(head, listType) {
@@ -1340,23 +1342,19 @@
 		
 		function removeLastFromList(head, listType) {
 			let lastElement = head[listType.last];
-			
-			delete lastElement[listType.memberTag]; 
 			removeFromList(head, listType, lastElement);
-			
 			return lastElement;
 		}
 
 		function removeFirstFromList(head, listType) {
 			let firstElement = head[listType.first];
-			
-			delete firstElement[listType.memberTag]; 
 			removeFromList(head, listType, firstElement);
-			
 			return firstElement;
 		}
 		
 		function removeFromList(head, listType, listElement) {
+			// log("removeFromList");
+			// log(listType);
 			if (inList(listType, listElement)) {
 				// log("removeFromList");
 				// log(listType);
@@ -1364,7 +1362,7 @@
 				let first = listType.first;
 				let last = listType.last;
 				let next = listType.next;
-				let previous = listType.next;
+				let previous = listType.previous;
 				
 				delete listElement[listType.memberTag]; 
 				
@@ -1384,8 +1382,11 @@
 					head[first] = listElement[next];
 				}
 				
+				delete listElement[listType.memberTag];
 				delete listElement[next];
 				delete listElement[previous];				
+			} else {
+				log("not in list!");
 			}
 		}
 		
@@ -1411,8 +1412,9 @@
 		
 		// Unstable zone
 		let unstableZone = createListType("UnstableZone");
-		let unexpandedUnstableZone = createListType("UnexpandedUnstableZone", "UnstableUnexpandedZone");
-		let nextUnexpandedUnstableZone = createListType("NextUnexpandedUnstableZone", "UnstableUnexpandedZone");
+		let unexpandedUnstableZone = createListType("UnexpandedUnstableZone");
+		// let unexpandedUnstableZone = createListType("UnexpandedUnstableZone", "UnstableUnexpandedZone");
+		// let nextUnexpandedUnstableZone = createListType("NextUnexpandedUnstableZone", "UnstableUnexpandedZone");
 	
 		// Destruction zone
 		let destructionZone = createListType("DestructionZone");
@@ -1425,7 +1427,7 @@
 			// Unstable zone
 			initializeList(gcState, unstableZone);
 			initializeList(gcState, unexpandedUnstableZone);
-			initializeList(gcState, nextUnexpandedUnstableZone);
+			// initializeList(gcState, nextUnexpandedUnstableZone);
 
 			// Incoming iteration
 			gcState.scanningIncomingFor = null;
@@ -1451,10 +1453,16 @@
 		}
 		
 		
-		function getFirstPendingUnstableObject() {
-			let firstImage = removeFirstFromList(gcState, pendingUnstableOrigins);			
-			return getObjectFromImage(firstImage);
-		}
+		// function getFirstPendingUnstableObject() {
+			// let firstImage = removeFirstFromList(gcState, pendingUnstableOrigins);	
+			// // if (inList(gcState, pendingUnstableOrigins, firstImage)) {
+			// // }
+			// log("Here");
+			// log(inList(gcState, pendingUnstableOrigins, firstImage));
+			// log(firstImage);
+			// throw new Error("fuck!");
+			// return getObjectFromImage(firstImage);
+		// }
 		
 		function collectAll() {
 			while(!oneStepCollection()) {}
@@ -1478,7 +1486,7 @@
 			removeFromList(gcState, pendingForChildReattatchment, dbImage);
 			removeFromList(gcState, unstableZone, dbImage);
 			removeFromList(gcState, unexpandedUnstableZone, dbImage);
-			removeFromList(gcState, nextUnexpandedUnstableZone, dbImage);
+			// removeFromList(gcState, nextUnexpandedUnstableZone, dbImage);
 			removeFromList(gcState, destructionZone, dbImage);
 			removeFromList(gcState, deallocationZone, dbImage);
 		}
@@ -1533,17 +1541,17 @@
 					return false;
 				}
 				
-				// Move to next zone expansion
-				if (isEmptyList(gcState, unexpandedUnstableZone) && !isEmptyList(gcState, nextUnexpandedUnstableZone)) {
-					log("<<<<                                    >>>>>");
-					log("<<<< Move to nextUnexpandedUnstableZone >>>>>");
-					log("<<<<                                    >>>>>");
-					let first = getFirstOfList(gcState, nextUnexpandedUnstableZone);
-					let last = getLastOfList(gcState, nextUnexpandedUnstableZone);
-					detatchAllListElements(gcState, nextUnexpandedUnstableZone);
-					replaceEntireList(gcState, unexpandedUnstableZone, first, last);
-					return false;
-				}
+				// // Move to next zone expansion
+				// if (isEmptyList(gcState, unexpandedUnstableZone) && !isEmptyList(gcState, nextUnexpandedUnstableZone)) {
+					// log("<<<<                                    >>>>>");
+					// log("<<<< Move to nextUnexpandedUnstableZone >>>>>");
+					// log("<<<<                                    >>>>>");
+					// let first = getFirstOfList(gcState, nextUnexpandedUnstableZone);
+					// let last = getLastOfList(gcState, nextUnexpandedUnstableZone);
+					// detatchAllListElements(gcState, nextUnexpandedUnstableZone);
+					// replaceEntireList(gcState, unexpandedUnstableZone, first, last);
+					// return false;
+				// }
 				
 				// Expand unstable zone
 				if (!isEmptyList(gcState, unexpandedUnstableZone)) {
@@ -1551,17 +1559,22 @@
 					log("<<<< expand unstable zone   >>>>>");
 					log("<<<<                        >>>>>");
 					let dbImage = removeFirstFromList(gcState, unexpandedUnstableZone);
-					let object = getObjectFromImage(dbImage);
+					// log(dbImage.const.name);
+					// dbImage = removeFirstFromList(gcState, unexpandedUnstableZone);
+					// log(dbImage.const.name);
+					// log(dbImage);
 					// Consider: Will this cause an object pulse??? No... just reading starts no pulse...
-					for (let property in object) {
-						let value = object[property];
-						if (objectCausality.isObject(value)) {
-							let referedImage = value.const.dbImage;
-							if (referedImage._eternityParent === dbImage && property === referedImage._eternityParentProperty) {
-								addLastToList(gcState, nextUnexpandedUnstableZone, referedImage);
-								addLastToList(gcState, unstableZone, referedImage);
-								delete dbImage._eternityParent; // This signifies that an image (if connected to an object), is unstable. If set to > 0, it means it is a root.
-								delete dbImage._eternityParentProperty;
+					for (let property in dbImage) {
+						if (!property.startsWith(eternityTag)) {							
+							let value = dbImage[property];
+							if (objectCausality.isObject(value)) {
+								let referedImage = value.const.dbImage;
+								if (referedImage._eternityParent === dbImage && property === referedImage._eternityParentProperty) {
+									addLastToList(gcState, unexpandedUnstableZone, referedImage);
+									addLastToList(gcState, unstableZone, referedImage);
+									delete dbImage._eternityParent; // This signifies that an image (if connected to an object), is unstable. If set to > 0, it means it is a root.
+									delete dbImage._eternityParentProperty;
+								}
 							}
 						}
 					}
@@ -1612,7 +1625,7 @@
 					if (gcState.currentIncomingStructureRoot !== null) {
 						gcState.currentIncomingStructureRoot = gcState.currentIncomingStructureRoot.next;
 						if(gcState.currentIncomingStructureRoot === null) {
-							addLastToList(destructionZone, gcState.scanningIncomingFor);
+							addLastToList(gcState, destructionZone, gcState.scanningIncomingFor);
 						} else {
 							if (tryReconnectFromIncomingContents(gcState.currentIncomingStructureRoot.contents)) {
 								return false;
@@ -1629,7 +1642,7 @@
 					log("<<<< Destroy ......  >>>>>");
 					log("<<<<                 >>>>>");
 					
-					let toDestroy = getFirstOfList(gcState, destructionZone);
+					let toDestroy = removeFirstOfList(gcState, destructionZone);
 					
 					// Make sure that object beeing destroyed is loaded.
 					objectCausality.pokeObject(toDestroy.const.correspondingObject);
@@ -1653,9 +1666,17 @@
 					log("<<<<                        >>>>>");
 
 					// Start new unstable cycle.
-					let newUnstableZone = getFirstOfList(gcState, pendingUnstableOrigins);
+					let newUnstableZone = removeFirstFromList(gcState, pendingUnstableOrigins);
+					
+					// log(inList(pendingUnstableOrigins, newUnstableZone));
+					// log(newUnstableZone);
+					// delete newUnstableZone['_eternityPendingUnstableOriginPrevious'];
+					// log(newUnstableZone);
+					// throw new Error("fuck!");
+					
 					addFirstToList(gcState, unstableZone, newUnstableZone);
-					addFirstToList(gcState, nextUnexpandedUnstableZone, newUnstableZone);
+					addFirstToList(gcState, unexpandedUnstableZone, newUnstableZone);
+					gcState.unstableZoneDepth = 1;
 					return false;
 				} else {
 					// Finally! everything is done
