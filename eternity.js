@@ -75,8 +75,7 @@
 								if (trace.eternity) log("set event");
 								markOldValueAsUnstable(dbImage, event);
 									
-								// Potentially flood create new images
-								setPropertyOfImage(dbImage, event.property, event.newValue);
+								setPropertyOfImageAndFloodCreateNewImages(dbImage, event.property, event.newValue);
 							} else if (event.type === 'delete') {
 								markOldValueAsUnstable(dbImage, event);
 																
@@ -104,7 +103,7 @@
 			}
 		}
 		
-		function setPropertyOfImage(dbImage, property, objectValue) {
+		function setPropertyOfImageAndFloodCreateNewImages(dbImage, property, objectValue) {
 			if (trace.eternity) {
 				log("setPropertyOfImage: " + property + " = ...");
 				log(objectCausality.state);
@@ -214,7 +213,7 @@
 		function fillDbImageFromCorrespondingObject(object) {
 			let dbImage = object.const.dbImage;
 			for (let property in object) { 
-				setPropertyOfImage(dbImage, property, object[property]);
+				setPropertyOfImageAndFloodCreateNewImages(dbImage, property, object[property]);
 			}			
 			loadedObjects++;
 			// log("fillDbImageFromCorrespondingObject, and poking...");
@@ -467,8 +466,9 @@
 			if (trace.eternity) log("compileUpdate:");			
 			logGroup();
 			if (trace.eternity) {
-				// log("events:");
-				// log(events, 2);				
+				// if (trace.eternity) log(events);
+				log("events:");
+				log(events, 2);				
 			}
 			imageCausality.disableIncomingRelations(function () { // All incoming structures fully visible!
 				
@@ -487,9 +487,9 @@
 						// log("events.forEach(function(event)) { ..."); 
 					}
 					if (!isMacroEvent(event)) {
-							let dbImage = event.object;
-							let imageId = dbImage.const.id;
-								
+						let dbImage = event.object;
+						let imageId = dbImage.const.id;
+							
 						if (event.type === 'creation') {
 							if (typeof(dbImage.const.dbId) === 'undefined') {
 								// Maintain image structure
@@ -511,7 +511,7 @@
 							if (typeof(dbImage.const.dbId) !== 'undefined' && dbImage.const.dbId !== null) { // 
 								// Maintain image structure
 								increaseLoadedIncomingMacroReferenceCounters(dbImage, event.property);
-								// decreaseLoadedIncomingMacroReferenceCounters(dbImage, event.); // TODO: Decrease counters here?
+								// decreaseLoadedIncomingMacroReferenceCounters(dbImage, event.); // TODO: Decrease counters here? Get the previousIncomingStructure... 
 								
 								// Only update if we will not do a full write on this image. 
 								let dbId = dbImage.const.dbId;
@@ -526,8 +526,33 @@
 								let property = event.property;
 								property = imageCausality.transformPossibleIdExpression(property, imageIdToDbIdOrTmpDbId);
 								imageUpdates[event.property] = newValue;
+								if (typeof(imageUpdates["_eternityDeletedKeys"]) !== 'undefined') {
+									delete imageUpdates["_eternityDeletedKeys"][event.property];
+								} 
 							}
-						}				
+						} else if (event.type === 'delete') {
+							if (typeof(dbImage.const.dbId) !== 'undefined' && dbImage.const.dbId !== null) { // 
+								// Maintain image structure
+								// decreaseLoadedIncomingMacroReferenceCounters(dbImage, event.); // TODO: Decrease counters here?
+								
+								// Only update if we will not do a full write on this image. 
+								let dbId = dbImage.const.dbId;
+								if (typeof(pendingUpdate.imageUpdates[dbId]) === 'undefined') {
+									pendingUpdate.imageUpdates[dbId] = {};
+								}
+								if (typeof(pendingUpdate.imageUpdates[dbId]["_eternityDeletedKeys"]) === 'undefined') {
+									pendingUpdate.imageUpdates[dbId]["_eternityDeletedKeys"] = {};
+								}
+								let imageUpdates = pendingUpdate.imageUpdates[dbId];
+								let deletedKeys = imageUpdates["_eternityDeletedKeys"];
+								
+								// Serialized value with temporary db ids. 
+								let property = event.property;
+								property = imageCausality.transformPossibleIdExpression(property, imageIdToDbIdOrTmpDbId);
+								deletedKeys[property] = true;
+								delete imageUpdates[event.property];
+							}
+						}		
 					}
 				});								
 			});
@@ -641,12 +666,20 @@
 			for (let id in pendingUpdate.imageUpdates) {
 				// log("update dbImage id:" + id + " keys: " + Object.keys(pendingImageUpdates[id]));
 				let updates = pendingUpdate.imageUpdates[id];
-				let updatesWithoutDbIds = replaceTmpDbIdsWithDbIds(updates);
-				for (let property in updatesWithoutDbIds) {
-					let value = updatesWithoutDbIds[property];
-					// value = replaceTmpDbIdsWithDbIds(value);
-					// property = imageCausality.transformPossibleIdExpression(property, convertTmpDbIdToDbId);
-					mockMongoDB.updateRecordPath(id, [property], value);
+				let updatesWithoutTmpDbIds = replaceTmpDbIdsWithDbIds(updates);
+				for (let property in updatesWithoutTmpDbIds) {
+					if (property !== "_eternityDeletedKeys") {
+						let value = updatesWithoutTmpDbIds[property];
+						// value = replaceTmpDbIdsWithDbIds(value);
+						// property = imageCausality.transformPossibleIdExpression(property, convertTmpDbIdToDbId);
+						mockMongoDB.updateRecordPath(id, [property], value);						
+					}
+				}
+				
+				if (typeof(updatesWithoutTmpDbIds["_eternityDeletedKeys"]) !== 'undefined') {
+					for (let deletedProperty in updatesWithoutTmpDbIds["_eternityDeletedKeys"]) {						
+						mockMongoDB.deleteRecordPath(id, [deletedProperty]);
+					}
 				}
 			}
 
@@ -711,7 +744,9 @@
 				let newObject = (entity instanceof Array) ? [] : {};
 				// TODO: what about the property? 
 				for (let property in entity) {
-					newObject[propertyConverter(property)] = replaceRecursivley(entity[property], pattern, replacer, propertyConverter); 
+					if (!property.startsWith("_eternityDeletedKeys")) { // Hack! add a property filter as well?
+						newObject[propertyConverter(property)] = replaceRecursivley(entity[property], pattern, replacer, propertyConverter); 						
+					}
 				}
 				return newObject;
 			} else {
