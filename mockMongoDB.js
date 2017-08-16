@@ -91,6 +91,20 @@
 			dataRecords[id] = JSON.stringify(record);
 		}
 		
+		function deleteRecordPath(id, path, value) {
+			// log("updateRecordPath: {id:" + id + "}." + path.join(".") + " = " + value);
+			let record = getRecord(id);
+			let property = path[path.length - 1];
+			let index = 0;
+			let target = record;
+			while(index < path.length - 1) {
+				target = target[path[index]];
+				index++;
+			}
+			delete target[property];
+			dataRecords[id] = JSON.stringify(record);
+		}
+		
 		function getRecord(id) {
 			// console.log(dataRecords[id])
 			return JSON.parse(dataRecords[id]);
@@ -112,6 +126,7 @@
 			saveNewRecord : saveNewRecord,
 			updateRecord : updateRecord,
 			updateRecordPath : updateRecordPath,
+			deleteRecordPath : deleteRecordPath,
 			getRecord : getRecord,
 			deleteRecord : deleteRecord,
 			getAllRecordsParsed : getAllRecordsParsed,

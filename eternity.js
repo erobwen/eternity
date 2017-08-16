@@ -556,7 +556,7 @@
 					}
 				});								
 			});
-			if(trace.eternity) log(pendingUpdate, 3);
+			if(trace.eternity) log(pendingUpdate, 4);
 			logUngroup();
 		}
 		
@@ -662,11 +662,12 @@
 			}
 			
 			// TODO: Update entire record if the number of updates are more than half of fields.
-			// log("pendingImageUpdates:" + Object.keys(pendingImageUpdates).length);
+			if(trace.eternity) log("pendingUpdate.imageUpdates:" + Object.keys(pendingUpdate.imageUpdates).length);
 			for (let id in pendingUpdate.imageUpdates) {
 				// log("update dbImage id:" + id + " keys: " + Object.keys(pendingImageUpdates[id]));
 				let updates = pendingUpdate.imageUpdates[id];
 				let updatesWithoutTmpDbIds = replaceTmpDbIdsWithDbIds(updates);
+				if(trace.eternity) log(updatesWithoutTmpDbIds);
 				for (let property in updatesWithoutTmpDbIds) {
 					if (property !== "_eternityDeletedKeys") {
 						let value = updatesWithoutTmpDbIds[property];
@@ -742,11 +743,8 @@
 			} else if (typeof(entity) === 'object') {
 				if (entity === null) return null;
 				let newObject = (entity instanceof Array) ? [] : {};
-				// TODO: what about the property? 
 				for (let property in entity) {
-					if (!property.startsWith("_eternityDeletedKeys")) { // Hack! add a property filter as well?
-						newObject[propertyConverter(property)] = replaceRecursivley(entity[property], pattern, replacer, propertyConverter); 						
-					}
+					newObject[propertyConverter(property)] = replaceRecursivley(entity[property], pattern, replacer, propertyConverter); 						
 				}
 				return newObject;
 			} else {
