@@ -67,46 +67,40 @@
 						// log("event: " + event.type + " " + event.property);
 						
 						// Catch togging of independently persistent
-						if (event.type === 'set') {
-							if (trace.eternity) log("set event");
-							let object = event.object;
+						if (typeof(event.object.const.dbImage) !== 'undefined') {
+							let dbImage = event.object.const.dbImage;
+							if (trace.eternity) log("has a dbImage... transfer event...");
 
-							if (event.property === '_independentlyPersistent') {
-								
-								// Setting of independently persistent
-								if (event.newValue && typeof(object.const.dbImage) === 'undefined') {
-									// Object had no image, flood-create new images.
-									createDbImageForObject(object, null, null);
-								} else if (!event.newValue) {
-									// Had an image that becomes unstable
-									addUnstableOrigin(event.object.const.dbImage);
-								}
-								
-							} else if (typeof(object.const.dbImage) !== 'undefined'){
-								if (trace.eternity) log("has a dbImage... transfer...");
-								let objectDbImage = object.const.dbImage;
-								
-								// Mark old value as unstable if another object with dbImage
-								let oldValue = event.oldValue;
-								if (objectCausality.isObject(oldValue)) {
-									if (typeof(oldValue.const.dbImage) !== 'undefined') {
-										if (trace.eternity) log("old value is object...");
-										let oldValueDbImage = oldValue.const.dbImage;
-										if (oldValueDbImage._eternityParent === objectDbImage 
-											&& oldValueDbImage._eternityParentProperty === event.property) {
-											
-											if (trace.eternity) log("add unstabe origin...");
-											addUnstableOrigin(oldValueDbImage);
-										}
-									}
-								}
+							if (event.type === 'set') {
+								if (trace.eternity) log("set event");
+								markOldValueAsUnstable(dbImage, event);
 									
-								// Flood create new images
-								setPropertyOfImage(objectDbImage, event.property, event.newValue);
+								// Potentially flood create new images
+								setPropertyOfImage(dbImage, event.property, event.newValue);
+							} else if (event.type === 'delete') {
+								markOldValueAsUnstable(dbImage, event);
+																
+								delete dbImage[event.property];
 							}
 						}
 					});
 				});
+			}
+		}
+		
+		function markOldValueAsUnstable(dbImage, event) {
+			let oldValue = event.oldValue;
+			if (objectCausality.isObject(oldValue)) {
+				if (typeof(oldValue.const.dbImage) !== 'undefined') {
+					if (trace.eternity) log("old value is object...");
+					let oldValueDbImage = oldValue.const.dbImage;
+					if (oldValueDbImage._eternityParent === dbImage 
+						&& oldValueDbImage._eternityParentProperty === event.property) {
+						
+						if (trace.eternity) log("add unstabe origin...");
+						addUnstableOrigin(oldValueDbImage);
+					}
+				}
 			}
 		}
 		
@@ -153,7 +147,7 @@
 			} else {
 				if (trace.eternity) log("wtf...");
 				logGroup();
-				imageCausality.trace.basic = true;
+				// imageCausality.trace.basic = true;
 				dbImage[property] = objectValue;
 				delete imageCausality.trace.basic;
 				logUngroup();
