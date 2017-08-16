@@ -34,23 +34,29 @@ describe("garbage-collection", function () {
 		
 		// eternity.forAllPersistentIncomingNow(a, "a", function(object) { log("here!");log(object);});
 		// eternity.trace.basic = true;
-		// eternity.trace.eternity = true;
 		persistent.a = null;
 		// eternity.trace.basic = false;
-		// eternity.trace.eternity = false;
 		// delete persistent.a;
 		// eternity.forAllPersistentIncomingNow(a, "a", function(object) { log("here2!");log(object);});
 		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);
-		return;
-		log("=======================================================");
+		// log("=======================================================");
 		eternity.oneStepCollection();
-		log("-------------------------------------------------------");
+		// log("-------------------------------------------------------");
 		eternity.oneStepCollection();
-		log("-------------------------------------------------------");
+		// log("-------------------------------------------------------");
 		eternity.oneStepCollection();
-		log("-------------------------------------------------------");
-		return;
-		eternity.collectAll();
+		// log("-------------------------------------------------------");
+		// eternity.trace.eternity = true;
+		eternity.oneStepCollection();
+		// eternity.trace.eternity = false;
+		// log("-------------------------------------------------------");
+		eternity.oneStepCollection();		
+		// log("-------------------------------------------------------");
+		eternity.oneStepCollection();
+		// return;
+		// log("-------------------------------------------------------");
+		// log(a.const.dbImage);
+		// eternity.collectAll();
 		assert.equal(typeof(a.const.dbImage) === 'undefined', true);
 		
 		eternity.trace.eternity = true;

@@ -1449,7 +1449,11 @@
 		
 		function deallocateInDatabase(dbImage) {
 			mockMongoDB.deallocate(dbImage.const.dbId);
+			delete dbImage.const.correspondingObject.const.dbImage;
+			delete dbImage.const.correspondingObject.const.dbId;
+			delete dbImage.const.correspondingObject;
 			delete dbImage.const.dbId;
+			delete dbImage.const.tmpDbId;
 		}
 		
 		// Main state-holder image
@@ -1482,9 +1486,10 @@
 
 			// Incoming iteration
 			gcState.scanningIncomingFor = null;
-			gcState.currentIncomingStructure = null;
-			gcState.currentIncomingChunk = null;
-
+			gcState.currentIncomingStructures = null;
+			gcState.currentIncomingStructureRoot = null;
+			gcState.currentIncomingStructureChunk = null;
+						
 			// Reattatching
 			initializeList(gcState, pendingForChildReattatchment);
 			
@@ -1545,7 +1550,7 @@
 		
 		
 		function tryReconnectFromIncomingContents(contents) {
-			log("tryReconnectFromIncomingContents");
+			// log("tryReconnectFromIncomingContents");
 			for(id in contents) {
 				if (!id.startsWith("_eternity")) {
 					let referer = contents[id];
@@ -1570,16 +1575,19 @@
 		
 		
 		function oneStepCollection() {
-			log("oneStepCollection");
+			// log("oneStepCollection");
 			logGroup();
+			if (trace.eternity) {
+				// log(gcState, 3);
+			}
 			imageCausality.state.useIncomingStructures = false;
 			imageCausality.pulse(function() {
 				
 				// Reattatch 
 				if (!isEmptyList(gcState, pendingForChildReattatchment)) {
-					log("<<<<           >>>>>");
-					log("<<<< reattatch >>>>>");
-					log("<<<<           >>>>>");
+					// log("<<<<           >>>>>");
+					// log("<<<< reattatch >>>>>");
+					// log("<<<<           >>>>>");
 					let current = removeFirstFromList(gcState, pendingForChildReattatchment);
 					
 					for (let property in current) {
@@ -1610,9 +1618,9 @@
 				
 				// Expand unstable zone
 				if (!isEmptyList(gcState, unexpandedUnstableZone)) {
-					log("<<<<                        >>>>>");
-					log("<<<< expand unstable zone   >>>>>");
-					log("<<<<                        >>>>>");
+					// log("<<<<                        >>>>>");
+					// log("<<<< expand unstable zone   >>>>>");
+					// log("<<<<                        >>>>>");
 					let dbImage = removeFirstFromList(gcState, unexpandedUnstableZone);
 					// log(dbImage.const.name);
 					// dbImage = removeFirstFromList(gcState, unexpandedUnstableZone);
@@ -1640,9 +1648,9 @@
 
 				// Iterate incoming, try to stabilize...
 				if(gcState.scanningIncomingFor === null && !isEmptyList(gcState, unstableZone)) {
-					log("<<<<                        >>>>>");
-					log("<<<< Iterate incoming       >>>>>");
-					log("<<<<                        >>>>>");
+					// log("<<<<                        >>>>>");
+					// log("<<<< Iterate incoming       >>>>>");
+					// log("<<<<                        >>>>>");
 					let currentImage = removeFirstFromList(gcState, unstableZone);
 					if (typeof(currentImage.incoming) !== 'undefined') {
 						gcState.scanningIncomingFor = currentImage;
@@ -1651,6 +1659,7 @@
 						gcState.currentIncomingStructureChunk = null;
 						
 						if (tryReconnectFromIncomingContents(gcState.currentIncomingStructureRoot.contents)) {
+							// Reconnected with root
 							gcState.scanningIncomingFor = null;
 							gcState.currentIncomingStructures = null;
 							gcState.currentIncomingStructureRoot = null;
@@ -1658,8 +1667,17 @@
 							return false;
 						}
 						
-						gcState.currentIncomingStructureChunk = gcState.currentIncomingStructureRoot.first;
-						return false;
+						if (gcState.currentIncomingStructureRoot.first !== null) {
+							gcState.currentIncomingStructureChunk = gcState.currentIncomingStructureRoot.first;
+						} else {
+							// Has no more chunks! Fail
+							addLastToList(gcState, destructionZone, gcState.scanningIncomingFor);
+							
+							gcState.scanningIncomingFor = null;
+							gcState.currentIncomingStructures = null;
+							gcState.currentIncomingStructureRoot = null;
+							gcState.currentIncomingStructureChunk = null;
+						}
 					}
 					return false;
 				}
@@ -1667,10 +1685,10 @@
 
 				// Scan incoming in progress, continue with it
 				if (gcState.scanningIncomingFor !== null) {
-					log("<<<<                        >>>>>");
-					log("<<<< Scan in progress...... >>>>>");
-					log("<<<<                        >>>>>");
-					log(gcState.currentIncomingStructureChunk);
+					// log("<<<<                        >>>>>");
+					// log("<<<< Scan in progress...... >>>>>");
+					// log("<<<<                        >>>>>");
+					// log(gcState.currentIncomingStructureChunk);
 					
 					// Scan in chunk
 					if (gcState.currentIncomingStructureChunk !== null) {
@@ -1699,9 +1717,9 @@
 				
 				// Destroy those left in the destruction list. 
 				if (!isEmptyList(gcState, destructionZone)) {
-					log("<<<<                 >>>>>");
-					log("<<<< Destroy ......  >>>>>");
-					log("<<<<                 >>>>>");
+					// log("<<<<                 >>>>>");
+					// log("<<<< Destroy ......  >>>>>");
+					// log("<<<<                 >>>>>");
 					
 					let toDestroy = removeFirstFromList(gcState, destructionZone);
 					
@@ -1709,9 +1727,8 @@
 					objectCausality.pokeObject(toDestroy.const.correspondingObject);
 					
 					for(property in toDestroy) {
-						// TODO: These should be macro events!!! 
-						imageCausality.state.useIncomingStructures = true;
-						delete toDestroy[property];
+						imageCausality.state.useIncomingStructures = true; // Activate macro events.
+						delete toDestroy[property]; 
 						imageCausality.state.useIncomingStructures = false;
 					}
 					addFirstToList(gcState, deallocationZone, toDestroy);
@@ -1719,12 +1736,28 @@
 					    // toDestroy._eternityDismanteled = true;
 					return false;
 				}
+				
+				// Destroy those left in the destruction list. 
+				if (!isEmptyList(gcState, deallocationZone)) {
+					// log("<<<<                    >>>>>");
+					// log("<<<< Deallocate ......  >>>>>");
+					// log("<<<<                    >>>>>");
+					
+					let toDeallocate = removeFirstFromList(gcState, deallocationZone);
+					// Make sure that object beeing destroyed is loaded.
+					deallocateInDatabase(toDeallocate);
+					
+					loadedObjects--;
+					return false;
+				}
+				
+				
 							
 				// Start a new zone.
-				if (gcState.pendingUnstableOriginFirst !== null) {
-					log("<<<<                        >>>>>");
-					log("<<<< Start new zone ......  >>>>>");
-					log("<<<<                        >>>>>");
+				if (!isEmptyList(gcState, pendingUnstableOrigins)) {
+					// log("<<<<                        >>>>>");
+					// log("<<<< Start new zone ......  >>>>>");
+					// log("<<<<                        >>>>>");
 
 					// Start new unstable cycle.
 					let newUnstableZone = removeFirstFromList(gcState, pendingUnstableOrigins);
@@ -1741,6 +1774,9 @@
 					return false;
 				} else {
 					// Finally! everything is done
+					// log("<<<<                 >>>>>");
+					// log("<<<< Finished......  >>>>>");
+					// log("<<<<                 >>>>>");
 					return true;
 				}
 			});
@@ -1773,7 +1809,7 @@
 					persistentDbId = mockMongoDB.saveNewRecord({ name : "persistent" });
 
 					// Update placeholder
-					if (configuration.twoPhaseComit) updateDbId = mockMongoDB.saveNewRecord({ name: "updatePlaceholder" });
+					updateDbId = mockMongoDB.saveNewRecord({ name: "updatePlaceholder" });   //Allways have it here, even if not in use for compatiblity reasons. 
 					
 					// Garbage collection state.
 					collectionDbId = mockMongoDB.saveNewRecord({ name : "garbageCollection"});
@@ -2127,7 +2163,6 @@
 			let isZombie = false;
             // objectCausality.blockInitialize(function() {
                 // objectCausality.freezeActivityList(function() {
-                    // log("ASDFASDFASDFASDFASDFASDFASFDASDFASDFASDFASFASDFASDF");
                     isZombie = typeof(object.nonForwardConst.isZombie) !== 'undefined';
                     // log("isZombie: " + isZombie);
                 // });
