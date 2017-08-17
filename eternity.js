@@ -1300,8 +1300,9 @@
 		
 		function createListType(name) {
 			return {
-				first : eternityTag + "FirstOf" + name, 
-				last : eternityTag + "LastOf" + name, 
+				first : eternityTag + name + "First", 
+				last : eternityTag + name + "Last",
+				counter : eternityTag + name + "Counter", 
 				
 				memberTag : eternityTag + name + "Member",
 				next : eternityTag + name + "Next", 
@@ -1333,6 +1334,7 @@
 		function initializeList(head, listType) {
 			head[listType.first] = null;
 			head[listType.last] = null;
+			head[listType.counter] = 0;
 		}
 		
 		function addLastToList(head, listType, listElement) {
@@ -1342,6 +1344,7 @@
 			let previous = listType.previous;
 
 			listElement[listType.memberTag] = true; 
+			head[listType.counter]++;
 			
 			if (head[last] !== null) {
 				head[last][next] = listElement;
@@ -1365,6 +1368,7 @@
 			let previous = listType.previous;
 			
 			listElement[listType.memberTag] = true; 
+			head[listType.counter]++;
 			
 			if (head[first] !== null) {
 				head[first][previous] = listElement;
@@ -1414,7 +1418,8 @@
 				let next = listType.next;
 				let previous = listType.previous;
 				
-				delete listElement[listType.memberTag]; 
+				delete listElement[listType.memberTag];
+				head[listType.counter]--;
 				
 				if(listElement[next] !== null) {
 					// log(listElement);
@@ -1437,7 +1442,7 @@
 				delete listElement[previous];				
 			} else {
 				// throw new Error("WTF");
-				log("not in list!");
+				// log("not in list!");
 			}
 		}
 		
@@ -1558,12 +1563,12 @@
 			for(id in contents) {
 				if (!id.startsWith("_eternity")) {
 					let referer = contents[id];
-					log(referer.const.name);
-					if (typeof(referer._eternityParent) !== 'undefined' || referer === objectCausality.persistent.const.dbImage) { // && !inList(destructionZone, referer) && !inList(unstableZone, referer)
-						log("Connecting!!!!");
+					// log("Try reconnect with: " + referer.const.name);
+					if ((typeof(referer._eternityParent) !== 'undefined' && !inList(unstableZone, referer) && !inList(destructionZone, referer)) || referer === objectCausality.persistent.const.dbImage) { // && !inList(destructionZone, referer) && !inList(unstableZone, referer)
+						// log("Connecting!!!!");
 						gcState.scanningIncomingFor._eternityParent = referer; // TODO: disable incoming relations
 						gcState.scanningIncomingFor._eternityParentProperty = gcState.currentIncomingStructureRoot.property;
-						addFirstToList(gcState, pendingForChildReattatchment, currentImage);
+						addFirstToList(gcState, pendingForChildReattatchment, gcState.scanningIncomingFor);
 						
 						// End scanning incoming.
 						gcState.scanningIncomingFor = null;
@@ -1579,10 +1584,10 @@
 		
 		
 		function oneStepCollection() {
-			// log("oneStepCollection");
+			// log("oneStepCollection:");
 			logGroup();
 			if (trace.eternity) {
-				// log(gcState, 3);
+				log(gcState, 1);
 			}
 			imageCausality.state.useIncomingStructures = false;
 			let result = imageCausality.pulse(function() {
@@ -1590,7 +1595,7 @@
 				// Reattatch 
 				if (!isEmptyList(gcState, pendingForChildReattatchment)) {
 					// log("<<<<           >>>>>");
-					log("<<<< reattatch >>>>>");
+					// log("<<<< reattatch >>>>>");
 					// log("<<<<           >>>>>");
 					let current = removeFirstFromList(gcState, pendingForChildReattatchment);
 					
@@ -1623,25 +1628,29 @@
 				// Expand unstable zone
 				if (!isEmptyList(gcState, unexpandedUnstableZone)) {
 					// log("<<<<                        >>>>>");
-					log("<<<< expand unstable zone   >>>>>");
+					// log("<<<< expand unstable zone   >>>>>");
+					logGroup();
 					// log("<<<<                        >>>>>");
 					let dbImage = removeFirstFromList(gcState, unexpandedUnstableZone);
 					// log(dbImage.const.name);
 					// dbImage = removeFirstFromList(gcState, unexpandedUnstableZone);
 					// log(dbImage.const.name);
-					log("dbImage:");
-					log(dbImage);
+					// log("dbImage:");
+					// log(dbImage);
 					// Consider: Will this cause an object pulse??? No... just reading starts no pulse...
 					for (let property in dbImage) {
-						if (!property.startsWith(eternityTag)) {							
+						logGroup();
+						if (!property.startsWith(eternityTag) && property !== 'incoming') {							
+							// log("expanding property: " + property)
 							imageCausality.state.useIncomingStructures = true; // Activate macro events.
+							// log(imageCausality.state);
 							let value = dbImage[property];
 							imageCausality.state.useIncomingStructures = false; // Activate macro events.
 							if (imageCausality.isObject(value)) {
-								log("value:");
-								log(value);
+								// log("value:");
+								// log(value);
 								if (value._eternityParent === dbImage && property === value._eternityParentProperty) {
-									log("adding a child to unstable zone");
+									// log("adding a child to unstable zone");
 									addLastToList(gcState, unexpandedUnstableZone, value);
 									addLastToList(gcState, unstableZone, value);
 									delete value._eternityParent; // This signifies that an image (if connected to an object), is unstable. If set to > 0, it means it is a root.
@@ -1649,8 +1658,9 @@
 								}
 							}
 						}
+						logUngroup();
 					}
-					
+					logUngroup();
 					// gcState.unstableUnexpandedZoneFirst.
 					return false;
 				};
@@ -1658,9 +1668,10 @@
 				// Iterate incoming, try to stabilize...
 				if(gcState.scanningIncomingFor === null && !isEmptyList(gcState, unstableZone)) {
 					// log("<<<<                        >>>>>");
-					log("<<<< Iterate incoming       >>>>>");
+					// log("<<<< Iterate incoming       >>>>>");
 					// log("<<<<                        >>>>>");
 					let currentImage = removeFirstFromList(gcState, unstableZone);
+					// log(currentImage.const.name);
 					if (typeof(currentImage.incoming) !== 'undefined') {
 						gcState.scanningIncomingFor = currentImage;
 						gcState.currentIncomingStructures = currentImage.incoming;
@@ -1673,6 +1684,8 @@
 							gcState.currentIncomingStructures = null;
 							gcState.currentIncomingStructureRoot = null;
 							gcState.currentIncomingStructureChunk = null;
+							// log("WTF happened!");
+							// log(gcState);
 							return false;
 						}
 						
@@ -1695,7 +1708,7 @@
 				// Scan incoming in progress, continue with it
 				if (gcState.scanningIncomingFor !== null) {
 					// log("<<<<                        >>>>>");
-					log("<<<< Scan in progress...... >>>>>");
+					// log("<<<< Scan in progress...... >>>>>");
 					// log("<<<<                        >>>>>");
 					// log(gcState.currentIncomingStructureChunk);
 					
@@ -1727,7 +1740,7 @@
 				// Destroy those left in the destruction list. 
 				if (!isEmptyList(gcState, destructionZone)) {
 					// log("<<<<                 >>>>>");
-					log("<<<< Destroy ......  >>>>>");
+					// log("<<<< Destroy ......  >>>>>");
 					// log("<<<<                 >>>>>");
 					
 					let toDestroy = removeFirstFromList(gcState, destructionZone);
@@ -1749,7 +1762,7 @@
 				// Destroy those left in the destruction list. 
 				if (!isEmptyList(gcState, deallocationZone)) {
 					// log("<<<<                    >>>>>");
-					log("<<<< Deallocate ......  >>>>>");
+					// log("<<<< Deallocate ......  >>>>>");
 					// log("<<<<                    >>>>>");
 					
 					let toDeallocate = removeFirstFromList(gcState, deallocationZone);
@@ -1765,7 +1778,7 @@
 				// Start a new zone.
 				if (!isEmptyList(gcState, pendingUnstableOrigins)) {
 					// log("<<<<                        >>>>>");
-					log("<<<< Start new zone ......  >>>>>");
+					// log("<<<< Start new zone ......  >>>>>");
 					// log("<<<<                        >>>>>");
 
 					// Start new unstable cycle.
@@ -1784,7 +1797,7 @@
 				} else {
 					// Finally! everything is done
 					// log("<<<<                 >>>>>");
-					log("<<<< Finished......  >>>>>");
+					// log("<<<< Finished......  >>>>>");
 					// log("<<<<                 >>>>>");
 					return true;
 				}
