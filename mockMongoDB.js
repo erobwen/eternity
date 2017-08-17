@@ -39,6 +39,10 @@
 			deallocatedIds.push(id);
 		}
 		
+		function isDeallocated(id) {
+			return dataRecords[id] === "[deallocated]";
+		}
+		
 		function saveNewRecord(dataRecord) {
 			log("saveNewRecord:");
 			logGroup();
@@ -132,7 +136,8 @@
 			getAllRecordsParsed : getAllRecordsParsed,
 			getRecordsCount : getRecordsCount,
 			clearDatabase : clearDatabase,
-			deallocate : deallocate
+			deallocate : deallocate,
+			isDeallocated : isDeallocated
 		};		
 	}
 	

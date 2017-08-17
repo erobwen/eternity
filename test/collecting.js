@@ -6,6 +6,7 @@ let objectlog = require('../objectlog.js');
 let log = objectlog.log;
 let logGroup = objectlog.enter;
 let logUngroup = objectlog.exit;
+let eternity = require('../eternity')({name: "collecting.js", maxNumberOfLoadedObjects : 200});  // Includes persistent root.
 
 // Tests based on mobx test/array.js
 describe("garbage-collection", function () {
@@ -21,7 +22,6 @@ describe("garbage-collection", function () {
 	}
 	
     it('should garbage collect one thing in 6 steps', function () {
-		let eternity = require('../eternity')({name: "collecting.js", maxNumberOfLoadedObjects : 200});  // Includes persistent root.
 		let create = eternity.create;
 		let persistent = eternity.persistent;
 		let a = create({name: "a"});
@@ -81,6 +81,10 @@ describe("garbage-collection", function () {
 		assert.equal(typeof(c.const.dbImage) !== 'undefined', true);
 		assert.equal(typeof(d.const.dbImage) !== 'undefined', true);
 		assert.equal(typeof(e.const.dbImage) !== 'undefined', true);
+		let aDbId = a.const.dbImage.const.dbId;
+		let bDbId = b.const.dbImage.const.dbId;
+		let cDbId = c.const.dbImage.const.dbId;
+		
 		
 		// Dissconnect a from persistent
 		persistent.a = null;
@@ -88,11 +92,24 @@ describe("garbage-collection", function () {
 		// Garbage collect
 		eternity.collectAll();
 
-		// d and e are still persistent because 
+		// d and e are still persistent because persistent pointe to d
 		assert.equal(typeof(a.const.dbImage) === 'undefined', true);
 		assert.equal(typeof(b.const.dbImage) === 'undefined', true);
 		assert.equal(typeof(c.const.dbImage) === 'undefined', true);
 		assert.equal(typeof(d.const.dbImage) !== 'undefined', true);
 		assert.equal(typeof(e.const.dbImage) !== 'undefined', true);
+		
+		// Unload all and clear locals
+		a = b = c = d = e = null;
+		unloadAllAndClearMemory();
+		
+		// Check still persistent
+		assert.equal(typeof(persistent.d.const.dbImage) !== 'undefined', true);
+		assert.equal(typeof(persistent.d.e.const.dbImage) !== 'undefined', true);
+		
+		// Check deallocated
+		assert.ok(eternity.mockMongoDB.isDeallocated(aDbId));
+		assert.ok(eternity.mockMongoDB.isDeallocated(bDbId));
+		assert.ok(eternity.mockMongoDB.isDeallocated(cDbId));
 	});
 });
