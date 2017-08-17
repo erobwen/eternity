@@ -62,4 +62,68 @@ describe("garbage-collection", function () {
 		eternity.trace.eternity = true;
 		delete eternity.trace.eternity;
 	});
+	
+	
+	it('should garbage collect recursivley', function () {
+		let eternity = require('../eternity')({name: "collecting.js", maxNumberOfLoadedObjects : 200});  // Includes persistent root.
+		let create = eternity.create;
+		let persistent = eternity.persistent;
+		// return;
+
+		let a = create({name: "a"});
+		let b = create({name : "b"});
+		let c = create({name : "c"});
+		let d = create({name : "d"});
+		
+		// Connect tree bottom up, verify all is persistent
+		b.c = c;
+		b.d = d;
+		a.b = b;
+		persistent.a = a;
+		assert.equal(typeof(a.const.dbImage) !== 'undefined', true);
+		assert.equal(typeof(b.const.dbImage) !== 'undefined', true);
+		assert.equal(typeof(c.const.dbImage) !== 'undefined', true);
+		assert.equal(typeof(d.const.dbImage) !== 'undefined', true);
+		
+		// Dissconnect tree
+		persistent.a = null;
+
+		// Garbage collect
+		eternity.collectAll();
+
+		// All is collected
+		assert.equal(typeof(a.const.dbImage) === 'undefined', true);
+		assert.equal(typeof(b.const.dbImage) === 'undefined', true);
+		assert.equal(typeof(c.const.dbImage) === 'undefined', true);
+		assert.equal(typeof(d.const.dbImage) === 'undefined', true);
+
+
+		// eternity.forAllPersistentIncomingNow(a, "a", function(object) { log("here!");log(object);});
+		// eternity.trace.basic = true;
+		// eternity.trace.basic = false;
+		// delete persistent.a;
+		// eternity.forAllPersistentIncomingNow(a, "a", function(object) { log("here2!");log(object);});
+		// // log(eternity.mockMongoDB.getAllRecordsParsed(), 3);
+		// // log("=======================================================");
+		// eternity.oneStepCollection();
+		// // log("-------------------------------------------------------");
+		// eternity.oneStepCollection();
+		// // log("-------------------------------------------------------");
+		// eternity.oneStepCollection();
+		// // log("-------------------------------------------------------");
+		// // eternity.trace.eternity = true;
+		// eternity.oneStepCollection();
+		// // eternity.trace.eternity = false;
+		// // log("-------------------------------------------------------");
+		// eternity.oneStepCollection();		
+		// // log("-------------------------------------------------------");
+		// eternity.oneStepCollection();
+		// // return;
+		// // log("-------------------------------------------------------");
+		// // log(a.const.dbImage);
+		// assert.equal(typeof(a.const.dbImage) === 'undefined', true);
+		
+		// eternity.trace.eternity = true;
+		// delete eternity.trace.eternity;
+	});
 });

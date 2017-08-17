@@ -1876,8 +1876,9 @@
 		
 		function pulse(action) {
 			inPulse++;
-			action();
+			let result = action();
 			if (--inPulse === 0) postPulseCleanup();
+			return result;
 		}
 
 		let transaction = postponeObserverNotification;

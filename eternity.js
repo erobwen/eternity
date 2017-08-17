@@ -1521,7 +1521,11 @@
 		// }
 		
 		function collectAll() {
-			while(!oneStepCollection()) {}
+			let done = false;
+			while(!done) {
+				done = oneStepCollection();
+				// log(done);
+			}
 		}
 				
 		function isUnstable(dbImage) {
@@ -1581,12 +1585,12 @@
 				// log(gcState, 3);
 			}
 			imageCausality.state.useIncomingStructures = false;
-			imageCausality.pulse(function() {
+			let result = imageCausality.pulse(function() {
 				
 				// Reattatch 
 				if (!isEmptyList(gcState, pendingForChildReattatchment)) {
 					// log("<<<<           >>>>>");
-					// log("<<<< reattatch >>>>>");
+					log("<<<< reattatch >>>>>");
 					// log("<<<<           >>>>>");
 					let current = removeFirstFromList(gcState, pendingForChildReattatchment);
 					
@@ -1619,24 +1623,29 @@
 				// Expand unstable zone
 				if (!isEmptyList(gcState, unexpandedUnstableZone)) {
 					// log("<<<<                        >>>>>");
-					// log("<<<< expand unstable zone   >>>>>");
+					log("<<<< expand unstable zone   >>>>>");
 					// log("<<<<                        >>>>>");
 					let dbImage = removeFirstFromList(gcState, unexpandedUnstableZone);
 					// log(dbImage.const.name);
 					// dbImage = removeFirstFromList(gcState, unexpandedUnstableZone);
 					// log(dbImage.const.name);
-					// log(dbImage);
+					log("dbImage:");
+					log(dbImage);
 					// Consider: Will this cause an object pulse??? No... just reading starts no pulse...
 					for (let property in dbImage) {
 						if (!property.startsWith(eternityTag)) {							
+							imageCausality.state.useIncomingStructures = true; // Activate macro events.
 							let value = dbImage[property];
-							if (objectCausality.isObject(value)) {
-								let referedImage = value.const.dbImage;
-								if (referedImage._eternityParent === dbImage && property === referedImage._eternityParentProperty) {
-									addLastToList(gcState, unexpandedUnstableZone, referedImage);
-									addLastToList(gcState, unstableZone, referedImage);
-									delete dbImage._eternityParent; // This signifies that an image (if connected to an object), is unstable. If set to > 0, it means it is a root.
-									delete dbImage._eternityParentProperty;
+							imageCausality.state.useIncomingStructures = false; // Activate macro events.
+							if (imageCausality.isObject(value)) {
+								log("value:");
+								log(value);
+								if (value._eternityParent === dbImage && property === value._eternityParentProperty) {
+									log("adding a child to unstable zone");
+									addLastToList(gcState, unexpandedUnstableZone, value);
+									addLastToList(gcState, unstableZone, value);
+									delete value._eternityParent; // This signifies that an image (if connected to an object), is unstable. If set to > 0, it means it is a root.
+									delete value._eternityParentProperty;
 								}
 							}
 						}
@@ -1649,7 +1658,7 @@
 				// Iterate incoming, try to stabilize...
 				if(gcState.scanningIncomingFor === null && !isEmptyList(gcState, unstableZone)) {
 					// log("<<<<                        >>>>>");
-					// log("<<<< Iterate incoming       >>>>>");
+					log("<<<< Iterate incoming       >>>>>");
 					// log("<<<<                        >>>>>");
 					let currentImage = removeFirstFromList(gcState, unstableZone);
 					if (typeof(currentImage.incoming) !== 'undefined') {
@@ -1686,7 +1695,7 @@
 				// Scan incoming in progress, continue with it
 				if (gcState.scanningIncomingFor !== null) {
 					// log("<<<<                        >>>>>");
-					// log("<<<< Scan in progress...... >>>>>");
+					log("<<<< Scan in progress...... >>>>>");
 					// log("<<<<                        >>>>>");
 					// log(gcState.currentIncomingStructureChunk);
 					
@@ -1718,7 +1727,7 @@
 				// Destroy those left in the destruction list. 
 				if (!isEmptyList(gcState, destructionZone)) {
 					// log("<<<<                 >>>>>");
-					// log("<<<< Destroy ......  >>>>>");
+					log("<<<< Destroy ......  >>>>>");
 					// log("<<<<                 >>>>>");
 					
 					let toDestroy = removeFirstFromList(gcState, destructionZone);
@@ -1740,7 +1749,7 @@
 				// Destroy those left in the destruction list. 
 				if (!isEmptyList(gcState, deallocationZone)) {
 					// log("<<<<                    >>>>>");
-					// log("<<<< Deallocate ......  >>>>>");
+					log("<<<< Deallocate ......  >>>>>");
 					// log("<<<<                    >>>>>");
 					
 					let toDeallocate = removeFirstFromList(gcState, deallocationZone);
@@ -1756,7 +1765,7 @@
 				// Start a new zone.
 				if (!isEmptyList(gcState, pendingUnstableOrigins)) {
 					// log("<<<<                        >>>>>");
-					// log("<<<< Start new zone ......  >>>>>");
+					log("<<<< Start new zone ......  >>>>>");
 					// log("<<<<                        >>>>>");
 
 					// Start new unstable cycle.
@@ -1775,13 +1784,14 @@
 				} else {
 					// Finally! everything is done
 					// log("<<<<                 >>>>>");
-					// log("<<<< Finished......  >>>>>");
+					log("<<<< Finished......  >>>>>");
 					// log("<<<<                 >>>>>");
 					return true;
 				}
 			});
 			logUngroup();
 			imageCausality.state.useIncomingStructures = true;
+			return result;
 		}
 		
 		
