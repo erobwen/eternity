@@ -154,23 +154,24 @@
 		}
 
 		function createEmptyDbImage(object, potentialParentImage, potentialParentProperty) {
-			// log(object, 3);
-			// log(object);
-			let imageContents = {
-				_eternityParent : potentialParentImage,
-				_eternityObjectClass : Object.getPrototypeOf(object).constructor.name,
-				_eternityImageClass : (object instanceof Array) ? "Array" : "Object", 
-				_eternityParentProperty : potentialParentProperty,
-				_eternityIsObjectImage : true
-			};
-			// for (let property in object) {
-				// let value = object[property];
-				// // TODO: translate property
-				// if (!objectCausality.isObject(value)) {
-					// imageContents[property] = value;
-				// }
-			// }
-			return createDbImageConnectedWithObject(object, imageContents);
+			let dbImage = createDbImageConnectedWithObject(object);
+			dbImage.const.name = object.const.name + "(dbImage)";
+			dbImage["_eternityParent"] = potentialParentImage;
+			dbImage["_eternityObjectClass"] = Object.getPrototypeOf(object).constructor.name;
+			dbImage["_eternityImageClass"] = (object instanceof Array) ? "Array" : "Object";
+			dbImage["_eternityParentProperty"] = potentialParentProperty;
+			dbImage["_eternityIsObjectImage"] = true;
+			
+			// TODO: have causality work with this... currently incoming references count is not updatec correctly
+			// let imageContents = {
+				// _eternityParent : potentialParentImage,
+				// _eternityObjectClass : Object.getPrototypeOf(object).constructor.name,
+				// _eternityImageClass : (object instanceof Array) ? "Array" : "Object", 
+				// _eternityParentProperty : potentialParentProperty,
+				// _eternityIsObjectImage : true
+			// };
+
+			return dbImage;
 		}
 		
 		function createDbImageConnectedWithObject(object, contents) {
