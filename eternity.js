@@ -156,11 +156,13 @@
 		function createEmptyDbImage(object, potentialParentImage, potentialParentProperty) {
 			let dbImage = createDbImageConnectedWithObject(object);
 			dbImage.const.name = object.const.name + "(dbImage)";
+			imageCausality.state.useIncomingStructures = false;
 			dbImage["_eternityParent"] = potentialParentImage;
 			dbImage["_eternityObjectClass"] = Object.getPrototypeOf(object).constructor.name;
 			dbImage["_eternityImageClass"] = (object instanceof Array) ? "Array" : "Object";
 			dbImage["_eternityParentProperty"] = potentialParentProperty;
 			dbImage["_eternityIsObjectImage"] = true;
+			imageCausality.state.useIncomingStructures = true;
 			
 			// TODO: have causality work with this... currently incoming references count is not updatec correctly
 			// let imageContents = {
