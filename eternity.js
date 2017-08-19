@@ -1613,8 +1613,8 @@
                                 referedImage._eternityParentProperty = property;
                                 addLastToList(gcState, pendingForChildReattatchment, referedImage);
                                 removeFromAllGcLists(referedImage);
-                            }                            
-
+                            }  
+						}							
 					}
 
 					return false;
