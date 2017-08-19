@@ -108,7 +108,8 @@
 				let specifier = { 
 					specifierParent : javascriptObject, 
 					specifierProperty : specifierName, 
-					isIncomingStructure : true   // This is a reuse of this object as incoming node as well.
+					isIncomingStructure : true,   // This is a reuse of this object as incoming node as well.
+					name : "incomingStructure"
 				}
 				if (configuration.incomingStructuresAsCausalityObjects) {
 					javascriptObject[specifierName] = createImmutable(specifier);
@@ -316,7 +317,7 @@
 			return value;
 		}
 		
-		function removeIncomingRelation(objectProxy, key, removedValue) {
+		function removeIncomingRelation(objectProxy, key, removedValue, previousStructure) {
 			// Get refering object 
 			let referringRelation = key;
 			while (typeof(objectProxy.indexParent) !==  'undefined') {
@@ -327,7 +328,8 @@
 			// Tear down structure to old value
 			if (isObject(removedValue)) {
 				if (configuration.blockInitializeForIncomingStructures) blockingInitialize++;
-				removeIncomingStructure(objectProxy.const.id, removedValue); // TODO: Fix BUG. This really works?
+				removeIncomingStructure(objectProxy.const.id, previousStructure);
+				// removeIncomingStructure(objectProxy.const.id, removedValue);
 				if (typeof(removedValue.const.incomingObservers) !== 'undefined') {
 					notifyChangeObservers(removedValue.const.incomingObservers[referringRelation]);
 				}
@@ -426,7 +428,7 @@
 			// Create incoming structure
 			let incomingStructures;
 			if (typeof(referencedObject.incoming) === 'undefined') {
-				incomingStructures = { isIncomingStructures : true, referredObject: referencedObject, last: null, first: null };
+				incomingStructures = { name: "isIncomingStructures", isIncomingStructures : true, referredObject: referencedObject, last: null, first: null };
 				if (configuration.incomingStructuresAsCausalityObjects) {
 					incomingStructures = create(incomingStructures);
 				}
@@ -522,7 +524,7 @@
 			// console.log(activeRecorder);
 			if (typeof(incomingStructureRoot.initialized) === 'undefined') {
 				incomingStructureRoot.isRoot = true;
-				incomingStructureRoot.contents = {};
+				incomingStructureRoot.contents = { name: "contents" };
 				incomingStructureRoot.contentsCounter = 0;
 				incomingStructureRoot.initialized = true;
 				incomingStructureRoot.first = null;
@@ -1174,6 +1176,10 @@
 		function increaseIncomingCounter(value) {
 			if (configuration.blockInitializeForIncomingReferenceCounters) blockingInitialize++;
 			if (isObject(value)) {				
+				if (value.const.incomingReferencesCount < 0) {
+					log(value.const.incomingReferencesCount);
+					throw Error("WTAF");
+				} 
 				if (typeof(value.const.incomingReferencesCount) === 'undefined') {
 					value.const.incomingReferencesCount = 0;
 				}
@@ -1186,6 +1192,7 @@
 			if (configuration.blockInitializeForIncomingReferenceCounters) blockingInitialize++;
 			if (isObject(value)) {
 				value.const.incomingReferencesCount--;
+				if (value.const.incomingReferencesCount < 0) throw Error("WTAF");
 				if (value.const.incomingReferencesCount === 0) {
 					removedLastIncomingRelation(value);
 				}
@@ -1278,12 +1285,12 @@
 			let incomingStructureValue;
 			if (state.useIncomingStructures) {
 				activityListFrozen++;
-				increaseIncomingCounter(value);
 				decreaseIncomingCounter(previousValue);
-				decreaseIncomingCounter(previousIncomingStructure);
+				increaseIncomingCounter(value);
 				if (state.incomingStructuresDisabled === 0) { // && !isIndexParentOf(this.const.object, value)
 					state.incomingStructuresDisabled++;
 					incomingStructureValue = createAndRemoveIncomingRelations(this.const.object, key, value, previousValue, previousIncomingStructure);
+					decreaseIncomingCounter(previousIncomingStructure);
 					increaseIncomingCounter(incomingStructureValue);
 					target[key] = incomingStructureValue;
 					state.incomingStructuresDisabled--;
@@ -1976,7 +1983,7 @@
 
 		function emitDeleteEvent(handler, key, previousValue) {
 			if (configuration.recordPulseEvents || typeof(handler.observers) !== 'undefined') {
-				emitEvent(handler, {type: 'delete', property: key, deletedValue: previousValue});
+				emitEvent(handler, {type: 'delete', property: key, oldValue: previousValue});
 			}
 		}
 

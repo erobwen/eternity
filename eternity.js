@@ -205,7 +205,7 @@
 			if (typeof(object.const.dbImage) === 'undefined') {
 				let dbImage = createEmptyDbImage(object, potentialParentImage, potentialParentProperty);
 				object.const.dbImage = dbImage;
-				dbImage.const.name = object.const.name;
+				dbImage.const.name = object.const.name + "(dbImage)";
 				dbImage.const.correspondingObject = object;
 				fillDbImageFromCorrespondingObject(object);
 			}	
@@ -829,7 +829,7 @@
 			let placeholder = objectCausality.create(createTarget(peekAtRecord(dbImage.const.dbId)._eternityObjectClass));
 			connectObjectWithDbImage(placeholder, dbImage);
 			placeholder.const.dbId = dbImage.const.dbId;
-			placeholder.const.name = dbImage.const.name; // TODO: remove? 
+			placeholder.const.name = dbImage.const.name + "(object)"; // TODO: remove? 
 			placeholder.const.initializer = objectFromImageInitializer;
 			return placeholder;
 		}
@@ -1454,6 +1454,7 @@
 		 *-----------------------------------------------*/
 		
 		function deallocateInDatabase(dbImage) {
+			// dbImage._eternityDeallocate = true;
 			mockMongoDB.deallocate(dbImage.const.dbId);
 			delete dbImage.const.correspondingObject.const.dbImage;
 			delete dbImage.const.correspondingObject.const.dbId;
@@ -1601,14 +1602,19 @@
 					let current = removeFirstFromList(gcState, pendingForChildReattatchment);
 					
 					for (let property in current) {
-						let value = current[property];
-						if (imageCausality.isObject(value) && isUnstable(value)) { // Has to exists!
-							let referedImage = value;
-							referedImage._eternityParent = current;
-							referedImage._eternityParentProperty = property;
-							addLastToList(gcState, pendingForChildReattatchment, referedImage);
-							removeFromAllGcLists(referedImage);
-						}
+						if (property !== 'incoming') {
+                            imageCausality.state.useIncomingStructures = true; // Activate macro events.
+                            let value = current[property];
+                            imageCausality.state.useIncomingStructures = false; // Activate macro events.
+                            if (imageCausality.isObject(value) && isUnstable(value) && objectCausality.persistent.const.dbImage !== value) { // Has to exists!
+                                let referedImage = value;
+                                if(trace.gc) log("reconnecting " + referedImage.const.name + "!");
+                                referedImage._eternityParent = current;
+                                referedImage._eternityParentProperty = property;
+                                addLastToList(gcState, pendingForChildReattatchment, referedImage);
+                                removeFromAllGcLists(referedImage);
+                            }                            
+
 					}
 
 					return false;
@@ -1749,10 +1755,12 @@
 					// Make sure that object beeing destroyed is loaded.
 					objectCausality.pokeObject(toDestroy.const.correspondingObject);
 					
-					for(property in toDestroy) {
-						imageCausality.state.useIncomingStructures = true; // Activate macro events.
-						delete toDestroy[property]; 
-						imageCausality.state.useIncomingStructures = false;
+					for(let property in toDestroy) {
+						if(property !== 'incoming') {
+							imageCausality.state.useIncomingStructures = true; // Activate macro events.
+							delete toDestroy[property]; 
+							imageCausality.state.useIncomingStructures = false;
+						}
 					}
 					addFirstToList(gcState, deallocationZone, toDestroy);
 					loadedObjects--;
@@ -2101,7 +2109,8 @@
 		// Image causality
 		// let imageCausality = requireUncached("causalityjs_advanced");
 		let imageCausality = require("./causality.js")({ 
-			name : 'imageCausality:' + JSON.stringify(configuration),
+			name : 'imageCausality',
+			id : 'imageCausality:' + JSON.stringify(configuration),
 			recordPulseEvents : true, 
 			incomingStructureChunkSize : configuration.persistentIncomingChunkSize,
 			incomingChunkRemovedCallback : incomingChunkRemovedForImage,
@@ -2152,7 +2161,8 @@
 		let objectCausalityConfiguration = {};
 		Object.assign(objectCausalityConfiguration, configuration.causalityConfiguration);
 		Object.assign(objectCausalityConfiguration, {
-			name: 'objectCausality:' + JSON.stringify(configuration), 
+			name: 'objectCausality', 
+			id: 'objectCausality:' + JSON.stringify(configuration), 
 			recordPulseEvents : true,
 			objectActivityList : true,
 			incomingReferenceCounters : true, 
