@@ -1,14 +1,22 @@
 TODO:
 
-* Shakedown of GC
-* Create an index class
-* Convert old Liquid
+Eternity work in progress:
+* Shakedown of GC amost done
+	* Make sure deallocations occur within the same pulse. IMPORTANT
+    * Make it possible to deallocate "on the fly"? (skip?)
+* Create an index class. IMPORTANT
+* Incoming structures enhandement:
+	* Refactor and create the incoming observation interface. IMPORTANT
+	* Make sure incoming structures are removed when not needed. maybe... 
 * Store reactive primitives persistently
-	* Modify causality to use methods rather than functions
-	* Store observers persistently
-* Create a state object
-* Optimization of GC
+	* Modify causality to use methods rather than functions. POSTPONE TO LATER
+	* Store observers persistently.  POSTPONE TO LATER
+* Move more things to the state object POSTPONE TO LATER
+* Optimization of GC, use depth count to try early reattatch.  POSTPONE TO LATER
+* Connect to an actual database. POSTPONE TO LATER
 
+Next Major Step:
+* Convert old Liquid
 
 
 
