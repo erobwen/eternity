@@ -1570,7 +1570,7 @@
 					// log("Try reconnect with: " + referer.const.name);
 					if ((typeof(referer._eternityParent) !== 'undefined' && !inList(unstableZone, referer) && !inList(destructionZone, referer)) || referer === objectCausality.persistent.const.dbImage) { // && !inList(destructionZone, referer) && !inList(unstableZone, referer)
 						// log("Connecting!!!!");
-						gcState.scanningIncomingFor._eternityParent = referer; // TODO: disable incoming relations
+						gcState.scanningIncomingFor._eternityParent = referer; // TODO: disable incoming relations, should be fine... 
 						gcState.scanningIncomingFor._eternityParentProperty = gcState.currentIncomingStructureRoot.property;
 						addFirstToList(gcState, pendingForChildReattatchment, gcState.scanningIncomingFor);
 						
@@ -1659,11 +1659,12 @@
 								// log("value:");
 								// log(value);
 								if (value._eternityParent === dbImage && property === value._eternityParentProperty) {
-									// log("adding a child to unstable zone");
+									log("adding a child to unstable zone");
 									addLastToList(gcState, unexpandedUnstableZone, value);
 									addLastToList(gcState, unstableZone, value);
 									delete value._eternityParent; // This signifies that an image (if connected to an object), is unstable. If set to > 0, it means it is a root.
 									delete value._eternityParentProperty;
+									log(value, 2);
 								}
 							}
 						}
@@ -1759,6 +1760,7 @@
 					
 					for(let property in toDestroy) {
 						if(property !== 'incoming') {
+							log(property);
 							imageCausality.state.useIncomingStructures = true; // Activate macro events.
 							delete toDestroy[property]; 
 							imageCausality.state.useIncomingStructures = false;
@@ -1803,7 +1805,9 @@
 					
 					addFirstToList(gcState, unstableZone, newUnstableZone);
 					addFirstToList(gcState, unexpandedUnstableZone, newUnstableZone);
-					gcState.unstableZoneDepth = 1;
+					delete newUnstableZone._eternityParent;
+					delete newUnstableZone._eternityParentProperty;
+					// gcState.unstableZoneDepth = 1;
 					return false;
 				} else {
 					// Finally! everything is done

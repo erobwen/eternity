@@ -1097,11 +1097,6 @@
 					if (state.useIncomingStructures && state.incomingStructuresDisabled === 0 && keyInTarget && key !== 'incoming') {
 						// console.log("find referred object");
 						// console.log(key);
-						if (trace.get > 0) {
-							log(key);
-							log(state);
-							log("find referred object");							
-						}
 						if (trace.get > 0) logUngroup();
 						return findReferredObject(target[key]);
 					} else {
