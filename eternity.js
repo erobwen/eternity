@@ -1919,6 +1919,7 @@
 		
 		function forAllPersistentIncomingPersistentIteration(object, property, objectAction) {
 			imageCausality.disableIncomingRelations(function() {
+				// imageCausality.state.useIncomingStructures = false;
 				if (typeof(object.const.dbImage) !== 'undefined') {
 					let dbImage = object.const.dbImage;
 					if (typeof(dbImage.incoming) !== 'undefined') {
@@ -1932,7 +1933,7 @@
 							let contents = relation.contents;
 							// log("processing root contents");
 							for (let id in contents) {
-								if (!id.startsWith("_eternity")) {
+								if (!id.startsWith("_eternity") && id !== 'name') {
 									let referer = getObjectFromImage(contents[id]);
 									// log("Iterate object in chunk...");
 									objectAction.object[objectAction.functionName](referer);											
@@ -1950,16 +1951,24 @@
 
 							// Setup the rest for iteration
 							// TODO: Ensure that this iteration is not lost as incoming references are removed...
-							let currentChunk = relation.first
+							// log("relation:");
+							// log(relation, 2);
+							// imageCausality.trace.get = true;
+							let currentChunk = relation.first;
+							// imageCausality.trace.get = false;
+							// log(currentChunk);
 							if (typeof(currentChunk) !== 'undefined' && currentChunk !== null) {
+								// log("pushing chunk!!!");
 								iterations.push(imageCausality.create({
 									currentChunk : currentChunk,
 									objectAction : objectAction
 								}));
+								// log(iterations,3);
 							}
 						}
 					}
 				}
+				// imageCausality.state.useIncomingStructures = true;
 			});
 		}
 		
@@ -1969,6 +1978,7 @@
 		
 
 		function incomingChunkRemovedForImage(incomingChunk) {
+			log("incomingChunkRemovedForImage");
 			let newIterations = []; 
 			let iterations = objectCausality.persistent.iterations;
 			iterations.forEach(function(iteration) {
@@ -1997,18 +2007,20 @@
 				
 					objectCausality.persistent.iterations.forEach(function(iteration) {
 						let currentChunk = iteration.currentChunk;
+						// log("Here!!!")
+						// log(currentChunk);
 						let contents = currentChunk.contents;
 						// log("processing contents");
 						for (let id in contents) {
-							if (!id.startsWith("_eternity")) {
+							if (!id.startsWith("_eternity") && id !== 'name') {
 								let referer = getObjectFromImage(contents[id]);
+								// log(referer.name,2);
 								let objectAction = iteration.objectAction;
+								// log(objectAction,2);
 								objectAction.object[objectAction.functionName](referer);
 							}
 						}
 						
-						// log("Here!!!")
-						// log(currentChunk);
 						if (typeof(currentChunk.next) !== 'undefined' && currentChunk.next !== null) {
 							iteration.currentChunk = currentChunk.next;
 							newIterations.push(iteration);
@@ -2047,7 +2059,7 @@
 							// Iterate the root
 							let contents = relation.contents;
 							for (let id in contents) {
-								if (!id.startsWith("_eternity")) {
+								if (!id.startsWith("_eternity") && id !== 'name') {
 									let referer = getObjectFromImage(contents[id]);
 									// log("Iterate object in chunk...");
 									objectAction(referer);											
@@ -2084,7 +2096,7 @@
 					let contents = currentChunk.contents;
 					// log("process chunk...");
 					for (let id in contents) {
-						if (!id.startsWith("_eternity")) {
+						if (!id.startsWith("_eternity") && id !== 'name') {
 							let referer = getObjectFromImage(contents[id]);
 							iteration.objectAction(referer);
 						}

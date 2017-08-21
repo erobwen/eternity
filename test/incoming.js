@@ -82,12 +82,17 @@ describe("incoming", function () {
 		// log("==================== CLEAR MEMORY ==========================");
 		
 		referers = [];
-		let collector = create({ iterate : function(referer) {
-			referers.push(referer);
-		}});
+		let collector = create({
+			name : "collector",
+			iterate : function(referer) {
+				// log(" Iterate in application");
+				referers.push(referer);
+			}
+		});
 		
 		eternity.forAllPersistentIncomingNow(persistent.A.D, "D", eternity.createAction(collector, "iterate"));
-		assert.equal(3, referers.length);
+		// log(referers);
+		assert.equal(referers.length, 3);
 		assert.equal(persistent.A, referers[0]);		
 		assert.equal(persistent.B, referers[1]);		
 		assert.equal(persistent.C, referers[2]);		

@@ -524,7 +524,8 @@
 			// console.log(activeRecorder);
 			if (typeof(incomingStructureRoot.initialized) === 'undefined') {
 				incomingStructureRoot.isRoot = true;
-				incomingStructureRoot.contents = { name: "contents" };
+				// incomingStructureRoot.contents = { name: "contents" };
+				incomingStructureRoot.contents = {};
 				incomingStructureRoot.contentsCounter = 0;
 				incomingStructureRoot.initialized = true;
 				incomingStructureRoot.first = null;
@@ -1096,6 +1097,11 @@
 					if (state.useIncomingStructures && state.incomingStructuresDisabled === 0 && keyInTarget && key !== 'incoming') {
 						// console.log("find referred object");
 						// console.log(key);
+						if (trace.get > 0) {
+							log(key);
+							log(state);
+							log("find referred object");							
+						}
 						if (trace.get > 0) logUngroup();
 						return findReferredObject(target[key]);
 					} else {
@@ -1367,7 +1373,7 @@
 					decreaseIncomingCounter(previousIncomingStructure);
 					if (state.incomingStructuresDisabled === 0) { // && !isIndexParentOf(this.const.object, value)
 						state.incomingStructuresDisabled++;
-						removeIncomingRelation(this.const.object, key, previousValue);
+						removeIncomingRelation(this.const.object, key, previousValue, previousIncomingStructure);
 						delete target[key];
 						state.incomingStructuresDisabled--;
 					} else {
