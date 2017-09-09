@@ -5,7 +5,7 @@
     } else if (typeof module === 'object' && module.exports) {
         module.exports = factory(); // Support NodeJS
     } else {
-        root.causality = factory(); // Support browser global
+        root.objectlog = factory(); // Support browser global
     }
 }(this, function () {
 	
