@@ -22,7 +22,10 @@
   "homepage": "https://github.com/erobwen/eternity#readme",
   "dependencies": {
     "mocha": "^3.1.2",
-	"causalityjs_advanced" : "^1.0.0",
-	"require-uncached" :  "^1.0.3"
+    "causalityjs_advanced": "^1.0.0",
+    "require-uncached": "^1.0.3"
+  },
+  "devDependencies": {
+    "bower-json": "^0.8.1"
   }
 }
