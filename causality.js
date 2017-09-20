@@ -203,8 +203,37 @@
 		 *  Incoming relations. 
 		 *
 		 ***************************************************************/
-
-		function forAllIncoming(object, property, callback) {
+		  
+		
+		function getSingleIncomingReference(object, property, filter) {	
+			let result = null;
+			forAllIncoming(object, property, function(object) {
+				if (result === null) {
+					result = object;
+				} else {
+					throw new Error("Unexpected: More than one incoming reference for property: " + property);
+				}
+			}, filter);
+			return result;
+		}
+		
+		function getIncomingReferences(object, property, filter) {	
+			let result = [];
+			forAllIncoming(object, property, function(object) {
+				result.push(object);
+			}, filter);
+			return result;
+		}
+		
+		function getIncomingReferencesMap(object, property, filter) {	
+			let result = {};
+			forAllIncoming(object, property, function(object) {
+				result[idExpression(object.const.id)] = object;
+			}, filter);
+			return result;
+		}
+		
+		function forAllIncoming(object, property, callback, filter) {
 			if(trace.basics) log("forAllIncoming");
 			registerAnyChangeObserver(getSpecifier(getSpecifier(object.const, "incomingObservers"), property));
 			withoutRecording(function() { // This is needed for setups where incoming structures are made out of causality objects. 
@@ -223,7 +252,9 @@
 							let contents = currentChunk.contents;
 							for (id in contents) {
 								let referer = contents[id];
-								callback(referer);
+								if (typeof(filter) === 'undefined' || filter(referer)) {
+									callback(referer);									
+								}
 							}
 							currentChunk = currentChunk.next;
 						}
@@ -232,6 +263,12 @@
 			});
 		}
 		
+		// TODO: 
+		// Cannot do this unless we have a neat way to iterate over all incoming relations.
+		// Right now the structure is: { name: "isIncomingStructures", isIncomingStructures : true, referredObject: referencedObject, last: null, first: null };
+		// function forEveryIncoming(object, callback, filter) {
+			// ...
+		// }
 
 		// function hasIncomingRelationArray(array, index) { // Maybe not needed???
 			// state.incomingStructuresDisabled++;
@@ -244,7 +281,6 @@
 			// return false;
 			// state.incomingStructuresDisabled--;			
 		// }
-
 		
 		function hasIncomingRelation(object, property) {
 			state.incomingStructuresDisabled++;
@@ -257,7 +293,6 @@
 			return false;
 			state.incomingStructuresDisabled--;			
 		}
-
 
 		function disableIncomingRelations(action) {
 			inPulse++;
@@ -1492,6 +1527,8 @@
 			} else if (typeof(createdTarget) === 'function') {
 				initializer = createdTarget; 
 				createdTarget = {};
+			} else if (typeof(createdTarget) === 'string') {
+				createdTarget = classRegister[createdTarget]();
 			}
 			if (typeof(cacheId) === 'undefined') {
 				cacheId = null;
