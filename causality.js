@@ -235,7 +235,7 @@
 		
 		function forAllIncoming(object, property, callback, filter) {
 			if(trace.basics) log("forAllIncoming");
-			registerAnyChangeObserver(getSpecifier(getSpecifier(object.const, "incomingObservers"), property));
+			registerAnyChangeObserver(getSpecifier(getSpecifier(object.const, "incoming"), property));
 			withoutRecording(function() { // This is needed for setups where incoming structures are made out of causality objects. 
 				if (typeof(object.incoming) !== 'undefined') {
 					if(trace.basics) log("incoming exists!");
@@ -334,8 +334,8 @@
 				if (trace.basic) log("tear down previous... ");
 				if (configuration.blockInitializeForIncomingStructures) blockingInitialize++;
 				removeIncomingStructure(objectProxy.const.id, previousStructure); // TODO: Fix BUG. This really works?
-				if (typeof(previousValue.const.incomingObservers) !== 'undefined') {
-					notifyChangeObservers(previousValue.const.incomingObservers[referringRelation]);
+				if (typeof(previousValue.const.incoming) !== 'undefined') {
+					notifyChangeObservers(previousValue.const.incoming[referringRelation]);
 				}
 				if (configuration.blockInitializeForIncomingStructures) blockingInitialize--;
 			}
@@ -343,8 +343,8 @@
 			// Setup structure to new value
 			if (isObject(value)) {
 				let referencedValue = createIncomingStructure(objectProxy, objectProxy.const.id, referringRelation, value);
-				if (typeof(value.const.incomingObservers) !== 'undefined') {
-					notifyChangeObservers(value.const.incomingObservers[referringRelation]);
+				if (typeof(value.const.incoming) !== 'undefined') {
+					notifyChangeObservers(value.const.incoming[referringRelation]);
 				}
 				value = referencedValue;
 			}
@@ -365,8 +365,8 @@
 				if (configuration.blockInitializeForIncomingStructures) blockingInitialize++;
 				removeIncomingStructure(objectProxy.const.id, previousStructure);
 				// removeIncomingStructure(objectProxy.const.id, removedValue);
-				if (typeof(removedValue.const.incomingObservers) !== 'undefined') {
-					notifyChangeObservers(removedValue.const.incomingObservers[referringRelation]);
+				if (typeof(removedValue.const.incoming) !== 'undefined') {
+					notifyChangeObservers(removedValue.const.incoming[referringRelation]);
 				}
 				if (configuration.blockInitializeForIncomingStructures) blockingInitialize--;
 			}
@@ -389,8 +389,8 @@
 					addedElement.const.incomingReferences++;
 					// log("added element is object");
 					let referencedValue = createIncomingStructure(arrayProxy, arrayProxy.const.id, referringRelation, addedElement);
-					if (typeof(addedElement.const.incomingObservers) !== 'undefined') {
-						notifyChangeObservers(addedElement.const.incomingObservers[referringRelation]);
+					if (typeof(addedElement.const.incoming) !== 'undefined') {
+						notifyChangeObservers(addedElement.const.incoming[referringRelation]);
 					}
 					addedAdjusted.push(referencedValue);
 				} else {
@@ -404,8 +404,8 @@
 					if (isObject(removedElement)) {
 						if ((previousValue.const.incomingReferences -= 1) === 0)  removedLastIncomingRelation(removedElement);
 						removeIncomingStructure(proxy.const.id, removedElement);
-						if (typeof(removedElement.const.incomingObservers) !== 'undefined') {
-							notifyChangeObservers(removedElement.const.incomingObservers[referringRelation]);
+						if (typeof(removedElement.const.incoming) !== 'undefined') {
+							notifyChangeObservers(removedElement.const.incoming[referringRelation]);
 						}
 					}					
 				});					
