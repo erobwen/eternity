@@ -10,7 +10,9 @@ describe("Incoming Relations", function(){
     it("Testing incoming relation exists and can be removed", function(){
 		let x = create();
 		let y = create();
+		// causality.trace.basic = true;
 		x.foo = y;
+		// causality.trace.basic = false;
 
 		// Analyze incoming structure
 		let yIncomingFoo = []
