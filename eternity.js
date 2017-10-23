@@ -591,6 +591,10 @@
 					serialized[property] = value;
 				}
 			}
+			
+			let value = convertReferencesToDbIdsOrTemporaryIds(dbImage.const.incoming);
+			serialized["_eternityIncoming"] = value;				
+
 			return serialized;			
 		}
 		
@@ -928,7 +932,7 @@
 				// log(dbRecord);
 				for (let property in dbRecord) {
 					// printKeys(dbImage);
-					if (property !== 'const' && property !== 'id') {
+					if (property !== 'const' && property !== 'id' && property !== "_eternityIncoming") {
 						// log("loadFromDbIdToImage: " + dbId + " property: " + property);
 						// log(dbRecord);
 						let recordValue = dbRecord[property];
@@ -947,7 +951,21 @@
 						// if (property !== 'A') imageCausality.endTrace();
 						// log("loadFromDbIdToImage: " + dbId + " property: " + property + "...finished assigning");
 						// printKeys(dbImage);
-					}				
+					}
+					if (property === "_eternityIncoming") {
+						let recordValue = dbRecord["_eternityIncoming"];
+						// log(dbRecord);
+						let value = loadDbValue(recordValue);
+						
+						// log(dbRecord);
+						// log("loadFromDbIdToImage: " + dbId + " property: " + property + "...assigning");
+						// if (property !== 'A') imageCausality.startTrace();
+						// log("value loaded to image:");
+						// log(value);
+						// increaseImageIncomingLoadedCounter(value);
+						increaseLoadedIncomingMacroReferenceCounters(dbImage, "_eternityIncoming");
+						dbImage.const.incoming = value; // TODO: Consider, do we need to merge here? Is it possible another incoming is created that is not loaded?... prob. not... 
+					}
 				}
 				dbImage.const.name = dbRecord.name; // TODO remove debugg
 
@@ -1682,10 +1700,10 @@
 					// log("<<<<                        >>>>>");
 					let currentImage = removeFirstFromList(gcState, unstableZone);
 					// log(currentImage.const.name);
-					if (typeof(currentImage.incoming) !== 'undefined') {
+					if (typeof(currentImage.const.incoming) !== 'undefined') {
 						gcState.scanningIncomingFor = currentImage;
-						gcState.currentIncomingStructures = currentImage.incoming;
-						gcState.currentIncomingStructureRoot = currentImage.incoming.first;
+						gcState.currentIncomingStructures = currentImage.const.incoming;
+						gcState.currentIncomingStructureRoot = currentImage.const.incoming.first;
 						gcState.currentIncomingStructureChunk = null;
 						
 						if (tryReconnectFromIncomingContents(gcState.currentIncomingStructureRoot.contents)) {
@@ -1926,8 +1944,8 @@
 				// imageCausality.state.useIncomingStructures = false;
 				if (typeof(object.const.dbImage) !== 'undefined') {
 					let dbImage = object.const.dbImage;
-					if (typeof(dbImage.incoming) !== 'undefined') {
-						let relations = dbImage.incoming;
+					if (typeof(dbImage.const.incoming) !== 'undefined') {
+						let relations = dbImage.const.incoming;
 						// log(relations, 3);
 						// log("here");
 						if (typeof(relations[property]) !== 'undefined') {
@@ -2053,8 +2071,8 @@
 			imageCausality.disableIncomingRelations(function() {
 				if (typeof(object.const.dbImage) !== 'undefined') {
 					let dbImage = object.const.dbImage;
-					if (typeof(dbImage.incoming) !== 'undefined') {
-						let relations = dbImage.incoming;
+					if (typeof(dbImage.const.incoming) !== 'undefined') {
+						let relations = dbImage.const.incoming;
 						// log(relations, 3);
 						// log("here");
 						if (typeof(relations[property]) !== 'undefined') {
