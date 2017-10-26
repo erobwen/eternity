@@ -2245,6 +2245,7 @@
 
 
 		// Recorders is a map from id => recorder
+		// A bit like "for all incoming"...
 		function notifyChangeObservers(observers) {
 			if (typeof(observers.initialized) !== 'undefined') {
 				if (observerNotificationNullified > 0) {
