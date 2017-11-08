@@ -16,10 +16,14 @@
 	
 	
 	function createCausalityInstance(configuration) {
+		// Class registry
+		let classRegistry =  {};
 		
+		// State
 		let state = { 
 			useIncomingStructures : configuration.useIncomingStructures,
-			incomingStructuresDisabled : 0
+			incomingStructuresDisabled : 0,
+			blockInitialize : false
 		};
 
 		/***************************************************************
@@ -109,7 +113,7 @@
 					specifierParent : javascriptObject, 
 					specifierProperty : specifierName, 
 					isIncomingStructure : true,   // This is a reuse of this object as incoming node as well.
-					name : "incomingStructure"
+					// name : "incomingStructure" // This fucked up things for incoming relations of name "name"
 				}
 				if (configuration.incomingStructuresAsCausalityObjects) {
 					javascriptObject[specifierName] = createImmutable(specifier);
@@ -131,11 +135,12 @@
 			state.incomingStructuresDisabled++;
 			
 			let previousValue = object[property];
-			if (typeof(previousValue) === 'object') {
+			if (isObject(previousValue)) {
 				delete previousValue.indexParent;
 				delete previousValue.indexParentRelation;				
 			}
 			
+			index.name = property;
 			index.indexParent = object;
 			index.indexParentRelation = property;
 			object[property] = index;
@@ -205,11 +210,12 @@
 		 ***************************************************************/
 		  
 		
-		function getSingleIncomingReference(object, property, filter) {	
+		function getSingleIncomingReference(object, property, filter) {
+			trace.basic && log("getSingleIncomingReference");
 			let result = null;
-			forAllIncoming(object, property, function(object) {
+			forAllIncoming(object, property, function(foundObject) {
 				if (result === null) {
-					result = object;
+					result = foundObject;
 				} else {
 					throw new Error("Unexpected: More than one incoming reference for property: " + property);
 				}
@@ -217,10 +223,15 @@
 			return result;
 		}
 		
-		function getIncomingReferences(object, property, filter) {	
+		function getIncomingReferences(object, property, filter) {
+			// log(trace)
+			trace.basic && log("getIncomingReferences");
+			if (typeof(object) === 'undefined') {
+				throw new Error("No object given to 'getIncomingReferences'");
+			}
 			let result = [];
-			forAllIncoming(object, property, function(object) {
-				result.push(object);
+			forAllIncoming(object, property, function(foundObject) {
+				result.push(foundObject);
 			}, filter);
 			return result;
 		}
@@ -235,12 +246,14 @@
 		
 		function forAllIncoming(object, property, callback, filter) {
 			if(trace.basics) log("forAllIncoming");
+			if(trace.basic) log(object.const.incoming, 2);
 			if (inActiveRecording) registerAnyChangeObserver(getSpecifier(getSpecifier(getSpecifier(object.const, "incoming"), property), "observers"));
 			withoutRecording(function() { // This is needed for setups where incoming structures are made out of causality objects. 
 				if (typeof(object.const.incoming) !== 'undefined') {
 					if(trace.basics) log("incoming exists!");
 					let relations = object.const.incoming;
 					if (typeof(relations[property]) !== 'undefined') {
+						trace.basic && log("property exists");
 						let relation = relations[property];
 						if (relation.initialized === true) {							
 							let contents = relation.contents;
@@ -322,13 +335,26 @@
 		
 		
 		function createAndRemoveIncomingRelations(objectProxy, key, value, previousValue, previousStructure) {
-			if (trace.basic) log("createAndRemoveIncomingRelations");
+			let referringRelation = key;
+			if (trace.basic) {
+				log("createAndRemoveIncomingRelations");
+				log(referringRelation);
+				log(objectProxy);
+			}
 			
 			// Get refering object 
-			let referringRelation = key;
 			while (typeof(objectProxy.indexParent) !==  'undefined') {
 				referringRelation = objectProxy.indexParentRelation;
-				objectProxy = objectProxy.indexParent;
+				objectProxy = objectProxy.indexParent;				
+				if (trace.basic) {
+					log("Moving up one step:");
+					log(referringRelation);
+					log(objectProxy);
+				}
+			}
+			if (!isObject(objectProxy)) {
+				log(objectProxy);
+				throw new Error("object proxy not an object!");
 			}
 			
 			// Tear down structure to old value
@@ -444,19 +470,24 @@
 		}
 		
 		function createIncomingStructure(referingObject, referingObjectId, property, object) {
-			// log("createIncomingStructure");
+			trace.basic && log("createIncomingStructure");
 			let incomingStructure = getIncomingRelationStructure(object, property);
-			// log(incomingStructure);
+
+			trace.basic && log(incomingStructure);
+			if (typeof(incomingStructure) === 'undefined') throw new Error("WTF");
+
 			let incomingRelationChunk = intitializeAndConstructIncomingStructure(incomingStructure, referingObject, referingObjectId);
 			if (incomingRelationChunk !== null) {
 				return incomingRelationChunk;
 			} else {
-				return object;
+				return object; // TODO:  this will return if already added in root? not a problem because of refusal to set same value twice?
 			}
 		} 
 		
 		
 		function getIncomingRelationStructure(referencedObject, property) {
+			trace.basic && log("getIncomingRelationStructure");
+			
 			// Sanity test TODO: remove 
 			if (state.incomingStructuresDisabled === 0) {
 				referencedObject.foo.bar;
@@ -488,6 +519,11 @@
 				if (configuration.incomingStructuresAsCausalityObjects) {
 					// Disable incoming relations here? otherwise we might end up with incoming structures between 
 					incomingStructure = create(incomingStructure);
+					if (incomingStructure.property === "indexParent") {
+						throw new Error("What is this, should not have incoming structure for indexParent....");
+					}
+					// log("CREATED INCOMING STRUCTURE THAT IS AN OBJECT");
+					// log(incomingStructure);
 				}
 				incomingStructures[property] = incomingStructure;
 			}
@@ -908,11 +944,8 @@
 					return true;
 				}
 			}
-
-			// If cumulative assignment, inside recorder and value is undefined, no assignment.
-			if (configuration.cumulativeAssignment && inActiveRecording && (isNaN(value) || typeof(value) === 'undefined')) {
-				return true;
-			}
+			
+			// Start pulse if can write
 			if (!canWrite(this.const.object)) return;
 			inPulse++;
 			observerNotificationPostponed++; // TODO: Do this for backwards references from arrays as well...
@@ -1119,6 +1152,7 @@
 						let descriptor = Object.getOwnPropertyDescriptor(scan, key);
 						if (typeof(descriptor) !== 'undefined' && typeof(descriptor.get) !== 'undefined') {
 							if (trace.get > 0) logUngroup();
+							// if (trace.basic) log("returning bound thing...");
 							return descriptor.get.bind(this.const.object)();
 						}
 						scan = Object.getPrototypeOf( scan );
@@ -1230,7 +1264,10 @@
 			if (configuration.blockInitializeForIncomingReferenceCounters) blockingInitialize++;
 			if (isObject(value)) {
 				value.const.incomingReferencesCount--;
-				if (value.const.incomingReferencesCount < 0) throw Error("WTAF");
+				if (value.const.incomingReferencesCount < 0) {
+					console.log(value);
+					throw Error("WTAF");					
+				}
 				if (value.const.incomingReferencesCount === 0) {
 					removedLastIncomingRelation(value);
 				}
@@ -1253,6 +1290,7 @@
 		
 		
 		function setHandlerObject(target, key, value) {
+			// log("setHandlerObject" + key);
 			// Ensure initialized
 			if (trace.basic > 0) {
 				log("setHandlerObject: " + this.const.name + "." + key + "= ");
@@ -1268,12 +1306,14 @@
 				if (trace.basic > 0) logUngroup();
 				return overlayHandler.set.apply(overlayHandler, [overlayHandler.target, key, value]);
 			} else {
-				if (trace.basic > 0) log("no forward");
+				// if (trace.basic > 0) log("no forward");
+				// if (trace.basic) log("no forward");
+				trace.basic && log("no forward");
 			}
 			
 			// logGroup();
 			if (configuration.objectActivityList) registerActivity(this);
-			if (trace.basic > 0) log("configuration.objectActivityList: " + configuration.objectActivityList);
+			// if (trace.basic > 0) log("configuration.objectActivityList: " + configuration.objectActivityList);
 			
 			// Write protection
 			if (!canWrite(this.const.object)) {
@@ -1281,6 +1321,18 @@
 				return;
 			}
 			if (trace.basic > 0) log("can write!");
+			
+			// Check if setting a property
+			let scan = target;
+			while ( scan !== null && typeof(scan) !== 'undefined' ) {
+				let descriptor = Object.getOwnPropertyDescriptor(scan, key);
+				if (typeof(descriptor) !== 'undefined' && typeof(descriptor.get) !== 'undefined') {
+					if (trace.basic > 0) logUngroup();
+					if (trace.basic) log("Calling setter!...");
+					return descriptor.set.apply(this.const.object, [value]);
+				}
+				scan = Object.getPrototypeOf( scan );
+			}
 			
 			// Get previous value		// Get previous value
 			let previousValue;
@@ -1301,17 +1353,11 @@
 			// If same value as already set, do nothing.
 			if (key in target) {
 				if (previousValue === value || (Number.isNaN(previousValue) && Number.isNaN(value)) ) {
+					trace.basic && log("cannot set same value");
 					// if (configuration.name === 'objectCausality')  log("ALREAD SET");
 					if (trace.basic > 0) logUngroup();
 					return true;
 				}
-			}
-			
-			// If cumulative assignment, inside recorder and value is undefined, no assignment.
-			if (configuration.cumulativeAssignment && inActiveRecording && (isNaN(value) || typeof(value) === 'undefined')) {
-				// if (configuration.name === 'objectCausality')  log("CUMULATIVE");
-				if (trace.basic > 0) logUngroup();
-				return true;
 			}
 			
 			// Pulse start
@@ -1321,14 +1367,18 @@
 					
 			// Perform assignment with regards to incoming structures.
 			let incomingStructureValue;
+			trace.basic && log(state);
+			trace.basic && log(configuration);
 			if (state.useIncomingStructures) {
+				trace.basic && log("use incoming structures...");
 				activityListFrozen++;
 				decreaseIncomingCounter(previousValue);
 				increaseIncomingCounter(value);
 				if (state.incomingStructuresDisabled === 0) { // && !isIndexParentOf(this.const.object, value)
+					trace.basic && log("incoming structures not disbled...");
 					state.incomingStructuresDisabled++;
 					incomingStructureValue = createAndRemoveIncomingRelations(this.const.object, key, value, previousValue, previousIncomingStructure);
-					decreaseIncomingCounter(previousIncomingStructure);
+					if (typeof(previousIncomingStructure) !== 'undefined') decreaseIncomingCounter(previousIncomingStructure);
 					increaseIncomingCounter(incomingStructureValue);
 					target[key] = incomingStructureValue;
 					state.incomingStructuresDisabled--;
@@ -1337,12 +1387,14 @@
 				}
 				activityListFrozen--;
 			} else if (configuration.incomingReferenceCounters){
+				trace.basic && log("just use incoming reference counters...");
 				activityListFrozen++;
 				increaseIncomingCounter(value);
 				decreaseIncomingCounter(previousValue);
 				activityListFrozen--;
 				target[key] = value;
 			} else {
+				trace.basic && log("plain assignment... ");
 				target[key] = value;
 			}
 			
@@ -1357,8 +1409,8 @@
 				}
 			}
 
-			// Emit event
-			if (state.useIncomingStructures && state.incomingStructuresDisabled === 0) {// && !isIndexParentOf(this.const.object, value)) {
+			// Emit event   && 
+			if (state.useIncomingStructures && state.incomingStructuresDisabled === 0 && (previousValue !== previousIncomingStructure || value !== incomingStructureValue)) {// && !isIndexParentOf(this.const.object, value)) {
 				// Emit extra event 
 				state.incomingStructuresDisabled++
 				emitSetEvent(this, key, incomingStructureValue, previousIncomingStructure);
@@ -1367,8 +1419,7 @@
 			emitSetEvent(this, key, value, previousValue);
 			
 			// End pulse 
-			observerNotificationPostponed--;
-			proceedWithPostponedNotifications();
+			if (--observerNotificationPostponed === 0) proceedWithPostponedNotifications();
 			if (--inPulse === 0) postPulseCleanup();
 			if (trace.basic > 0) logUngroup();
 			return true;
@@ -1500,13 +1551,30 @@
 		 *  Create
 		 *
 		 ***************************************************************/
+		
+		// classRegistry = {};
+		
+		function addClasses(classes) {
+			// log("addClasses!!");
+			// log(classes, 2);
+			Object.assign(classRegistry, classes); 
+			// log(classRegistry, 2);
+		};
+		
+		function assignClassNamesTo(object) {
+			Object.assign(object, classRegistry);
+		}
 		 
 		function createImmutable(initial) {
 			inPulse++;
 			if (typeof(initial.const) === 'undefined') {			
-				initial.const = {id : nextId++};
+				initial.const = {
+					id : nextId++,
+					causalityInstance : causalityInstance
+				};
 			} else {
 				initial.const.id = nextId++;
+				initial.const.causalityInstance = causalityInstance;
 			}
 			
 			emitImmutableCreationEvent(initial);
@@ -1514,9 +1582,9 @@
 			return initial;
 		} 
 		 
-		function create(createdTarget, cacheId) {
+		function create(createdTarget, cacheIdOrInitData) {
 			if (trace.basic > 0) {
-				log("create:");
+				log("create, target type: " + typeof(createdTarget));
 				logGroup();
 			}
 			
@@ -1530,10 +1598,30 @@
 				initializer = createdTarget; 
 				createdTarget = {};
 			} else if (typeof(createdTarget) === 'string') {
-				createdTarget = classRegister[createdTarget]();
+				// log("create: " +  createdTarget);
+				if (createdTarget === 'Array') {
+					createdTarget = []; // On Node.js this is different from Object.create(eval("Array").prototype) for some reason... 
+				} else if (createdTarget === 'Object') {
+					createdTarget = {}; // Just in case of similar situations to above for some Javascript interpretors... 
+				} else {
+					let classOrPrototype = classRegistry[createdTarget];
+					if (typeof(classOrPrototype) !== 'function') {
+						throw new Error("No class found: " +  createdTarget);
+					}
+					// console.log(Object.keys(classRegistry));
+					// console.log(createdTarget);
+					// console.log(classOrPrototype);
+					createdTarget = new classRegistry[createdTarget]();
+				}
 			}
-			if (typeof(cacheId) === 'undefined') {
-				cacheId = null;
+			let cacheId = null;
+			let initialData = null;
+			if (typeof(cacheIdOrInitData) !== 'undefined') {
+				if (typeof(cacheIdOrInitData) === 'string') {
+					cacheId = cacheIdOrInitData; // TODO: int too? 
+				} else {
+					initialData = cacheIdOrInitData;
+				}
 			}
 
 			let handler;
@@ -1593,6 +1681,8 @@
 				// }
 			}
 
+			let initialConst = createdTarget.const;
+			delete createdTarget.const;
 			handler.target = createdTarget;
 			
 			// createdTarget.const.id = id; // TODO ??? 
@@ -1633,6 +1723,10 @@
 				removeForwarding : genericRemoveForwarding.bind(proxy),
 				mergeAndRemoveForwarding: genericMergeAndRemoveForwarding.bind(proxy)
 			};
+			for(property in initialConst) {
+				handler.const[property] = initialConst[property];
+			}
+			
 			if (typeof(createdTarget.const) !== 'undefined') {
 				for (property in createdTarget.const) {
 					handler.const[property] = createdTarget.const[property]; 
@@ -1675,24 +1769,44 @@
 			
 			if (trace.basic > 0) logUngroup();
 			
+			if(!state.blockInitialize && typeof(proxy.initialize) === 'function' ) {
+				if (initialData === null) {
+					initialData = {};
+				}
+				proxy.initialize.apply(proxy, [initialData]);
+			}
 			return proxy;
 		}
 
 		function isObject(entity) {
 			// console.log();
 			// console.log("isObject:");
-			// console.log(typeof(entity) === 'object');
-			// if (typeof(entity) === 'object') {
-				// console.log(entity !== null);
-				// if (entity !== null) {
-					// console.log(typeof(entity.const) !== 'undefined');
-					// if (typeof(entity.const) !== 'undefined')
-						// console.log(entity.const.causalityInstanceIdentity === causalityInstanceIdentity);				
-				// }
-			// }
-			// TODO: Fix the causality identity somehow. 
-			// return typeof(entity) === 'object' && entity !== null && typeof(entity.const) !== 'undefined' && entity.const.causalityInstanceIdentity === causalityInstanceIdentity;
-			return typeof(entity) === 'object' && entity !== null && typeof(entity.const) !== 'undefined' && entity.const.causalityInstance === causalityInstance;
+
+			let typeCorrect = typeof(entity) === 'object';
+			let notNull = entity !== null;
+			let hasConst = false;			
+			let rightCausalityInstance = false;
+			
+			if (typeCorrect && notNull) {
+				hasConst = typeof(entity.const) !== 'undefined';
+				// console.log("rightafter")
+				// console.log(hasConst);
+			
+				if (hasConst === true) {
+					rightCausalityInstance = entity.const.causalityInstance === causalityInstance;
+				}
+			}
+			
+			// console.log(typeCorrect);
+			// console.log(notNull);
+			// console.log(hasConst);
+			// console.log(rightCausalityInstance);
+			let result = (typeCorrect && notNull && hasConst && rightCausalityInstance); 
+			// console.log(result);
+			return result; 
+			
+			// One go!
+			// return typeof(entity) === 'object' && entity !== null && typeof(entity.const) !== 'undefined' && entity.const.causalityInstance === causalityInstance;
 		}
 		
 		/**********************************
@@ -1942,8 +2056,12 @@
 		let contextsScheduledForPossibleDestruction = [];
 
 		function postPulseCleanup() {
+			// logGroup("postPulseCleanup");
+			// log("postPulseCleanup");
 			inPulse++; // block new pulses!
+			
 			postPulseProcess++; // Blocks any model writing during post pulse cleanup
+			// log(pulseEvents);
 			contextsScheduledForPossibleDestruction.forEach(function(context) {
 				if (!context.directlyInvokedByApplication) {
 					if (emptyObserverSet(context.contextObservers)) {
@@ -1956,6 +2074,7 @@
 				callback(pulseEvents);
 			});
 			pulseEvents = [];
+			// logUngroup();
 			postPulseProcess--;
 			inPulse--;
 		}
@@ -2144,6 +2263,7 @@
 		 **********************************/
 
 		function uponChangeDo() { // description(optional), doFirst, doAfterChange. doAfterChange cannot modify model, if needed, use a repeater instead. (for guaranteed consistency)
+			// TODO: Consider, should this start a pulse?
 			// Arguments
 			let doFirst;
 			let doAfterChange;
@@ -2156,7 +2276,7 @@
 				doFirst       = arguments[0];
 				doAfterChange = arguments[1];
 			}
-
+			// log("createImmutable...");
 			// Recorder context
 			let context = createImmutable({
 				nextToNotify: null,
@@ -2169,8 +2289,10 @@
 					this.sources.lenght = 0;  // From repeater itself.
 				}
 			});
+			// log("createImmutableArrayIndex...");
 			createImmutableArrayIndex(context, "sources");
 			
+			// log("enterContext...");
 			enterContext('recording', context);
 			let returnValue = performAction(doFirst);
 			leaveContext();
@@ -2272,7 +2394,9 @@
 
 		function notifyChangeObserver(observer) {
 			if (observer != microContext) {
-				observer.remove(); // Cannot be any more dirty than it already is!
+				if (typeof(observer.remove) === 'function') {
+					observer.remove(); // Cannot be any more dirty than it already is!					
+				}
 				if (observerNotificationPostponed > 0) {
 					if (lastObserverToNotifyChange !== null) {
 						lastObserverToNotifyChange.nextToNotify = observer;
@@ -2334,7 +2458,7 @@
 			return refreshRepeater(createImmutable({
 				description: description,
 				action: repeaterAction,
-				remove: function() {
+				remove : function() {
 					// console.log("removeRepeater: " + repeater.const.id + "." + repeater.description);
 					removeChildContexts(this);
 					detatchRepeater(this);
@@ -3191,10 +3315,16 @@
 			c : create,
 			isObject: isObject,
 			
+			// Security
+			canRead : canRead, // TODO: change to allow read/write?
+			canWrite : canWrite, // TODO: change to allow read/write?
+			
 			// Reactive primitives
 			uponChangeDo : uponChangeDo,
 			repeatOnChange : repeatOnChange,
 			repeat: repeatOnChange,
+			getObjectAttatchedCache : getObjectAttatchedCache,
+			callAndCacheForUniqueArgumentLists : callAndCacheForUniqueArgumentLists, 
 			
 			// Global modifiers
 			withoutSideEffects : withoutSideEffects,
@@ -3211,6 +3341,9 @@
 			
 			// Incoming images
 			forAllIncoming : forAllIncoming,
+			getIncomingReferences : getIncomingReferences,
+			getIncomingReferencesMap : getIncomingReferencesMap,
+			getSingleIncomingReference : getSingleIncomingReference, 
 			createArrayIndex : createArrayIndex,
 			setIndex : setIndex
 		}
@@ -3245,6 +3378,9 @@
 			
 			// Install causality to global scope. 
 			install : install,
+			addClasses : addClasses,
+			assignClassNamesTo : assignClassNamesTo,
+			classRegistry : classRegistry, 
 			
 			// Setup. Consider: add these to configuration instead? 
 			addPostPulseAction : addPostPulseAction,
@@ -3303,7 +3439,6 @@
 			blockInitializeForIncomingStructures: false, 
 			blockInitializeForIncomingReferenceCounters: false, 
 			
-			cumulativeAssignment : false,
 			directStaticAccess : false,
 			objectActivityList : false,
 			recordPulseEvents : false

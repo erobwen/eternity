@@ -29,7 +29,8 @@ describe("Post pulse events etc", function(){
 			y.fooY = 31;
 			z.fumZ = 3;			
 		});
-		assert.equal(6, pulseEvents.length);
+		// console.log(pulseEvents);
+		assert.equal(3, pulseEvents.length);
 		assert.equal('set', pulseEvents[0].type);
 		assert.equal('fooX', pulseEvents[0].property);
 	});
