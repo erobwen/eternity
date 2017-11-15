@@ -196,13 +196,13 @@ describe("Projections", function(){
         assert.equal(detectedEvents[0].type, 'set');
 		assert.equal(detectedEvents[0].object.value, 4);
         assert.equal(detectedEvents[0].property, 'next');
-        assert.equal(detectedEvents[0].newValue.value, 4.5);
+        assert.equal(detectedEvents[0].value.value, 4.5);
         assert.equal(detectedEvents[0].oldValue.value, 5);
 
         assert.equal(detectedEvents[1].type, 'set');
 		assert.equal(detectedEvents[1].object.value, 5);
         assert.equal(detectedEvents[1].property, 'previous');
-        assert.equal(detectedEvents[1].newValue.value, 4.5);
+        assert.equal(detectedEvents[1].value.value, 4.5);
         assert.equal(detectedEvents[1].oldValue.value, 4);
     });
 
@@ -334,13 +334,13 @@ describe("Projections", function(){
         assert.equal(detectedEvents[0].type, 'set');
 		assert.equal(detectedEvents[0].object.value, 4);
         assert.equal(detectedEvents[0].property, 'next');
-        assert.equal(detectedEvents[0].newValue.value, 4.5);
+        assert.equal(detectedEvents[0].value.value, 4.5);
         assert.equal(detectedEvents[0].oldValue.value, 5);
 
         assert.equal(detectedEvents[1].type, 'set');
 		assert.equal(detectedEvents[1].object.value, 5);
         assert.equal(detectedEvents[1].property, 'previous');
-        assert.equal(detectedEvents[1].newValue.value, 4.5);
+        assert.equal(detectedEvents[1].value.value, 4.5);
         assert.equal(detectedEvents[1].oldValue.value, 4);
 
         // Assert updated

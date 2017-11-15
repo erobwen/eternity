@@ -75,7 +75,7 @@
 								if (trace.eternity) log("set event");
 								markOldValueAsUnstable(dbImage, event);
 									
-								setPropertyOfImageAndFloodCreateNewImages(dbImage, event.property, event.newValue);
+								setPropertyOfImageAndFloodCreateNewImages(dbImage, event.property, event.value);
 							} else if (event.type === 'delete') {
 								markOldValueAsUnstable(dbImage, event);
 																
@@ -379,7 +379,7 @@
 				imageCausality.blockInitialize(function() {
 					// log(event, 1);
 					// if (event.type === 'set') {
-						// log(valueToString(event.object) + ".set " + event.property + " to " + valueToString(event.newValue) + (event.incomingStructureEvent ? " [incoming]" : ""));
+						// log(valueToString(event.object) + ".set " + event.property + " to " + valueToString(event.value) + (event.incomingStructureEvent ? " [incoming]" : ""));
 					// }
 				});
 			});
@@ -525,7 +525,7 @@
 								
 								// Serialized value with temporary db ids. 
 								// recursiveCounter = 0;
-								let newValue = convertReferencesToDbIdsOrTemporaryIds(event.newValue);
+								let newValue = convertReferencesToDbIdsOrTemporaryIds(event.value);
 								let property = event.property;
 								property = imageCausality.transformPossibleIdExpression(property, imageIdToDbIdOrTmpDbId);
 								imageUpdates[event.property] = newValue;
@@ -570,7 +570,7 @@
 		
 		
 		function imageEventHasObjectValue(event) {
-			return imageCausality.isObject(event.newValue) || imageCausality.isObject(event.oldValue);
+			return imageCausality.isObject(event.value) || imageCausality.isObject(event.oldValue);
 		}
 		
 	

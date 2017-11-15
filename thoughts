@@ -9,6 +9,7 @@ Eternity work in progress:
 	* Refactor and create the incoming observation interface. IMPORTANT
 	* Make sure incoming structures are removed+deallocated when not needed. IMPORTANT BUT CAN WAIT
 	* Make sure loaded incoming references is updated upon adding and removal of persistent objects.  IMPORTANT BUT CAN WAIT
+* Activate: event.isConsequence in causality... IMPORTANT
 
 * Store reactive primitives persistently
 	* Modify causality to use methods rather than functions. POSTPONE TO LATER
@@ -18,7 +19,7 @@ Eternity work in progress:
 * Connect to an actual database. POSTPONE TO LATER
 
 Next Major Step:
-* Convert old Liquid
+* Convert old Liquid In progress.... 
 
 
 

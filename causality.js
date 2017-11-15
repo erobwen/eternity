@@ -23,7 +23,8 @@
 		let state = { 
 			useIncomingStructures : configuration.useIncomingStructures,
 			incomingStructuresDisabled : 0,
-			blockInitialize : false
+			blockInitialize : false,
+			refreshingRepeater : false
 		};
 
 		/***************************************************************
@@ -360,7 +361,11 @@
 			if (isObject(previousValue)) {
 				if (trace.basic) log("tear down previous... ");
 				if (configuration.blockInitializeForIncomingStructures) blockingInitialize++;
-				removeIncomingStructure(objectProxy.const.id, previousStructure);
+				// if (typeof(previousStructure) === 'undefined') {
+					// log(previousValue);
+					// throw new Error("Waaaaaaaaaaaaat");
+				// }
+				if (typeof(previousStructure) !== 'undefined') removeIncomingStructure(objectProxy.const.id, previousStructure);
 				if (previousValue.const.incoming && previousValue.const.incoming[referringRelation]&& previousValue.const.incoming[referringRelation].observers) {
 					notifyChangeObservers(previousValue.const.incoming[referringRelation]);
 				}
@@ -1290,6 +1295,8 @@
 		
 		function setHandlerObject(target, key, value) {
 			// log("setHandlerObject" + key);
+			if (configuration.reactiveStructuresAsCausalityObjects && key === '_cachedCalls') throw new Error("Should not be happening!");
+			
 			// Ensure initialized
 			if (trace.basic > 0) {
 				log("setHandlerObject: " + this.const.name + "." + key + "= ");
@@ -1334,19 +1341,20 @@
 			}
 			
 			// Get previous value		// Get previous value
-			let previousValue;
+			let previousValue = target[key];
 			let previousIncomingStructure;
-			if (state.useIncomingStructures && state.incomingStructuresDisabled === 0) {  // && !isIndexParentOf(this.const.object, value) (not needed... )
+			if (typeof(previousValue) === 'object' && state.useIncomingStructures && state.incomingStructuresDisabled === 0) {  // && !isIndexParentOf(this.const.object, value) (not needed... )
 				// console.log("causality.getHandlerObject:");
 				// console.log(key);
 				state.incomingStructuresDisabled++;
 				activityListFrozen++;
-				previousIncomingStructure = target[key];
-				previousValue = findReferredObject(target[key]);
+				let actualPreviousValue = findReferredObject(previousValue);
+				if (actualPreviousValue !== previousValue) {
+					previousIncomingStructure = previousValue;
+					previousValue = actualPreviousValue;
+				}
 				activityListFrozen--;
 				state.incomingStructuresDisabled--;
-			} else {
-				previousValue = target[key]; 
 			}
 			
 			// If same value as already set, do nothing.
@@ -1409,10 +1417,10 @@
 			}
 
 			// Emit event   && 
-			if (state.useIncomingStructures && state.incomingStructuresDisabled === 0 && (previousValue !== previousIncomingStructure || value !== incomingStructureValue)) {// && !isIndexParentOf(this.const.object, value)) {
+			if (state.useIncomingStructures && state.incomingStructuresDisabled === 0 && (typeof(previousIncomingStructure) !== 'undefined' || value !== incomingStructureValue)) {// && !isIndexParentOf(this.const.object, value)) {
 				// Emit extra event 
 				state.incomingStructuresDisabled++
-				emitSetEvent(this, key, incomingStructureValue, previousIncomingStructure);
+				emitSetEvent(this, key, incomingStructureValue, typeof(previousIncomingStructure) !== 'undefined' ? previousIncomingStructure : previousValue);
 				state.incomingStructuresDisabled--
 			}
 			emitSetEvent(this, key, value, previousValue);
@@ -2135,7 +2143,7 @@
 
 		function emitSetEvent(handler, key, value, previousValue) {
 			if (configuration.recordPulseEvents || typeof(handler.observers) !== 'undefined') {
-				emitEvent(handler, {type: 'set', property: key, newValue: value, oldValue: previousValue});
+				emitEvent(handler, {type: 'set', property: key, value: value, oldValue: previousValue});
 			}
 		}
 
@@ -2158,6 +2166,7 @@
 				// console.log(event);
 				// event.objectId = handler.const.id;
 				event.object = handler.const.object; 
+				// event.isConsequence = state.refreshingRepeater; // TODO: Add this
 				if (configuration.recordPulseEvents) {
 					pulseEvents.push(event);
 				}
@@ -2169,8 +2178,8 @@
 			}
 		}
 		
-		function emitUnobservableEvent(event) {
-			if (configuration.recordPulseEvents) {
+		function emitUnobservableEvent(event) { // TODO: move reactiveStructuresAsCausalityObjects upstream in the call chain..  
+			if (configuration.reactiveStructuresAsCausalityObjects && configuration.recordPulseEvents) {
 				pulseEvents.push(event);
 			}
 		}
@@ -2497,6 +2506,7 @@
 		}
 
 		function refreshRepeater(repeater) {
+			state.refreshingRepeater = true;
 			enterContext('repeater_refreshing', repeater);
 			// console.log("parent context type: " + repeater.parent.type);
 			// console.log("context type: " + repeater.type);
@@ -2510,6 +2520,7 @@
 				}
 			);
 			leaveContext();
+			state.refreshingRepeater = false;
 			return repeater;
 		}
 
@@ -2814,7 +2825,7 @@
 			let functionName = argumentsList.shift();
 			
 			return callAndCacheForUniqueArgumentLists(
-				getObjectAttatchedCache(this, "_cachedCalls", functionName), 
+				getObjectAttatchedCache(configuration.reactiveStructuresAsCausalityObjects ? this : this.const, "_cachedCalls", functionName), 
 				argumentsList,
 				function() {
 					return this[functionName].apply(this, argumentsList);
@@ -2886,7 +2897,7 @@
 			let functionName = argumentsList.shift();
 
 			// Cached
-			let cache = getObjectAttatchedCache(this, "_cachedCalls", functionName);
+			let cache = getObjectAttatchedCache(configuration.reactiveStructuresAsCausalityObjects ? this : this.const, "_cachedCalls", functionName);
 			let functionCacher = getFunctionCacher(cache, argumentsList);
 
 			if (functionCacher.cacheRecordExists()) {
