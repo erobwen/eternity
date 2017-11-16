@@ -245,15 +245,15 @@
 			objectCausality.pokeObject(object); // poke all newly saved?
 		}
 		
-		function createDbImageRecursivley(entity, potentialParentImage, potentialParentProperty) {
-			// log("createDbImageRecursivley");
-			if (objectCausality.isObject(entity)) {
-				createDbImageForObject(entity, potentialParentImage, potentialParentProperty);		
-				return entity.const.dbImage;
-			} else {
-				return entity;
-			}
-		} 
+		// function createDbImageRecursivley(entity, potentialParentImage, potentialParentProperty) {
+			// // log("createDbImageRecursivley");
+			// if (objectCausality.isObject(entity)) {
+				// createDbImageForObject(entity, potentialParentImage, potentialParentProperty);		
+				// return entity.const.dbImage;
+			// } else {
+				// return entity;
+			// }
+		// } 
 		
 
 		/*-----------------------------------------------

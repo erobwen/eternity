@@ -148,6 +148,16 @@
 		}
 		 
 		
+		// Remove ? 
+		// function isIndexParentOf(potentialParent, potentialIndex) {
+			// if (!isObject(potentialParent) || !isObject(potentialIndex)) {  // what is actually an object, what 
+			// // if (typeof(potentialParent) !== 'object' || typeof(potentialIndex) !== 'object') {
+				// return false;
+			// } else {
+				// return (typeof(potentialIndex.indexParent) !== 'undefined') && potentialIndex.indexParent === potentialParent;
+			// }
+		// }
+		
 		function createReactiveArrayIndex(object, property) {
 			let index = [];
 			if (configuration.reactiveStructuresAsCausalityObjects) index = createImmutable(index);
@@ -208,7 +218,12 @@
 		 *  Incoming relations. 
 		 *
 		 ***************************************************************/
-		  
+		 
+		function getReferredObject(value) {
+			if (isObject(value)) {
+				
+			}
+		}
 		
 		function getSingleIncomingReference(object, property, filter) {
 			trace.incoming && log("getSingleIncomingReference");
@@ -918,8 +933,6 @@
 				return this.const;
 			} else if (constArrayOverrides[key]) {
 				return constArrayOverrides[key].bind(this);
-			} else if (configuration.directStaticAccess && typeof(this.const[key]) !== 'undefined') {
-				return this.const[key];
 			} else {
 				if (inActiveRecording) {
 					registerChangeObserver(getSpecifier(this.const, "_arrayObservers"));//object
@@ -1082,41 +1095,6 @@
 		 *  Object Handlers
 		 *
 		 ***************************************************************/
-	/*
-		function getHandlerObjectOptimized(target, key) {
-			key = key.toString();
-
-			if (this.const.forwardsTo !== null && key !== "nonForwardConst") {
-				let overlayHandler = this.const.forwardsTo.const.handler;
-				let result = overlayHandler.get.apply(overlayHandler, [overlayHandler.target, key]);
-				return result;
-			}
-					
-			if (key === 'const') {
-				return this.const;
-			} else {
-				if (typeof(key) !== 'undefined') {
-					let scan = target;
-					while ( scan !== null && typeof(scan) !== 'undefined' ) {
-						let descriptor = Object.getOwnPropertyDescriptor(scan, key);
-						if (typeof(descriptor) !== 'undefined' && typeof(descriptor.get) !== 'undefined') {
-							return descriptor.get.bind(this.const.object)();
-						}
-						scan = Object.getPrototypeOf( scan );
-					}
-					let keyInTarget = key in target;
-					if (inActiveRecording) {
-						if (keyInTarget) {
-							registerChangeObserver(getSpecifier(getSpecifier(this.const, "_propertyObservers"), key));
-						} else {
-							registerChangeObserver(getSpecifier(this.const, "_enumerateObservers"));
-						}
-					}
-					return target[key];
-				}
-			}
-		}
-	*/
 		
 		function getHandlerObject(target, key) {
 			if (trace.get > 0) {
@@ -1146,10 +1124,6 @@
 			if (key === "const" || key === "nonForwardConst") {
 				if (trace.get > 0) logUngroup();
 				return this.const;
-			} else if (configuration.directStaticAccess && typeof(this.const[key]) !== 'undefined') { // TODO: implement directStaticAccess for other readers. 
-				// console.log("direct const access: " + key);
-				if (trace.get > 0) logUngroup();
-				return this.const[key];
 			} else {
 				if (typeof(key) !== 'undefined') {
 					let scan = target;
@@ -1182,71 +1156,6 @@
 				}
 			}
 		}
-		
-		/*
-		function setHandlerObjectOptimized(target, key, value) {		
-			// Overlays
-			if (this.const.forwardsTo !== null) {
-				let overlayHandler = this.const.forwardsTo.const.handler;
-				return overlayHandler.set.apply(overlayHandler, [overlayHandler.target, key, value]);
-			}
-			
-			// Writeprotection
-			if (postPulseProcess) {
-				return;
-			}
-			if (writeRestriction !== null && typeof(writeRestriction[object.const.id]) === 'undefined') {
-				return;
-			}
-			
-			let previousValue = target[key];
-			
-			// If same value as already set, do nothing.
-			if (key in target) {
-				if (previousValue === value || (Number.isNaN(previousValue) && Number.isNaN(value)) ) {
-					return true;
-				}
-			}
-			
-			// Pulse start
-			inPulse++;
-			// observerNotificationPostponed++;
-			let undefinedKey = !(key in target);
-			
-			// Perform assignment with regards to incoming structures.
-			target[key] = value;
-
-			
-			// If assignment was successful, notify change
-			if (undefinedKey) {
-				if (typeof(this.const._enumerateObservers) !== 'undefined') {
-					notifyChangeObservers(this.const._enumerateObservers);
-				}
-			} else {
-				if (typeof(this.const._propertyObservers) !== 'undefined' && typeof(this.const._propertyObservers[key]) !== 'undefined') {
-					notifyChangeObservers(this.const._propertyObservers[key]);
-				}
-			}
-
-			// Emit event
-			emitSetEvent(this, key, value, previousValue);
-			
-			// End pulse 
-			// observerNotificationPostponed--;
-			// proceedWithPostponedNotifications();
-			if (--inPulse === 0) postPulseCleanup();
-			return true;
-		}
-		*/
-
-		// function isIndexParentOf(potentialParent, potentialIndex) {
-			// if (!isObject(potentialParent) || !isObject(potentialIndex)) {  // what is actually an object, what 
-			// // if (typeof(potentialParent) !== 'object' || typeof(potentialIndex) !== 'object') {
-				// return false;
-			// } else {
-				// return (typeof(potentialIndex.indexParent) !== 'undefined') && potentialIndex.indexParent === potentialParent;
-			// }
-		// }
 		
 		
 		
@@ -3486,14 +3395,13 @@
 			useIncomingStructures : false,
 			incomingStructureChunkSize: 500,
 			incomingChunkRemovedCallback : null,
-			incomingStructuresAsCausalityObjects: false,
+			incomingStructuresAsCausalityObjects: false, // implies events will be on an incoming structure level as well. 
 			incomingReferenceCounters : false, 
 			blockInitializeForIncomingStructures: false, 
 			blockInitializeForIncomingReferenceCounters: false,
 			
 			reactiveStructuresAsCausalityObjects: false, 
 			
-			directStaticAccess : false,
 			objectActivityList : false,
 			recordPulseEvents : false
 		}
