@@ -16,13 +16,12 @@
 	// Neat logging
 	let objectlog = require('./objectlog.js');
 	let log = objectlog.log;
-	// function log() {
-		// throw new Error("quit talking");
-	// }
 	let logGroup = objectlog.enter;
 	let logUngroup = objectlog.exit;
 
 	function createEternityInstance(configuration) {
+		// console.log(">>> CREATE ETERNITY INSTANCE <<<");
+
 		// log("createEternityInstance: " + configuration.name);
 		// logGroup();
 		// log(configuration,5);
@@ -31,10 +30,17 @@
 		/*-----------------------------------------------
 		 *          Object post pulse events
 		 *-----------------------------------------------*/
-		 
+		
+		let postPulseCallbackBeforeStorage = null;
+		function setPostPulseActionBeforeStorage(callback) {
+			postPulseCallbackBeforeStorage = callback;
+		}
+		
 		let unstableImages = [];
 
 		function postObjectPulseAction(events) {
+			if (postPulseCallbackBeforeStorage) postPulseCallbackBeforeStorage();
+			
 			// log("postObjectPulseAction: " + events.length + " events");
 			// logGroup();
 			// if (events.length > 0) {
@@ -54,6 +60,8 @@
 				log("transferChangesToImage");
 				logGroup();
 			}
+			// log("objectCausalityState: ");
+			// log(objectCausality.state);
 			if (events.length > 0) {
 				// log("... Model pulse complete, update image and flood create images & flood unstable ");
 				// log("events.length = " + events.length);
@@ -75,11 +83,11 @@
 								if (trace.eternity) log("set event");
 								markOldValueAsUnstable(dbImage, event);
 									
-								setPropertyOfImageAndFloodCreateNewImages(dbImage, event.property, event.value);
+								setPropertyOfImageAndFloodCreateNewImages(event.object, event.property, event.value);
 							} else if (event.type === 'delete') {
 								markOldValueAsUnstable(dbImage, event);
 																
-								delete dbImage[event.property];
+								delete dbImage[event.property]; // TODO: Do we need something special when deleting indicies?
 							}
 						}
 					});
@@ -103,53 +111,67 @@
 			}
 		}
 		
-		function setPropertyOfImageAndFloodCreateNewImages(dbImage, property, objectValue) {
+		function setPropertyOfImageAndFloodCreateNewImages(object, property, objectValue) {
+			// log("setPropertyOfImage: " + property + " = ...");
 			if (trace.eternity) {
-				log("setPropertyOfImage: " + property + " = ...");
 				log(objectCausality.state);
 				log(imageCausality.state);
 			}
 			
-			if (objectCausality.isObject(objectValue)) {
-				let newValue = objectValue;
+			if (objectCausality.isObject(objectValue)) {             
+				let imageValue; 
 				// Get existing or create new image. 
-				if (typeof(newValue.const.dbImage) === 'object') {
-					let referedDbImage = newValue.const.dbImage;
-					if (unstableOrBeeingKilledInGcProcess(referedDbImage)) {
+				if (typeof(objectValue.const.dbImage) === 'object') {
+					imageValue = objectValue.const.dbImage;
+					if (unstableOrBeeingKilledInGcProcess(imageValue)) {
 						// log("here...filling");
-						referedDbImage._eternityParent = dbImage;
-						referedDbImage._eternityParentProperty = property;
-						if (inList(deallocationZone, referedDbImage)) {
-							fillDbImageFromCorrespondingObject(newValue); 							
+						imageValue._eternityParent = object.const.dbImage;
+						imageValue._eternityParentProperty = property;
+						if (inList(deallocationZone, imageValue)) {
+							fillDbImageFromCorrespondingObject(imageValue); 							
 						}
-						addFirstToList(gcState, pendingForChildReattatchment, referedDbImage);
+						addFirstToList(gcState, pendingForChildReattatchment, imageValue);
 						
-						removeFromAllGcLists(referedDbImage);
-					} else {
-						// log("say what...");
-						// log(referedDbImage);
-						newValue = referedDbImage;
+						removeFromAllGcLists(imageValue);
 					}
 				} else {
-					createDbImageForObject(newValue, dbImage, property);					
-					newValue = newValue.const.dbImage;
+					createDbImageForObject(objectValue, object.const.dbImage, property);					
+					imageValue = objectValue.const.dbImage;
 				}
 				
 				// Check if this is an index assignment. 
-				if (newValue.indexParent === dbImage) {
-					disableIncomingRelations(function() {
-						dbImage[property] = newValue;
-					});
+				if (objectValue.indexParent === object && objectValue.indexParentRelation === property && typeof(object.const.dbImage[property] === 'undefined')) {
+					// throw new Error("here A");
+					imageCausality.setIndex(object.const.dbImage, property, imageValue);
 				} else {
-					dbImage[property] = newValue; 
+					// if (property === "indexParent" && typeof(imageValue[property] === 'undefined')) {
+						// // throw new Error("here B");
+						// imageCausality.setIndex(imageValue, property, object.const.dbImage);
+					// } else {
+					if (property !== 'indexParent' && property !== 'indexParentRelation') {
+						object.const.dbImage[property] = imageValue; 
+					}
+					// }
 				}
 			} else {
-				if (trace.eternity) log("wtf...");
-				logGroup();
-				// imageCausality.trace.basic = true;
-				dbImage[property] = objectValue;
-				delete imageCausality.trace.basic;
-				logUngroup();
+				// log("no object value");
+				// if (trace.eternity) log("wtf...");
+				// log("a");
+				// logGroup();
+				// if (property === 'indexParentRelation') {
+					// imageCausality.trace.basic++;
+					// log("relationName: " + objectValue);
+				// }
+				// log("b");
+				// log(property);
+				if (property !== 'indexParent' && property !== 'indexParentRelation') {
+					object.const.dbImage[property] = objectValue;
+				}
+				// if (property === 'indexParentRelation') imageCausality.trace.basic--;
+				// log("c");
+				// delete imageCausality.trace.basic;
+				// logUngroup();
+				// log("...");
 			}
 		}
 
@@ -214,9 +236,9 @@
 		}
 		
 		function fillDbImageFromCorrespondingObject(object) {
-			let dbImage = object.const.dbImage;
 			for (let property in object) { 
-				setPropertyOfImageAndFloodCreateNewImages(dbImage, property, object[property]);
+				setPropertyOfImageAndFloodCreateNewImages(object, property, object[property]);
+				// log("after in small loop");
 			}			
 			loadedObjects++;
 			// log("fillDbImageFromCorrespondingObject, and poking...");
@@ -525,10 +547,10 @@
 								
 								// Serialized value with temporary db ids. 
 								// recursiveCounter = 0;
-								let newValue = convertReferencesToDbIdsOrTemporaryIds(event.value);
+								let value = convertReferencesToDbIdsOrTemporaryIds(event.value);
 								let property = event.property;
 								property = imageCausality.transformPossibleIdExpression(property, imageIdToDbIdOrTmpDbId);
-								imageUpdates[event.property] = newValue;
+								imageUpdates[event.property] = value;
 								if (typeof(imageUpdates["_eternityDeletedKeys"]) !== 'undefined') {
 									delete imageUpdates["_eternityDeletedKeys"][event.property];
 								} 
@@ -576,13 +598,11 @@
 	
 		// should disableIncomingRelations
 		function serializeDbImage(dbImage) {
-			
 			// imageCausality.disableIncomingRelations(function() {
 			// log(dbImage, 2);
 			// log(imageCausality.isObject(dbImage));
 			let serialized = (dbImage instanceof Array) ? [] : {};
 			for (let property in dbImage) {
-				// TODO: convert idExpressions
 				if (property !== 'const') {
 					// && property != 'incoming'
 					// recursiveCounter = 0;
@@ -622,6 +642,31 @@
 					return getTmpDbId(entity);
 				}
 			} else if (entity !== null && typeof(entity) === 'object') {
+				
+				if (!configuration.allowPlainObjectReferences) { 
+				
+					let typeCorrect = typeof(entity) === 'object';
+					let notNull = entity !== null;
+					let hasConst = false;			
+					let rightCausalityInstance = false;
+					
+					if (typeCorrect && notNull) {
+						hasConst = typeof(entity.const) !== 'undefined';
+						// console.log("rightafter")
+						// console.log(hasConst);
+					
+						if (hasConst === true) {
+							rightCausalityInstance = entity.const.causalityInstance === imageCausality;
+						}
+					}
+					
+					console.log(typeCorrect);
+					console.log(notNull);
+					console.log(hasConst);
+					console.log(rightCausalityInstance);
+					log(entity, 1);
+					throw new Error("Plain object references not allowed!"); 
+				}
 				// log("===========");
 				// log(entity, 3);
 				// log("===========");
@@ -803,7 +848,8 @@
 			let placeholder;
 			imageCausality.pulse(function() { // Pulse here to make sure that dbId is set before post image pulse comence.
 				let record = peekAtRecord(dbId);
-				placeholder = imageCausality.create(createTarget(typeof(record._eternityImageClass) !== 'undefined' ? record._eternityImageClass : 'Object'));
+				// console.log(typeof(record._eternityImageClass) !== 'undefined' ? record._eternityImageClass : 'Object');
+				placeholder = imageCausality.create(typeof(record._eternityImageClass) !== 'undefined' ? record._eternityImageClass : 'Object');
 				placeholder.const.isObjectImage = typeof(record._eternityIsObjectImage) !== 'undefined' ? record._eternityIsObjectImage : false;
 				placeholder.const.loadedIncomingReferenceCount = 0;
 				placeholder.const.dbId = dbId;
@@ -872,7 +918,7 @@
 		}
 		
 		function createObjectPlaceholderFromDbId(dbId) {
-			let placeholder = objectCausality.create(createTarget(peekAtRecord(dbId)._eternityObjectClass));
+			let placeholder = objectCausality.create(peekAtRecord(dbId)._eternityObjectClass);
 			placeholder.const.dbId = dbId;
 			placeholder.const.name = peekAtRecord(dbId).name;
 			// log("createObjectPlaceholderFromDbId: " + dbId + ", " + placeholder.const.name);
@@ -2152,7 +2198,7 @@
 			incomingChunkRemovedCallback : incomingChunkRemovedForImage,
 			useIncomingStructures: true,
 			incomingReferenceCounters : true, 
-			incomingStructuresAsCausalityObjects : true,
+			incomingStructuresAsCausalityObjects : true, // Is this static or non static objects? 
 			blockInitializeForIncomingReferenceCounters: true,
 		});
 		imageCausality.addPostPulseAction(postImagePulseAction);
@@ -2195,6 +2241,7 @@
 		
 		// Primary causality object space
 		let objectCausalityConfiguration = {};
+		// log("Assigning causality");
 		Object.assign(objectCausalityConfiguration, configuration.causalityConfiguration);
 		Object.assign(objectCausalityConfiguration, {
 			name: 'objectCausality', 
@@ -2211,6 +2258,9 @@
 		let objectCausality = require("./causality.js")(objectCausalityConfiguration);
 		
 		// Additions 
+		Object.assign(objectCausality, {
+			setPostPulseActionBeforeStorage : setPostPulseActionBeforeStorage
+		});
 		objectCausality.addPostPulseAction(postObjectPulseAction);
 		objectCausality.mockMongoDB = mockMongoDB;
 		objectCausality.unloadAllAndClearMemory = unloadAllAndClearMemory;
@@ -2281,9 +2331,9 @@
 		return {
 			maxNumberOfLoadedObjects : 10000,
 			persistentIncomingChunkSize : 500,
-			classRegistry : {},
 			twoPhaseComit : true,
-			causalityConfiguration : {}
+			causalityConfiguration : {},
+			allowPlainObjectReferences : true
 		}
 	}
 	

@@ -211,7 +211,7 @@
 		  
 		
 		function getSingleIncomingReference(object, property, filter) {
-			trace.basic && log("getSingleIncomingReference");
+			trace.incoming && log("getSingleIncomingReference");
 			let result = null;
 			forAllIncoming(object, property, function(foundObject) {
 				if (result === null) {
@@ -225,7 +225,7 @@
 		
 		function getIncomingReferences(object, property, filter) {
 			// log(trace)
-			trace.basic && log("getIncomingReferences");
+			trace.incoming && log("getIncomingReferences");
 			if (typeof(object) === 'undefined') {
 				throw new Error("No object given to 'getIncomingReferences'");
 			}
@@ -245,15 +245,15 @@
 		}
 		
 		function forAllIncoming(object, property, callback, filter) {
-			if(trace.basics) log("forAllIncoming");
-			if(trace.basic) log(object.const.incoming, 2);
+			if(trace.incoming) log("forAllIncoming");
+			if(trace.incoming) log(object.const.incoming, 2);
 			if (inActiveRecording) registerAnyChangeObserver(getSpecifier(getSpecifier(getSpecifier(object.const, "incoming"), property), "observers"));
 			withoutRecording(function() { // This is needed for setups where incoming structures are made out of causality objects. 
 				if (typeof(object.const.incoming) !== 'undefined') {
-					if(trace.basics) log("incoming exists!");
+					if(trace.incoming) log("incoming exists!");
 					let relations = object.const.incoming;
 					if (typeof(relations[property]) !== 'undefined') {
-						trace.basic && log("property exists");
+						trace.incoming && log("property exists");
 						let relation = relations[property];
 						if (relation.initialized === true) {							
 							let contents = relation.contents;
@@ -335,8 +335,9 @@
 		
 		
 		function createAndRemoveIncomingRelations(objectProxy, key, value, previousValue, previousStructure) {
+			// Note: sometimes value and previous value are just strings. Optimize for this case... 
 			let referringRelation = key;
-			if (trace.basic) {
+			if (trace.incoming) {
 				log("createAndRemoveIncomingRelations");
 				log(referringRelation);
 				log(objectProxy);
@@ -346,20 +347,20 @@
 			while (typeof(objectProxy.indexParent) !==  'undefined') {
 				referringRelation = objectProxy.indexParentRelation;
 				objectProxy = objectProxy.indexParent;				
-				if (trace.basic) {
+				if (trace.incoming) {
 					log("Moving up one step:");
 					log(referringRelation);
 					log(objectProxy);
 				}
 			}
 			if (!isObject(objectProxy)) {
-				log(objectProxy);
+				// log(objectProxy);
 				throw new Error("object proxy not an object!");
 			}
 			
 			// Tear down structure to old value
 			if (isObject(previousValue)) {
-				if (trace.basic) log("tear down previous... ");
+				if (trace.incoming) log("tear down previous... ");
 				if (configuration.blockInitializeForIncomingStructures) blockingInitialize++;
 				// if (typeof(previousStructure) === 'undefined') {
 					// log(previousValue);
@@ -474,10 +475,10 @@
 		}
 		
 		function createIncomingStructure(referingObject, referingObjectId, property, object) {
-			trace.basic && log("createIncomingStructure");
+			trace.incoming && log("createIncomingStructure");
 			let incomingStructure = getIncomingRelationStructure(object, property);
 
-			trace.basic && log(incomingStructure);
+			trace.incoming && log(incomingStructure);
 			if (typeof(incomingStructure) === 'undefined') throw new Error("WTF");
 
 			let incomingRelationChunk = intitializeAndConstructIncomingStructure(incomingStructure, referingObject, referingObjectId);
@@ -490,7 +491,7 @@
 		
 		
 		function getIncomingRelationStructure(referencedObject, property) {
-			trace.basic && log("getIncomingRelationStructure");
+			trace.incoming && log("getIncomingRelationStructure");
 			
 			// Sanity test TODO: remove 
 			if (state.incomingStructuresDisabled === 0) {
@@ -540,7 +541,7 @@
 		* Structure helpers
 		*/				
 		function removeIncomingStructure(refererId, referedEntity) {
-			if (trace.basic) {
+			if (trace.incoming) {
 				log("removeIncomingStructure");
 				log(refererId);
 				log(referedEntity, 3);
@@ -717,11 +718,11 @@
 				
 				// TODO: configuration.incomingReferenceCounters || .... 
 				if (state.useIncomingStructures && state.incomingStructuresDisabled === 0) {
-					state.incomingStructuresDisabled++
+					state.incomingStructuresDisabled++;
 					added = createAndRemoveArrayIncomingRelations(this.const.object, index, removed, added); // TODO: implement for other array manipulators as well. 
 					// TODO: What about removed adjusted? 
 					// TODO: What about the events? 
-					state.incomingStructuresDisabled--
+					state.incomingStructuresDisabled--;
 				}
 				
 				observerNotificationNullified++;
@@ -1156,7 +1157,7 @@
 						let descriptor = Object.getOwnPropertyDescriptor(scan, key);
 						if (typeof(descriptor) !== 'undefined' && typeof(descriptor.get) !== 'undefined') {
 							if (trace.get > 0) logUngroup();
-							// if (trace.basic) log("returning bound thing...");
+							// if (trace.get) log("returning bound thing...");
 							return descriptor.get.bind(this.const.object)();
 						}
 						scan = Object.getPrototypeOf( scan );
@@ -1374,8 +1375,8 @@
 					
 			// Perform assignment with regards to incoming structures.
 			let incomingStructureValue;
-			trace.basic && log(state);
-			trace.basic && log(configuration);
+			// trace.basic && log(state);
+			// trace.basic && log(configuration);
 			if (state.useIncomingStructures) {
 				trace.basic && log("use incoming structures...");
 				activityListFrozen++;
@@ -2142,6 +2143,11 @@
 		}
 
 		function emitSetEvent(handler, key, value, previousValue) {
+			if (trace.basic) {
+				log("emitSetEvent");
+				log(configuration);
+				
+			}
 			if (configuration.recordPulseEvents || typeof(handler.observers) !== 'undefined') {
 				emitEvent(handler, {type: 'set', property: key, value: value, oldValue: previousValue});
 			}
@@ -2157,6 +2163,7 @@
 			if (trace.basic) {
 				log("emitEvent: ");// + event.type + " " + event.property);
 				log(event);
+				log("emitEventPaused: " + emitEventPaused);
 			}
 			if (emitEventPaused === 0) {
 				// log("EMIT EVENT " + configuration.name + " " + event.type + " " + event.property + "=...");
@@ -2166,7 +2173,7 @@
 				// console.log(event);
 				// event.objectId = handler.const.id;
 				event.object = handler.const.object; 
-				// event.isConsequence = state.refreshingRepeater; // TODO: Add this
+				// event.isConsequence = state.refreshingRepeater;
 				if (configuration.recordPulseEvents) {
 					pulseEvents.push(event);
 				}
@@ -2179,6 +2186,7 @@
 		}
 		
 		function emitUnobservableEvent(event) { // TODO: move reactiveStructuresAsCausalityObjects upstream in the call chain..  
+			// throw new Error("Should not be here!!");
 			if (configuration.reactiveStructuresAsCausalityObjects && configuration.recordPulseEvents) {
 				pulseEvents.push(event);
 			}
