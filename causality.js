@@ -128,7 +128,23 @@
 		 *  Indicies
 		 *
 		 ***************************************************************/
-		 
+		 		
+		/**
+		 * Traverse the index structure. TODO: This should perahps be used for all assignments.... ?
+		 */
+		let gottenReferingObject;
+		let gottenReferingObjectRelation;
+		function getReferingObject(possibleIndex, relationFromPossibleIndex) {
+			gottenReferingObject = possibleIndex;
+			gottenReferingObjectRelation = relationFromPossibleIndex;
+			while (typeof(gottenReferingObject.indexParent) !== 'undefined') {
+				gottenReferingObjectRelation = gottenReferingObject.indexParentRelation;
+				gottenReferingObject = gottenReferingObject.indexParent;
+			}
+			
+			return gottenReferingObject;
+		}
+		
 		function setIndex(object, property, index) {
 			state.incomingStructuresDisabled++;
 			
@@ -196,21 +212,7 @@
 		}
 
 		
-		/**
-		 * Traverse the index structure. TODO: This should perahps be used for all assignments.... ?
-		 */
-		let gottenReferingObject;
-		let gottenReferingObjectRelation;
-		function getReferingObject(possibleIndex, relationFromPossibleIndex) {
-			gottenReferingObject = possibleIndex;
-			gottenReferingObjectRelation = relationFromPossibleIndex;
-			while (typeof(gottenReferingObject.indexParent) !== 'undefined') {
-				gottenReferingObjectRelation = gottenReferingObject.indexParentRelation;
-				gottenReferingObject = gottenReferingObject.indexParent;
-			}
-			
-			return gottenReferingObject;
-		}
+
 
 		
 		/***************************************************************
@@ -219,10 +221,30 @@
 		 *
 		 ***************************************************************/
 		 
-		function getReferredObject(value) {
-			if (isObject(value)) {
-				
+		/**
+		 * Traverse the incoming relation structure foobar
+		 */
+		function getReferredObject(referredItem) {
+			// console.log("getReferredObject:");
+			// console.log(referredItem);
+			// Note, referred item can sometimes be a function???
+			// if (referredItem instanceof Function || typeof(referredItem) === 'function') {
+				// referredItem.foo.bar;
+			// }
+			// log("getReferredObject");
+			// logGroup();
+			if (typeof(referredItem) === 'object' && referredItem !== null) {
+				// log("is object");
+				if (typeof(referredItem.referredObject) !== 'undefined') {
+					// logUngroup();		
+					return referredItem.referredObject;
+				} else {
+					// logUngroup();
+					return referredItem;
+				}
 			}
+			// logUngroup();
+			return referredItem;
 		}
 		
 		function getSingleIncomingReference(object, property, filter) {
@@ -463,31 +485,6 @@
 		} 
 		
 		
-		/**
-		 * Traverse the incoming relation structure foobar
-		 */
-		function findReferredObject(referredItem) {
-			// console.log("findReferredObject:");
-			// console.log(referredItem);
-			// Note, referred item can sometimes be a function???
-			// if (referredItem instanceof Function || typeof(referredItem) === 'function') {
-				// referredItem.foo.bar;
-			// }
-			// log("findReferredObject");
-			// logGroup();
-			if (typeof(referredItem) === 'object' && referredItem !== null) {
-				// log("is object");
-				if (typeof(referredItem.referredObject) !== 'undefined') {
-					// logUngroup();		
-					return referredItem.referredObject;
-				} else {
-					// logUngroup();
-					return referredItem;
-				}
-			}
-			// logUngroup();
-			return referredItem;
-		}
 		
 		function createIncomingStructure(referingObject, referingObjectId, property, object) {
 			trace.incoming && log("createIncomingStructure");
@@ -697,6 +694,53 @@
 
 		/***************************************************************
 		 *
+		 *  Incoming counters
+		 *
+		 ***************************************************************/
+
+		
+		function increaseIncomingCounter(value) {
+			if (configuration.blockInitializeForIncomingReferenceCounters) blockingInitialize++;
+			if (isObject(value)) {				
+				if (value.const.incomingReferencesCount < 0) {
+					log(value.const.incomingReferencesCount);
+					throw Error("WTAF");
+				} 
+				if (typeof(value.const.incomingReferencesCount) === 'undefined') {
+					value.const.incomingReferencesCount = 0;
+				}
+				value.const.incomingReferencesCount++;
+			}
+			if (configuration.blockInitializeForIncomingReferenceCounters) blockingInitialize--;
+		}
+		
+		function decreaseIncomingCounter(value) {
+			if (configuration.blockInitializeForIncomingReferenceCounters) blockingInitialize++;
+			if (isObject(value)) {
+				value.const.incomingReferencesCount--;
+				if (value.const.incomingReferencesCount < 0) {
+					console.log(value);
+					throw Error("WTAF");					
+				}
+				if (value.const.incomingReferencesCount === 0) {
+					removedLastIncomingRelation(value);
+				}
+			}
+			if (configuration.blockInitializeForIncomingReferenceCounters) blockingInitialize--;
+		}
+		
+		// if (state.useIncomingStructures) {
+			// if (state.useIncomingStructures && state.incomingStructuresDisabled === 0) {	
+				// increaseIncomingCounter(value);
+				// decreaseIncomingCounter(previousValue);
+				// decreaseIncomingCounter(previousIncomingStructure);
+			// } else {
+				// increaseIncomingCounter(value);
+				// decreaseIncomingCounter(previousValue);					
+			// }
+		// }
+		/***************************************************************
+		 *
 		 *  Array const
 		 *
 		 ***************************************************************/
@@ -710,9 +754,9 @@
 				inPulse++;
 
 				let index = this.target.length - 1;
-				observerNotificationNullified++;
+				// observerNotificationNullified++;
 				let result = this.target.pop();
-				observerNotificationNullified--;
+				// observerNotificationNullified--;
 				if (typeof(this.const._arrayObservers) !== 'undefined') {
 					notifyChangeObservers(this.const._arrayObservers);
 				}
@@ -740,9 +784,9 @@
 					state.incomingStructuresDisabled--;
 				}
 				
-				observerNotificationNullified++;
+				// observerNotificationNullified++;
 				this.target.push.apply(this.target, argumentsArray);
-				observerNotificationNullified--;
+				// observerNotificationNullified--;
 				if (typeof(this.const._arrayObservers) !== 'undefined') {
 					notifyChangeObservers(this.const._arrayObservers);
 				}
@@ -756,9 +800,9 @@
 				if (!canWrite(this.const.object)) return;
 				inPulse++;
 
-				observerNotificationNullified++;
+				// observerNotificationNullified++;
 				let result = this.target.shift();
-				observerNotificationNullified--;
+				// observerNotificationNullified--;
 				if (typeof(this.const._arrayObservers) !== 'undefined') {
 					notifyChangeObservers(this.const._arrayObservers);
 				}
@@ -1148,7 +1192,7 @@
 						// console.log("find referred object");
 						// console.log(key);
 						if (trace.get > 0) logUngroup();
-						return findReferredObject(target[key]);
+						return getReferredObject(target[key]);
 					} else {
 						if (trace.get > 0) logUngroup();
 						return target[key];
@@ -1157,48 +1201,6 @@
 			}
 		}
 		
-		
-		
-		function increaseIncomingCounter(value) {
-			if (configuration.blockInitializeForIncomingReferenceCounters) blockingInitialize++;
-			if (isObject(value)) {				
-				if (value.const.incomingReferencesCount < 0) {
-					log(value.const.incomingReferencesCount);
-					throw Error("WTAF");
-				} 
-				if (typeof(value.const.incomingReferencesCount) === 'undefined') {
-					value.const.incomingReferencesCount = 0;
-				}
-				value.const.incomingReferencesCount++;
-			}
-			if (configuration.blockInitializeForIncomingReferenceCounters) blockingInitialize--;
-		}
-		
-		function decreaseIncomingCounter(value) {
-			if (configuration.blockInitializeForIncomingReferenceCounters) blockingInitialize++;
-			if (isObject(value)) {
-				value.const.incomingReferencesCount--;
-				if (value.const.incomingReferencesCount < 0) {
-					console.log(value);
-					throw Error("WTAF");					
-				}
-				if (value.const.incomingReferencesCount === 0) {
-					removedLastIncomingRelation(value);
-				}
-			}
-			if (configuration.blockInitializeForIncomingReferenceCounters) blockingInitialize--;
-		}
-		
-		// if (state.useIncomingStructures) {
-			// if (state.useIncomingStructures && state.incomingStructuresDisabled === 0) {	
-				// increaseIncomingCounter(value);
-				// decreaseIncomingCounter(previousValue);
-				// decreaseIncomingCounter(previousIncomingStructure);
-			// } else {
-				// increaseIncomingCounter(value);
-				// decreaseIncomingCounter(previousValue);					
-			// }
-		// }
 		
 		let trace = { basic : 0}; 
 		
@@ -1258,7 +1260,7 @@
 				// console.log(key);
 				state.incomingStructuresDisabled++;
 				activityListFrozen++;
-				let actualPreviousValue = findReferredObject(previousValue);
+				let actualPreviousValue = getReferredObject(previousValue);
 				if (actualPreviousValue !== previousValue) {
 					previousIncomingStructure = previousValue;
 					previousValue = actualPreviousValue;
@@ -1363,7 +1365,7 @@
 					// console.log("causality.getHandlerObject:");
 					// console.log(key);
 					previousIncomingStructure = target[key];
-					previousValue = findReferredObject(target[key]);
+					previousValue = getReferredObject(target[key]);
 				} else {
 					previousValue = target[key]; 
 				}
