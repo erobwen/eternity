@@ -8,8 +8,8 @@ let log = require("../objectlog.js").log;
 describe("Incoming Relations", function(){
 
     it("Testing incoming relation exists and can be removed", function(){
-		let x = create();
-		let y = create();
+		let x = create({name: "x"});
+		let y = create({name: "y"});
 		// causality.trace.basic = true;
 		x.foo = y;
 		// causality.trace.basic = false;
@@ -21,9 +21,9 @@ describe("Incoming Relations", function(){
 		});
 		assert.equal(yIncomingFoo[0], x);
 		
-		// causality.trace.basic = true;
+		causality.trace.basic++;
 		x.foo = null;
-		// delete causality.trace.basic;
+		causality.trace.basic--;
 		
 		// Analyze incoming structure
 		yIncomingFoo = []

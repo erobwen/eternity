@@ -2252,7 +2252,7 @@
 			blockInitializeForIncomingStructures: true, 
 			blockInitializeForIncomingReferenceCounters: true
 			// TODO: make it possible to run these following in conjunction with eternity.... as of now it will totally confuse eternity.... 
-			// incomingRelations : true, // this works only in conjunction with incomingStructuresAsCausalityObjects, otherwise isObject fails.... 
+			// incomingRelations : true, // this works only in conjunction with incomingStructuresAsCausalityObjects, otherwise isObject fails.... Note: this only seems to be a problem with eternity, and not with plain causality. 
 			// incomingStructuresAsCausalityObjects : true
 		});
 		let objectCausality = require("./causality.js")(objectCausalityConfiguration);

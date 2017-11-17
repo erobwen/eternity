@@ -111,9 +111,9 @@
 		function getSpecifier(javascriptObject, specifierName) {
 			if (typeof(javascriptObject[specifierName]) === 'undefined' || javascriptObject[specifierName] === null) {
 				let specifier = { 
-					specifierParent : javascriptObject, 
 					specifierProperty : specifierName, 
 					isIncomingStructure : true,   // This is a reuse of this object as incoming node as well.
+					referredObject : javascriptObject
 					// name : "incomingStructure" // This fucked up things for incoming relations of name "name"
 				}
 				if (configuration.incomingStructuresAsCausalityObjects) specifier = createImmutable(specifier);
@@ -1253,20 +1253,19 @@
 			}
 			
 			// Get previous value		// Get previous value
-			let previousValue = target[key];
-			let previousIncomingStructure;
-			if (typeof(previousValue) === 'object' && state.useIncomingStructures && state.incomingStructuresDisabled === 0) {  // && !isIndexParentOf(this.const.object, value) (not needed... )
+			let previousValueOrIncomingStructure = target[key];
+			let previousValue;
+			//typeof(previousValueOrIncomingStructure) === 'object' && 
+			if (state.useIncomingStructures && state.incomingStructuresDisabled === 0) {  // && !isIndexParentOf(this.const.object, value) (not needed... )
 				// console.log("causality.getHandlerObject:");
 				// console.log(key);
 				state.incomingStructuresDisabled++;
 				activityListFrozen++;
-				let actualPreviousValue = getReferredObject(previousValue);
-				if (actualPreviousValue !== previousValue) {
-					previousIncomingStructure = previousValue;
-					previousValue = actualPreviousValue;
-				}
+				previousValue = getReferredObject(previousValueOrIncomingStructure);
 				activityListFrozen--;
 				state.incomingStructuresDisabled--;
+			} else {
+				previousValue = previousValueOrIncomingStructure;
 			}
 			
 			// If same value as already set, do nothing.
@@ -1279,41 +1278,49 @@
 				}
 			}
 			
+			// Take a note of wether the key is undefined or not 
+			let undefinedKey = !(key in target);
+			
 			// Pulse start
 			inPulse++;
 			observerNotificationPostponed++;
-			let undefinedKey = !(key in target);
 					
 			// Perform assignment with regards to incoming structures.
-			let incomingStructureValue;
-			// trace.basic && log(state);
-			// trace.basic && log(configuration);
+			let valueOrIncomingStructure;
 			if (state.useIncomingStructures) {
 				trace.basic && log("use incoming structures...");
 				activityListFrozen++;
-				decreaseIncomingCounter(previousValue);
-				increaseIncomingCounter(value);
 				if (state.incomingStructuresDisabled === 0) { // && !isIndexParentOf(this.const.object, value)
 					trace.basic && log("incoming structures not disbled...");
+					trace.basic && log(previousValue);
+					trace.basic && log(previousValueOrIncomingStructure);
+				
 					state.incomingStructuresDisabled++;
-					incomingStructureValue = createAndRemoveIncomingRelations(this.const.object, key, value, previousValue, previousIncomingStructure);
+					valueOrIncomingStructure = createAndRemoveIncomingRelations(this.const.object, key, value, previousValue, previousValueOrIncomingStructure);
 					if (typeof(previousIncomingStructure) !== 'undefined') decreaseIncomingCounter(previousIncomingStructure);
-					increaseIncomingCounter(incomingStructureValue);
-					target[key] = incomingStructureValue;
+					target[key] = valueOrIncomingStructure;
 					state.incomingStructuresDisabled--;
 				} else {
 					target[key] = value;
 				}
 				activityListFrozen--;
-			} else if (configuration.incomingReferenceCounters){
-				trace.basic && log("just use incoming reference counters...");
-				activityListFrozen++;
-				increaseIncomingCounter(value);
-				decreaseIncomingCounter(previousValue);
-				activityListFrozen--;
-				target[key] = value;
 			} else {
 				trace.basic && log("plain assignment... ");
+				target[key] = value;				
+			}
+			
+			// Update incoming references
+			if (configuration.incomingReferenceCounters){
+				trace.basic && log("use incoming reference counters...");
+				activityListFrozen++;
+				if (configuration.incomingStructuresAsCausalityObjects) {
+					increaseIncomingCounter(valueOrIncomingStructure);					
+					decreaseIncomingCounter(previousValueOrIncomingStructure);
+				} else {
+					increaseIncomingCounter(value);					
+					decreaseIncomingCounter(previousValue);					
+				}
+				activityListFrozen--;
 				target[key] = value;
 			}
 			
@@ -1328,14 +1335,12 @@
 				}
 			}
 
-			// Emit event   && 
-			if (state.useIncomingStructures && state.incomingStructuresDisabled === 0 && (typeof(previousIncomingStructure) !== 'undefined' || value !== incomingStructureValue)) {// && !isIndexParentOf(this.const.object, value)) {
-				// Emit extra event 
-				state.incomingStructuresDisabled++
-				emitSetEvent(this, key, incomingStructureValue, typeof(previousIncomingStructure) !== 'undefined' ? previousIncomingStructure : previousValue);
-				state.incomingStructuresDisabled--
+			// Emit event 
+			if (state.useIncomingStructures && state.incomingStructuresAsCausalityObjects) {
+				emitSetEvent(this, key, valueOrIncomingStructure, previousValueOrIncomingStructure);
+			} else {
+				emitSetEvent(this, key, value, previousValue);
 			}
-			emitSetEvent(this, key, value, previousValue);
 			
 			// End pulse 
 			if (--observerNotificationPostponed === 0) proceedWithPostponedNotifications();
