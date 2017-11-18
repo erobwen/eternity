@@ -21,6 +21,10 @@
 		
 		// State
 		let state = { 
+			inPulse : 0,
+			inPostPulseProcess : 0,
+			pulseEvents : [],
+			
 			incomingStructuresDisabled : configuration.useIncomingStructures ? 0 : 1,
 			blockInitialize : false,
 			refreshingRepeater : false
@@ -346,11 +350,11 @@
 		}
 
 		function disableIncomingRelations(action) {
-			inPulse++;
+			state.inPulse++;
 			state.incomingStructuresDisabled++;
 			action();
 			state.incomingStructuresDisabled--;
-			if(--inPulse === 0) postPulseCleanup();
+			if(--state.inPulse === 0) postPulseCleanup();
 		}
 		
 		let removedLastIncomingRelationCallback = null;
@@ -740,7 +744,7 @@
 		let constArrayOverrides = {
 			pop : function() {
 				if (!canWrite(this.const.object)) return;
-				inPulse++;
+				state.inPulse++;
 
 				let index = this.target.length - 1;
 				// observerNotificationNullified++;
@@ -750,13 +754,13 @@
 					notifyChangeObservers(this.const._arrayObservers);
 				}
 				emitSpliceEvent(this, index, [result], null);
-				if (--inPulse === 0) postPulseCleanup();
+				if (--state.inPulse === 0) postPulseCleanup();
 				return result;
 			},
 
 			push : function() {
 				if (!canWrite(this.const.object)) return;
-				inPulse++;
+				state.inPulse++;
 
 				let index = this.target.length;
 				let argumentsArray = argumentsToArray(arguments);
@@ -780,14 +784,14 @@
 					notifyChangeObservers(this.const._arrayObservers);
 				}
 				emitSpliceEvent(this, index, removed, added);
-				if (--inPulse === 0) postPulseCleanup();
+				if (--state.inPulse === 0) postPulseCleanup();
 				// logUngroup();
 				return this.target.length;
 			},
 
 			shift : function() {
 				if (!canWrite(this.const.object)) return;
-				inPulse++;
+				state.inPulse++;
 
 				// observerNotificationNullified++;
 				let result = this.target.shift();
@@ -796,14 +800,14 @@
 					notifyChangeObservers(this.const._arrayObservers);
 				}
 				emitSpliceEvent(this, 0, [result], null);
-				if (--inPulse === 0) postPulseCleanup();
+				if (--state.inPulse === 0) postPulseCleanup();
 				return result;
 
 			},
 
 			unshift : function() {
 				if (!canWrite(this.const.object)) return;
-				inPulse++;
+				state.inPulse++;
 
 				let index = this.target.length;
 				let argumentsArray = argumentsToArray(arguments);
@@ -814,13 +818,13 @@
 					notifyChangeObservers(this.const._arrayObservers);
 				}
 				emitSpliceEvent(this, 0, null, argumentsArray);
-				if (--inPulse === 0) postPulseCleanup();
+				if (--state.inPulse === 0) postPulseCleanup();
 				return this.target.length;
 			},
 
 			splice : function() {
 				if (!canWrite(this.const.object)) return;
-				inPulse++;
+				state.inPulse++;
 
 				let argumentsArray = argumentsToArray(arguments);
 				let index = argumentsArray[0];
@@ -836,13 +840,13 @@
 					notifyChangeObservers(this.const._arrayObservers);
 				}
 				emitSpliceEvent(this, index, removed, added);
-				if (--inPulse === 0) postPulseCleanup();
+				if (--state.inPulse === 0) postPulseCleanup();
 				return result; // equivalent to removed
 			},
 
 			copyWithin: function(target, start, end) {
 				if (!canWrite(this.const.object)) return;
-				inPulse++;
+				state.inPulse++;
 
 				if (target < 0) { start = this.target.length - target; }
 				if (start < 0) { start = this.target.length - start; }
@@ -863,7 +867,7 @@
 				}
 
 				emitSpliceEvent(this, target, added, removed);
-				if (--inPulse === 0) postPulseCleanup();
+				if (--state.inPulse === 0) postPulseCleanup();
 				return result;
 			}
 		};
@@ -871,7 +875,7 @@
 		['reverse', 'sort', 'fill'].forEach(function(functionName) {
 			constArrayOverrides[functionName] = function() {
 				if (!canWrite(this.const.object)) return;
-				inPulse++;
+				state.inPulse++;
 
 				let argumentsArray = argumentsToArray(arguments);
 				let removed = this.target.slice(0);
@@ -883,7 +887,7 @@
 					notifyChangeObservers(this.const._arrayObservers);
 				}
 				emitSpliceEvent(this, 0, removed, this.target.slice(0));
-				if (--inPulse === 0) postPulseCleanup();
+				if (--state.inPulse === 0) postPulseCleanup();
 				return result;
 			};
 		});
@@ -895,7 +899,7 @@
 		Object.assign(constArrayOverridesOptimized, {
 			push : function() {
 				if (!canWrite(this.const.object)) return;
-				inPulse++;
+				state.inPulse++;
 				let index = this.target.length;
 				let argumentsArray = argumentsToArray(arguments);
 				
@@ -906,7 +910,7 @@
 					notifyChangeObservers(this.const._arrayObservers);
 				}
 				emitSpliceEvent(this, index, null, argumentsArray);
-				if (--inPulse === 0) postPulseCleanup();
+				if (--state.inPulse === 0) postPulseCleanup();
 				return this.target.length;
 			}	
 		});
@@ -998,7 +1002,7 @@
 			
 			// Start pulse if can write
 			if (!canWrite(this.const.object)) return;
-			inPulse++;
+			state.inPulse++;
 			observerNotificationPostponed++; // TODO: Do this for backwards references from arrays as well...
 
 
@@ -1027,7 +1031,7 @@
 
 			observerNotificationPostponed--;
 			proceedWithPostponedNotifications();
-			if (--inPulse === 0) postPulseCleanup();
+			if (--state.inPulse === 0) postPulseCleanup();
 
 			if( target[key] !== value && !(Number.isNaN(target[key]) && Number.isNaN(value)) ) return false; // Write protected?
 			return true;
@@ -1045,7 +1049,7 @@
 			
 			ensureInitialized(this, target);
 			
-			inPulse++;
+			state.inPulse++;
 
 			let previousValue = target[key];
 			delete target[key];
@@ -1055,7 +1059,7 @@
 					notifyChangeObservers(this.const._arrayObservers);
 				}
 			}
-			if (--inPulse === 0) postPulseCleanup();
+			if (--state.inPulse === 0) postPulseCleanup();
 			if( key in target ) return false; // Write protected?
 			return true;
 		}
@@ -1099,12 +1103,12 @@
 			
 			ensureInitialized(this, target);
 			
-			inPulse++;
+			state.inPulse++;
 			// TODO: Elaborate here?
 			if (typeof(this.const._arrayObservers) !== 'undefined') {
 				notifyChangeObservers(this.const._arrayObservers);
 			}
-			if (--inPulse === 0) postPulseCleanup();
+			if (--state.inPulse === 0) postPulseCleanup();
 			return target;
 		}
 
@@ -1259,7 +1263,7 @@
 			activityListFrozen++;
 			
 			// Pulse start
-			inPulse++;
+			state.inPulse++;
 			observerNotificationPostponed++;
 					
 			// Perform assignment with regards to incoming structures.
@@ -1307,7 +1311,7 @@
 			
 			// End pulse 
 			if (--observerNotificationPostponed === 0) proceedWithPostponedNotifications();
-			if (--inPulse === 0) postPulseCleanup();
+			if (--state.inPulse === 0) postPulseCleanup();
 			if (trace.basic > 0) logUngroup();
 			activityListFrozen--;
 			return true;
@@ -1327,7 +1331,7 @@
 			if (!(key in target)) {
 				return true;
 			} else {
-				inPulse++;
+				state.inPulse++;
 				
 				// Note if key was undefined and get previous value
 				let previousValueOrIncomingStructure = target[key];
@@ -1366,7 +1370,7 @@
 						emitDeleteEvent(this, key, previousValue);
 					}
 				}
-				if (--inPulse === 0) postPulseCleanup();
+				if (--state.inPulse === 0) postPulseCleanup();
 				if( key in target ) return false; // Write protected?
 				return true;
 			}
@@ -1411,14 +1415,14 @@
 
 			ensureInitialized(this, target);
 			
-			inPulse++;
+			state.inPulse++;
 			let returnValue = Reflect.defineProperty(target, key, descriptor);
 			// TODO: emitEvent here?
 
 			if (typeof(this.const._enumerateObservers) !== 'undefined') {
 				notifyChangeObservers(this.const._enumerateObservers);
 			}
-			if (--inPulse === 0) postPulseCleanup();
+			if (--state.inPulse === 0) postPulseCleanup();
 			return returnValue;
 		}
 
@@ -1457,7 +1461,7 @@
 		}
 		 
 		function createImmutable(initial) {
-			inPulse++;
+			state.inPulse++;
 			if (typeof(initial.const) === 'undefined') {			
 				initial.const = {
 					id : nextId++,
@@ -1469,7 +1473,7 @@
 			}
 			
 			emitImmutableCreationEvent(initial);
-			if (--inPulse === 0) postPulseCleanup();
+			if (--state.inPulse === 0) postPulseCleanup();
 			return initial;
 		} 
 		 
@@ -1479,7 +1483,7 @@
 				logGroup();
 			}
 			
-			inPulse++;
+			state.inPulse++;
 			let id = nextId++;
 			
 			let initializer = null;
@@ -1656,7 +1660,7 @@
 			
 			emitCreationEvent(handler);
 			if (configuration.objectActivityList) registerActivity(handler);
-			if (--inPulse === 0) postPulseCleanup();
+			if (--state.inPulse === 0) postPulseCleanup();
 			
 			if (trace.basic > 0) logUngroup();
 			
@@ -1741,9 +1745,9 @@
 		}
 		 
 		function canWrite(object) {
-			if (postPulseProcess > 0) {
-				return true;
-			}
+			// if (postPulseProcess > 0) {
+				// return true;
+			// }
 			// log("CANNOT WRITE IN POST PULSE");
 				// return false;
 			// }
@@ -1919,40 +1923,31 @@
 		 *
 		 *  Upon change do
 		 **********************************/
-
-		let inPulse = 0;
-		
-		let postPulseProcess = 0; // Remove??
-	 
-		let pulseEvents = [];
 		
 		function pulse(action) {
-			inPulse++;
+			state.inPulse++;
 			let result = action();
-			if (--inPulse === 0) postPulseCleanup();
+			if (--state.inPulse === 0) postPulseCleanup();
 			return result;
 		}
 
 		let transaction = postponeObserverNotification;
 
 		function postponeObserverNotification(action) {
-			inPulse++;
+			state.inPulse++;
 			observerNotificationPostponed++;
 			action();
 			observerNotificationPostponed--;
 			proceedWithPostponedNotifications();
-			if (--inPulse === 0) postPulseCleanup();
+			if (--state.inPulse === 0) postPulseCleanup();
 		}
 
 		let contextsScheduledForPossibleDestruction = [];
 
 		function postPulseCleanup() {
-			// logGroup("postPulseCleanup");
-			// log("postPulseCleanup");
-			inPulse++; // block new pulses!
-			
-			postPulseProcess++; // Blocks any model writing during post pulse cleanup
-			// log(pulseEvents);
+			state.inPulse++; // block new pulses!			
+			state.inPostPulseProcess++; // Blocks any model writing during post pulse cleanup
+
 			contextsScheduledForPossibleDestruction.forEach(function(context) {
 				if (!context.directlyInvokedByApplication) {
 					if (emptyObserverSet(context.contextObservers)) {
@@ -1962,12 +1957,12 @@
 			});
 			contextsScheduledForPossibleDestruction = [];
 			postPulseHooks.forEach(function(callback) {
-				callback(pulseEvents);
+				callback(state.pulseEvents);
 			});
-			pulseEvents = [];
-			// logUngroup();
-			postPulseProcess--;
-			inPulse--;
+
+			state.pulseEvents = [];
+			state.inPostPulseProcess--;
+			state.inPulse--;
 		}
 
 		let postPulseHooks = [];
@@ -1985,24 +1980,24 @@
 		let emitEventPaused = 0;
 
 		function withoutEmittingEvents(action) {
-			inPulse++;
+			state.inPulse++;
 			emitEventPaused++;
 			// log(configuration.name + "pause emitting events");
 			// logGroup();
-			// log(configuration.name + " inPulse: " + inPulse);
+			// log(configuration.name + " state.inPulse: " + state.inPulse);
 			action();
-			// log("inPulse: " + inPulse);
-			// log(configuration.name + " inPulse: " + inPulse);
+			// log("state.inPulse: " + state.inPulse);
+			// log(configuration.name + " state.inPulse: " + state.inPulse);
 			// logUngroup();
 			emitEventPaused--;
-			if (--inPulse === 0) postPulseCleanup();
+			if (--state.inPulse === 0) postPulseCleanup();
 		}
 
 		function emitImmutableCreationEvent(object) {
 			if (configuration.recordPulseEvents) {
 				let event = { type: 'creation', object: object }
 				if (configuration.recordPulseEvents) {
-					pulseEvents.push(event);
+					state.pulseEvents.push(event);
 				}
 			}		
 		} 
@@ -2053,7 +2048,7 @@
 				event.object = handler.const.object; 
 				// event.isConsequence = state.refreshingRepeater;
 				if (configuration.recordPulseEvents) {
-					pulseEvents.push(event);
+					state.pulseEvents.push(event);
 				}
 				if (typeof(handler.observers) !== 'undefined') {
 					handler.observers.forEach(function(observerFunction) {
@@ -2066,7 +2061,7 @@
 		function emitUnobservableEvent(event) { // TODO: move reactiveStructuresAsCausalityObjects upstream in the call chain..  
 			// throw new Error("Should not be here!!");
 			if (configuration.reactiveStructuresAsCausalityObjects && configuration.recordPulseEvents) {
-				pulseEvents.push(event);
+				state.pulseEvents.push(event);
 			}
 		}
 
@@ -3228,7 +3223,7 @@
 		 ************************************************************************/
 		 
 		function getInPulse() {
-			return inPulse;
+			return state.inPulse;
 		}
 		
 		/************************************************************************
