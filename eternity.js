@@ -1674,7 +1674,7 @@
 					return false;
 				}
 				
-				// // Move to next zone expansion
+				// // Move to next zone expansion TODO: what is this???? ... forgotten comment out?
 				// if (isEmptyList(gcState, unexpandedUnstableZone) && !isEmptyList(gcState, nextUnexpandedUnstableZone)) {
 					// log("<<<<                                    >>>>>");
 					// log("<<<< Move to nextUnexpandedUnstableZone >>>>>");
