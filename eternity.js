@@ -511,88 +511,76 @@
 					if (trace.eternity) {
 						// log("events.forEach(function(event)) { ..."); 
 					}
-					if (!isMacroEvent(event)) {
-						let dbImage = event.object;
-						let imageId = dbImage.const.id;
+					let dbImage = event.object;
+					let imageId = dbImage.const.id;
+						
+					if (event.type === 'creation') {
+						if (typeof(dbImage.const.dbId) === 'undefined') {
+							// Maintain image structure
+							for (let property in dbImage) {
+								increaseLoadedIncomingMacroReferenceCounters(dbImage, property);
+							}
 							
-						if (event.type === 'creation') {
-							if (typeof(dbImage.const.dbId) === 'undefined') {
-								// Maintain image structure
-								for (let property in dbImage) {
-									increaseLoadedIncomingMacroReferenceCounters(dbImage, property);
-								}
-								
-								// Serialized image creation, with temporary db ids. 
-								let tmpDbId = getTmpDbId(dbImage);
-								pendingUpdate.imageCreations[tmpDbId] = serializeDbImage(dbImage);
-								
-								// if (typeof(pendingUpdate.imageUpdates[imageId]) !== 'undefined') {
-									// // We will do a full write of this image, no need to update after.				
-									// delete pendingUpdate.imageUpdates[dbId];   // will never happen anymore?
-								// }
+							// Serialized image creation, with temporary db ids. 
+							let tmpDbId = getTmpDbId(dbImage);
+							pendingUpdate.imageCreations[tmpDbId] = serializeDbImage(dbImage);
 							
+							// if (typeof(pendingUpdate.imageUpdates[imageId]) !== 'undefined') {
+								// // We will do a full write of this image, no need to update after.				
+								// delete pendingUpdate.imageUpdates[dbId];   // will never happen anymore?
+							// }
+						
+						}
+					} else if (event.type === 'set') {
+						if (typeof(dbImage.const.dbId) !== 'undefined' && dbImage.const.dbId !== null) { // 
+							// Maintain image structure
+							increaseLoadedIncomingMacroReferenceCounters(dbImage, event.property);
+							// decreaseLoadedIncomingMacroReferenceCounters(dbImage, event.); // TODO: Decrease counters here? Get the previousIncomingStructure... 
+							
+							// Only update if we will not do a full write on this image. 
+							let dbId = dbImage.const.dbId;
+							if (typeof(pendingUpdate.imageUpdates[dbId]) === 'undefined') {
+								pendingUpdate.imageUpdates[dbId] = {};
 							}
-						} else if (event.type === 'set') {
-							if (typeof(dbImage.const.dbId) !== 'undefined' && dbImage.const.dbId !== null) { // 
-								// Maintain image structure
-								increaseLoadedIncomingMacroReferenceCounters(dbImage, event.property);
-								// decreaseLoadedIncomingMacroReferenceCounters(dbImage, event.); // TODO: Decrease counters here? Get the previousIncomingStructure... 
-								
-								// Only update if we will not do a full write on this image. 
-								let dbId = dbImage.const.dbId;
-								if (typeof(pendingUpdate.imageUpdates[dbId]) === 'undefined') {
-									pendingUpdate.imageUpdates[dbId] = {};
-								}
-								let imageUpdates = pendingUpdate.imageUpdates[dbId];
-								
-								// Serialized value with temporary db ids. 
-								// recursiveCounter = 0;
-								let value = convertReferencesToDbIdsOrTemporaryIds(event.value);
-								let property = event.property;
-								property = imageCausality.transformPossibleIdExpression(property, imageIdToDbIdOrTmpDbId);
-								imageUpdates[event.property] = value;
-								if (typeof(imageUpdates["_eternityDeletedKeys"]) !== 'undefined') {
-									delete imageUpdates["_eternityDeletedKeys"][event.property];
-								} 
+							let imageUpdates = pendingUpdate.imageUpdates[dbId];
+							
+							// Serialized value with temporary db ids. 
+							// recursiveCounter = 0;
+							let value = convertReferencesToDbIdsOrTemporaryIds(event.value);
+							let property = event.property;
+							property = imageCausality.transformPossibleIdExpression(property, imageIdToDbIdOrTmpDbId);
+							imageUpdates[event.property] = value;
+							if (typeof(imageUpdates["_eternityDeletedKeys"]) !== 'undefined') {
+								delete imageUpdates["_eternityDeletedKeys"][event.property];
+							} 
+						}
+					} else if (event.type === 'delete') {
+						if (typeof(dbImage.const.dbId) !== 'undefined' && dbImage.const.dbId !== null) { // 
+							// Maintain image structure
+							// decreaseLoadedIncomingMacroReferenceCounters(dbImage, event.); // TODO: Decrease counters here?
+							
+							// Only update if we will not do a full write on this image. 
+							let dbId = dbImage.const.dbId;
+							if (typeof(pendingUpdate.imageUpdates[dbId]) === 'undefined') {
+								pendingUpdate.imageUpdates[dbId] = {};
 							}
-						} else if (event.type === 'delete') {
-							if (typeof(dbImage.const.dbId) !== 'undefined' && dbImage.const.dbId !== null) { // 
-								// Maintain image structure
-								// decreaseLoadedIncomingMacroReferenceCounters(dbImage, event.); // TODO: Decrease counters here?
-								
-								// Only update if we will not do a full write on this image. 
-								let dbId = dbImage.const.dbId;
-								if (typeof(pendingUpdate.imageUpdates[dbId]) === 'undefined') {
-									pendingUpdate.imageUpdates[dbId] = {};
-								}
-								if (typeof(pendingUpdate.imageUpdates[dbId]["_eternityDeletedKeys"]) === 'undefined') {
-									pendingUpdate.imageUpdates[dbId]["_eternityDeletedKeys"] = {};
-								}
-								let imageUpdates = pendingUpdate.imageUpdates[dbId];
-								let deletedKeys = imageUpdates["_eternityDeletedKeys"];
-								
-								// Serialized value with temporary db ids. 
-								let property = event.property;
-								property = imageCausality.transformPossibleIdExpression(property, imageIdToDbIdOrTmpDbId);
-								deletedKeys[property] = true;
-								delete imageUpdates[event.property];
+							if (typeof(pendingUpdate.imageUpdates[dbId]["_eternityDeletedKeys"]) === 'undefined') {
+								pendingUpdate.imageUpdates[dbId]["_eternityDeletedKeys"] = {};
 							}
-						}		
-					}
+							let imageUpdates = pendingUpdate.imageUpdates[dbId];
+							let deletedKeys = imageUpdates["_eternityDeletedKeys"];
+							
+							// Serialized value with temporary db ids. 
+							let property = event.property;
+							property = imageCausality.transformPossibleIdExpression(property, imageIdToDbIdOrTmpDbId);
+							deletedKeys[property] = true;
+							delete imageUpdates[event.property];
+						}
+					}		
 				});								
 			});
 			if(trace.eternity) log(pendingUpdate, 4);
 			logUngroup();
-		}
-		
-		
-		function isMacroEvent(event) {
-			return imageEventHasObjectValue(event) && !event.incomingStructureEvent;
-		}
-		
-		
-		function imageEventHasObjectValue(event) {
-			return imageCausality.isObject(event.value) || imageCausality.isObject(event.oldValue);
 		}
 		
 	
