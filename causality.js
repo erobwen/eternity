@@ -13,6 +13,8 @@
 	let log = objectlog.log;
 	let logGroup = objectlog.enter;
 	let logUngroup = objectlog.exit;
+	let trace = { basic : 0, incoming: 0}; 
+
 	
 	
 	function createCausalityInstance(configuration) {
@@ -21,14 +23,25 @@
 		
 		// State
 		let state = { 
+			nextId : 0,
+
 			inPulse : 0,
 			inPostPulseProcess : 0,
 			pulseEvents : [],
 			
+			blockingInitialize : 0,
+			
 			incomingStructuresDisabled : configuration.useIncomingStructures ? 0 : 1,
 			blockInitialize : false,
-			refreshingRepeater : false
+			refreshingRepeater : false,
+			
+			cachedCallsCount : 0 // Mostly for testing... 
 		};
+		
+		function resetObjectIds() {
+			state.nextId = 0;
+		}
+
 
 		/***************************************************************
 		 *
@@ -386,7 +399,7 @@
 			// Tear down structure to old value
 			if (isObject(previousValue)) {
 				if (trace.incoming) log("tear down previous... ");
-				if (configuration.blockInitializeForIncomingStructures) blockingInitialize++;
+				if (configuration.blockInitializeForIncomingStructures) state.blockingInitialize++;
 				// if (typeof(previousStructure) === 'undefined') {
 					// log(previousValue);
 					// throw new Error("Waaaaaaaaaaaaat");
@@ -395,7 +408,7 @@
 				if (previousValue.const.incoming && previousValue.const.incoming[referringRelation]&& previousValue.const.incoming[referringRelation].observers) {
 					notifyChangeObservers(previousValue.const.incoming[referringRelation]);
 				}
-				if (configuration.blockInitializeForIncomingStructures) blockingInitialize--;
+				if (configuration.blockInitializeForIncomingStructures) state.blockingInitialize--;
 			}
 
 			// Setup structure to new value
@@ -421,13 +434,13 @@
 			
 			// Tear down structure to old value
 			if (isObject(removedValue)) {
-				if (configuration.blockInitializeForIncomingStructures) blockingInitialize++;
+				if (configuration.blockInitializeForIncomingStructures) state.blockingInitialize++;
 				removeIncomingStructure(objectProxy.const.id, previousStructure);
 				// removeIncomingStructure(objectProxy.const.id, removedValue);
 				if (removedValue.const && removedValue.const.incoming && removedValue.const.incoming[referringRelation].observers) {
 					notifyChangeObservers(removedValue.const.incoming[referringRelation].observers);
 				}
-				if (configuration.blockInitializeForIncomingStructures) blockingInitialize--;
+				if (configuration.blockInitializeForIncomingStructures) state.blockingInitialize--;
 			}
 		}
 		
@@ -689,7 +702,7 @@
 
 		
 		function increaseIncomingCounter(value) {
-			if (configuration.blockInitializeForIncomingReferenceCounters) blockingInitialize++;
+			if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize++;
 			if (isObject(value)) {				
 				if (value.const.incomingReferencesCount < 0) {
 					log(value.const.incomingReferencesCount);
@@ -700,11 +713,11 @@
 				}
 				value.const.incomingReferencesCount++;
 			}
-			if (configuration.blockInitializeForIncomingReferenceCounters) blockingInitialize--;
+			if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize--;
 		}
 		
 		function decreaseIncomingCounter(value) {
-			if (configuration.blockInitializeForIncomingReferenceCounters) blockingInitialize++;
+			if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize++;
 			if (isObject(value)) {
 				value.const.incomingReferencesCount--;
 				if (value.const.incomingReferencesCount < 0) {
@@ -715,7 +728,7 @@
 					removedLastIncomingRelation(value);
 				}
 			}
-			if (configuration.blockInitializeForIncomingReferenceCounters) blockingInitialize--;
+			if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize--;
 		}
 		
 		
@@ -900,10 +913,6 @@
 			}	
 		});
 		
-		let nextId = 0;
-		function resetObjectIds() {
-			nextId = 0;
-		}
 
 
 		/***************************************************************
@@ -1170,10 +1179,7 @@
 				}
 			}
 		}
-		
-		
-		let trace = { basic : 0, incoming: 0}; 
-		
+				
 		
 		function setHandlerObject(target, key, value) {
 			// log("setHandlerObject" + key);
@@ -1441,11 +1447,11 @@
 			state.inPulse++;
 			if (typeof(initial.const) === 'undefined') {			
 				initial.const = {
-					id : nextId++,
+					id : state.nextId++,
 					causalityInstance : causalityInstance
 				};
 			} else {
-				initial.const.id = nextId++;
+				initial.const.id = state.nextId++;
 				initial.const.causalityInstance = causalityInstance;
 			}
 			
@@ -1461,7 +1467,7 @@
 			}
 			
 			state.inPulse++;
-			let id = nextId++;
+			let id = state.nextId++;
 			
 			let initializer = null;
 			if (typeof(createdTarget) === 'undefined') {
@@ -1688,7 +1694,7 @@
 		 **********************************/
 		 
 		function ensureInitialized(handler, target) {
-			if (handler.const.initializer !== null && blockingInitialize === 0) {
+			if (handler.const.initializer !== null && state.blockingInitialize === 0) {
 				if (trace.basic > 0) { log("initializing..."); logGroup() }
 				let initializer = handler.const.initializer;
 				handler.const.initializer = null;
@@ -1696,13 +1702,11 @@
 				if (trace.basic > 0) logUngroup();
 			}
 		}
-
-		let blockingInitialize = 0;
 		
 		function blockInitialize(action) {
-			blockingInitialize++;
+			state.blockingInitialize++;
 			action();
-			blockingInitialize--;
+			state.blockingInitialize--;
 		}
 		// function purge(object) {
 			// object.target.
@@ -2452,10 +2456,8 @@
 			}
 		}
 
-		let cachedCalls = 0;
-
 		function cachedCallCount() {
-			return cachedCalls;
+			return state.cachedCallsCount;
 		}
 
 		function getObjectAttatchedCache(object, cacheStoreName, functionName) {
@@ -2704,7 +2706,7 @@
 					cacheRecord.micro.remove(); // Remove recorder
 				};
 
-				cachedCalls++;
+				state.cachedCallsCount++;
 				enterContext('cached_call', cacheRecord);
 				nextIsMicroContext = true;
 				// Never encountered these arguments before, make a new cache
@@ -3106,7 +3108,7 @@
 		
 		function logActivityList() {
 			activityListFrozen++;
-			blockingInitialize++;
+			state.blockingInitialize++;
 		
 			let current = activityListFirst;
 			let result = "[";
@@ -3124,7 +3126,7 @@
 			
 			log(result + "]");
 			
-			blockingInitialize--;
+			state.blockingInitialize--;
 			activityListFrozen--;
 		}
 		
@@ -3133,7 +3135,7 @@
 			if (activityListFrozen === 0 && activityListFirst !== handler ) {
 				// log("here");
 				activityListFrozen++;
-				blockingInitialize++;
+				state.blockingInitialize++;
 				
 				if (activityListFilter === null || activityListFilter(handler.const.object)) {
 					// log("here2");
@@ -3169,7 +3171,7 @@
 					logUngroup();
 				}
 				
-				blockingInitialize--;
+				state.blockingInitialize--;
 				activityListFrozen--;
 			}
 		}
