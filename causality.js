@@ -412,6 +412,7 @@
 
 			// Setup structure to new value
 			if (isObject(value)) {
+				if (trace.basic) log("really creating incoming structure");
 				let referencedValue = createIncomingStructure(objectProxy, objectProxy.const.id, referringRelation, value);
 				if (value.const.incoming && value.const.incoming[referringRelation].observers) {
 					notifyChangeObservers(value.const.incoming[referringRelation].observers);
@@ -1202,7 +1203,7 @@
 		}
 		
 		
-		let trace = { basic : 0}; 
+		let trace = { basic : 0, incoming: 0}; 
 		
 		
 		function setHandlerObject(target, key, value) {
@@ -1254,6 +1255,7 @@
 			
 			// Get previous value		// Get previous value
 			let previousValueOrIncomingStructure = target[key];
+			trace.basic && log(previousValueOrIncomingStructure);
 			let previousValue;
 			//typeof(previousValueOrIncomingStructure) === 'object' && 
 			if (state.useIncomingStructures && state.incomingStructuresDisabled === 0) {  // && !isIndexParentOf(this.const.object, value) (not needed... )
@@ -1287,27 +1289,27 @@
 					
 			// Perform assignment with regards to incoming structures.
 			let valueOrIncomingStructure;
-			if (state.useIncomingStructures) {
+			if (state.useIncomingStructures && state.incomingStructuresDisabled === 0) {
 				trace.basic && log("use incoming structures...");
 				activityListFrozen++;
-				if (state.incomingStructuresDisabled === 0) { // && !isIndexParentOf(this.const.object, value)
-					trace.basic && log("incoming structures not disbled...");
-					trace.basic && log(previousValue);
-					trace.basic && log(previousValueOrIncomingStructure);
-				
-					state.incomingStructuresDisabled++;
-					valueOrIncomingStructure = createAndRemoveIncomingRelations(this.const.object, key, value, previousValue, previousValueOrIncomingStructure);
-					if (typeof(previousIncomingStructure) !== 'undefined') decreaseIncomingCounter(previousIncomingStructure);
-					target[key] = valueOrIncomingStructure;
-					state.incomingStructuresDisabled--;
-				} else {
-					target[key] = value;
-				}
+
+				trace.basic && log("incoming structures not disbled...");
+				trace.basic && log(previousValue);
+				trace.basic && log(previousValueOrIncomingStructure);
+			
+				state.incomingStructuresDisabled++;
+				valueOrIncomingStructure = createAndRemoveIncomingRelations(this.const.object, key, value, previousValue, previousValueOrIncomingStructure);
+				trace.basic && log("what is it?");
+				trace.basic && log(valueOrIncomingStructure, 2)
+				target[key] = valueOrIncomingStructure;
+				state.incomingStructuresDisabled--;
+			
 				activityListFrozen--;
 			} else {
 				trace.basic && log("plain assignment... ");
 				target[key] = value;				
 			}
+			trace.basic && log(target, 2);
 			
 			// Update incoming references
 			if (configuration.incomingReferenceCounters){
@@ -1321,7 +1323,6 @@
 					decreaseIncomingCounter(previousValue);					
 				}
 				activityListFrozen--;
-				target[key] = value;
 			}
 			
 			// If assignment was successful, notify change

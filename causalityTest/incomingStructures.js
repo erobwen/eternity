@@ -10,10 +10,13 @@ describe("Incoming Relations", function(){
     it("Testing incoming relation exists and can be removed", function(){
 		let x = create({name: "x"});
 		let y = create({name: "y"});
-		// causality.trace.basic = true;
+		// causality.trace.basic++;
+		// causality.trace.incoming++;
 		x.foo = y;
-		// causality.trace.basic = false;
-
+		// causality.trace.basic--;
+		// causality.trace.incoming--;
+		// log("===========================================");
+		// log(x.const.target, 2);
 		// Analyze incoming structure
 		let yIncomingFoo = []
 		causality.forAllIncoming(y, 'foo', function(referer) {
@@ -21,9 +24,9 @@ describe("Incoming Relations", function(){
 		});
 		assert.equal(yIncomingFoo[0], x);
 		
-		causality.trace.basic++;
+		// causality.trace.basic++;
 		x.foo = null;
-		causality.trace.basic--;
+		// causality.trace.basic--;
 		
 		// Analyze incoming structure
 		yIncomingFoo = []
