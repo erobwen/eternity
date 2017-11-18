@@ -215,9 +215,6 @@
 		}
 
 		
-
-
-		
 		/***************************************************************
 		 *
 		 *  Incoming relations. 
@@ -228,25 +225,13 @@
 		 * Traverse the incoming relation structure foobar
 		 */
 		function getReferredObject(referredItem) {
-			// console.log("getReferredObject:");
-			// console.log(referredItem);
-			// Note, referred item can sometimes be a function???
-			// if (referredItem instanceof Function || typeof(referredItem) === 'function') {
-				// referredItem.foo.bar;
-			// }
-			// log("getReferredObject");
-			// logGroup();
 			if (typeof(referredItem) === 'object' && referredItem !== null) {
-				// log("is object");
-				if (typeof(referredItem.referredObject) !== 'undefined') {
-					// logUngroup();		
+				if (typeof(referredItem.referredObject) !== 'undefined') {	
 					return referredItem.referredObject;
 				} else {
-					// logUngroup();
 					return referredItem;
 				}
 			}
-			// logUngroup();
 			return referredItem;
 		}
 		
@@ -915,14 +900,6 @@
 			}	
 		});
 		
-		
-		let collecting = [];
-		function collect(array, action) {
-			collecting.push(array);
-			action();
-			collecting.pop();
-		}
-
 		let nextId = 0;
 		function resetObjectIds() {
 			nextId = 0;
