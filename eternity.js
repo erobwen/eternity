@@ -401,7 +401,7 @@
 				imageCausality.blockInitialize(function() {
 					// log(event, 1);
 					// if (event.type === 'set') {
-						// log(valueToString(event.object) + ".set " + event.property + " to " + valueToString(event.value) + (event.incomingStructureEvent ? " [incoming]" : ""));
+						// log(valueToString(event.object) + ".set " + event.property + " to " + valueToString(event.value)));
 					// }
 				});
 			});

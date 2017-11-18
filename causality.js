@@ -1225,14 +1225,8 @@
 				if (trace.basic > 0) logUngroup();
 				return overlayHandler.set.apply(overlayHandler, [overlayHandler.target, key, value]);
 			} else {
-				// if (trace.basic > 0) log("no forward");
-				// if (trace.basic) log("no forward");
 				trace.basic && log("no forward");
 			}
-			
-			// logGroup();
-			if (configuration.objectActivityList) registerActivity(this);
-			// if (trace.basic > 0) log("configuration.objectActivityList: " + configuration.objectActivityList);
 			
 			// Write protection
 			if (!canWrite(this.const.object)) {
@@ -1253,35 +1247,28 @@
 				scan = Object.getPrototypeOf( scan );
 			}
 			
-			// Get previous value		// Get previous value
+			// Note if key was undefined and get previous value
+			let keyDefined = key in target;
 			let previousValueOrIncomingStructure = target[key];
-			trace.basic && log(previousValueOrIncomingStructure);
 			let previousValue;
-			//typeof(previousValueOrIncomingStructure) === 'object' && 
-			if (state.useIncomingStructures && state.incomingStructuresDisabled === 0) {  // && !isIndexParentOf(this.const.object, value) (not needed... )
-				// console.log("causality.getHandlerObject:");
-				// console.log(key);
-				state.incomingStructuresDisabled++;
-				activityListFrozen++;
+			if (keyDefined && typeof(previousValueOrIncomingStructure) === 'object' && state.useIncomingStructures && state.incomingStructuresDisabled === 0) {
 				previousValue = getReferredObject(previousValueOrIncomingStructure);
-				activityListFrozen--;
-				state.incomingStructuresDisabled--;
 			} else {
 				previousValue = previousValueOrIncomingStructure;
 			}
 			
 			// If same value as already set, do nothing.
-			if (key in target) {
+			if (keyDefined) {
 				if (previousValue === value || (Number.isNaN(previousValue) && Number.isNaN(value)) ) {
 					trace.basic && log("cannot set same value");
-					// if (configuration.name === 'objectCausality')  log("ALREAD SET");
 					if (trace.basic > 0) logUngroup();
 					return true;
 				}
 			}
 			
-			// Take a note of wether the key is undefined or not 
-			let undefinedKey = !(key in target);
+			// Manipulate activity list here? why not?
+			if (configuration.objectActivityList) registerActivity(this);
+			activityListFrozen++;
 			
 			// Pulse start
 			inPulse++;
@@ -1291,7 +1278,6 @@
 			let valueOrIncomingStructure;
 			if (state.useIncomingStructures && state.incomingStructuresDisabled === 0) {
 				trace.basic && log("use incoming structures...");
-				activityListFrozen++;
 
 				trace.basic && log("incoming structures not disbled...");
 				trace.basic && log(previousValue);
@@ -1304,7 +1290,7 @@
 				target[key] = valueOrIncomingStructure;
 				state.incomingStructuresDisabled--;
 			
-				activityListFrozen--;
+				
 			} else {
 				trace.basic && log("plain assignment... ");
 				target[key] = value;				
@@ -1314,7 +1300,6 @@
 			// Update incoming references
 			if (configuration.incomingReferenceCounters){
 				trace.basic && log("use incoming reference counters...");
-				activityListFrozen++;
 				if (configuration.incomingStructuresAsCausalityObjects) {
 					increaseIncomingCounter(valueOrIncomingStructure);					
 					decreaseIncomingCounter(previousValueOrIncomingStructure);
@@ -1322,17 +1307,16 @@
 					increaseIncomingCounter(value);					
 					decreaseIncomingCounter(previousValue);					
 				}
-				activityListFrozen--;
 			}
 			
 			// If assignment was successful, notify change
-			if (undefinedKey) {
-				if (typeof(this.const._enumerateObservers) !== 'undefined') {
-					notifyChangeObservers(this.const._enumerateObservers);
-				}
-			} else {
+			if (keyDefined) {
 				if (typeof(this.const._propertyObservers) !== 'undefined' && typeof(this.const._propertyObservers[key]) !== 'undefined') {
 					notifyChangeObservers(this.const._propertyObservers[key]);
+				}
+			} else {
+				if (typeof(this.const._enumerateObservers) !== 'undefined') {
+					notifyChangeObservers(this.const._enumerateObservers);
 				}
 			}
 
@@ -1347,6 +1331,7 @@
 			if (--observerNotificationPostponed === 0) proceedWithPostponedNotifications();
 			if (--inPulse === 0) postPulseCleanup();
 			if (trace.basic > 0) logUngroup();
+			activityListFrozen--;
 			return true;
 		}
 
@@ -2084,11 +2069,6 @@
 			}
 			if (emitEventPaused === 0) {
 				// log("EMIT EVENT " + configuration.name + " " + event.type + " " + event.property + "=...");
-				if (state.useIncomingStructures) {
-					event.incomingStructureEvent = state.incomingStructuresDisabled !== 0
-				}
-				// console.log(event);
-				// event.objectId = handler.const.id;
 				event.object = handler.const.object; 
 				// event.isConsequence = state.refreshingRepeater;
 				if (configuration.recordPulseEvents) {
