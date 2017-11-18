@@ -21,8 +21,7 @@
 		
 		// State
 		let state = { 
-			useIncomingStructures : configuration.useIncomingStructures,
-			incomingStructuresDisabled : 0,
+			incomingStructuresDisabled : configuration.useIncomingStructures ? 0 : 1,
 			blockInitialize : false,
 			refreshingRepeater : false
 		};
@@ -730,24 +729,13 @@
 			if (configuration.blockInitializeForIncomingReferenceCounters) blockingInitialize--;
 		}
 		
-		// if (state.useIncomingStructures) {
-			// if (state.useIncomingStructures && state.incomingStructuresDisabled === 0) {	
-				// increaseIncomingCounter(value);
-				// decreaseIncomingCounter(previousValue);
-				// decreaseIncomingCounter(previousIncomingStructure);
-			// } else {
-				// increaseIncomingCounter(value);
-				// decreaseIncomingCounter(previousValue);					
-			// }
-		// }
+		
 		/***************************************************************
 		 *
 		 *  Array const
 		 *
 		 ***************************************************************/
-
 		 
-
 		
 		let constArrayOverrides = {
 			pop : function() {
@@ -777,7 +765,7 @@
 				let added = argumentsArray;
 				
 				// TODO: configuration.incomingReferenceCounters || .... 
-				if (state.useIncomingStructures && state.incomingStructuresDisabled === 0) {
+				if (state.incomingStructuresDisabled === 0) {
 					state.incomingStructuresDisabled++;
 					added = createAndRemoveArrayIncomingRelations(this.const.object, index, removed, added); // TODO: implement for other array manipulators as well. 
 					// TODO: What about removed adjusted? 
@@ -1189,7 +1177,7 @@
 							registerChangeObserver(getSpecifier(this.const, "_enumerateObservers"));
 						}
 					}
-					if (state.useIncomingStructures && state.incomingStructuresDisabled === 0 && keyInTarget && key !== 'incoming') {
+					if (state.incomingStructuresDisabled === 0 && keyInTarget && key !== 'incoming') {
 						// console.log("find referred object");
 						// console.log(key);
 						if (trace.get > 0) logUngroup();
@@ -1251,7 +1239,7 @@
 			let keyDefined = key in target;
 			let previousValueOrIncomingStructure = target[key];
 			let previousValue;
-			if (keyDefined && typeof(previousValueOrIncomingStructure) === 'object' && state.useIncomingStructures && state.incomingStructuresDisabled === 0) {
+			if (keyDefined && typeof(previousValueOrIncomingStructure) === 'object' && state.incomingStructuresDisabled === 0) {
 				previousValue = getReferredObject(previousValueOrIncomingStructure);
 			} else {
 				previousValue = previousValueOrIncomingStructure;
@@ -1276,28 +1264,18 @@
 					
 			// Perform assignment with regards to incoming structures.
 			let valueOrIncomingStructure;
-			if (state.useIncomingStructures && state.incomingStructuresDisabled === 0) {
+			if (state.incomingStructuresDisabled === 0) {
 				trace.basic && log("use incoming structures...");
-
-				trace.basic && log("incoming structures not disbled...");
-				trace.basic && log(previousValue);
-				trace.basic && log(previousValueOrIncomingStructure);
-			
 				state.incomingStructuresDisabled++;
 				valueOrIncomingStructure = createAndRemoveIncomingRelations(this.const.object, key, value, previousValue, previousValueOrIncomingStructure);
-				trace.basic && log("what is it?");
-				trace.basic && log(valueOrIncomingStructure, 2)
 				target[key] = valueOrIncomingStructure;
 				state.incomingStructuresDisabled--;
-			
-				
 			} else {
 				trace.basic && log("plain assignment... ");
 				target[key] = value;				
 			}
-			trace.basic && log(target, 2);
 			
-			// Update incoming references
+			// Update incoming reference counters
 			if (configuration.incomingReferenceCounters){
 				trace.basic && log("use incoming reference counters...");
 				if (configuration.incomingStructuresAsCausalityObjects) {
@@ -1321,7 +1299,7 @@
 			}
 
 			// Emit event 
-			if (state.useIncomingStructures && state.incomingStructuresAsCausalityObjects) {
+			if (state.incomingStructuresAsCausalityObjects) {
 				emitSetEvent(this, key, valueOrIncomingStructure, previousValueOrIncomingStructure);
 			} else {
 				emitSetEvent(this, key, value, previousValue);
@@ -1350,39 +1328,42 @@
 				return true;
 			} else {
 				inPulse++;
+				
+				// Note if key was undefined and get previous value
+				let previousValueOrIncomingStructure = target[key];
 				let previousValue;
-				let previousIncomingStructure;
-				if (state.useIncomingStructures && state.incomingStructuresDisabled === 0) {  // && !isIndexParentOf(this.const.object, value) (not needed... )
-					// console.log("causality.getHandlerObject:");
-					// console.log(key);
-					previousIncomingStructure = target[key];
-					previousValue = getReferredObject(target[key]);
+				if (typeof(previousValueOrIncomingStructure) === 'object' && state.incomingStructuresDisabled === 0) {
+					previousValue = getReferredObject(previousValueOrIncomingStructure);
 				} else {
-					previousValue = target[key]; 
+					previousValue = previousValueOrIncomingStructure;
 				}
 				
-				if (state.useIncomingStructures) {
-					decreaseIncomingCounter(previousValue);
-					decreaseIncomingCounter(previousIncomingStructure);
-					if (state.incomingStructuresDisabled === 0) { // && !isIndexParentOf(this.const.object, value)
-						state.incomingStructuresDisabled++;
-						removeIncomingRelation(this.const.object, key, previousValue, previousIncomingStructure);
-						delete target[key];
-						state.incomingStructuresDisabled--;
-					} else {
-						delete target[key];
-					}
-				} else if (configuration.incomingReferenceCounters){
-					decreaseIncomingCounter(previousValue);
-					delete target[key];
-				} else {
-					delete target[key];
-				}
+				// Delete and remove incoming relations
+				if (state.incomingStructuresDisabled === 0) {
+					state.incomingStructuresDisabled++;
+					removeIncomingRelation(this.const.object, key, previousValue, previousValueOrIncomingStructure);
+					state.incomingStructuresDisabled--;
+				} 
 				delete target[key];
-				if(!( key in target )) { // Write protected?
-					emitDeleteEvent(this, key, previousValue);
+				
+				if (configuration.incomingReferenceCounters){
+					if (configuration.incomingStructuresAsCausalityObjects) {				
+						decreaseIncomingCounter(previousValueOrIncomingStructure);
+					} else {			
+						decreaseIncomingCounter(previousValue);					
+					}
+				}
+				
+				
+				if(!( key in target )) { // Write protected? // remove???
 					if (typeof(this.const._enumerateObservers) !== 'undefined') {
 						notifyChangeObservers(this.const._enumerateObservers);
+					}
+					
+					if (state.incomingStructuresAsCausalityObjects) {
+						emitDeleteEvent(this, key, previousValueOrIncomingStructure);
+					} else {
+						emitDeleteEvent(this, key, previousValue);
 					}
 				}
 				if (--inPulse === 0) postPulseCleanup();
