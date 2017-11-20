@@ -39,7 +39,14 @@
 			causalityStack : [],
 			context : null,
 			microContext : null,
-			nextIsMicroContext : false
+			nextIsMicroContext : false,
+			contextsScheduledForPossibleDestruction : [],
+			
+			inActiveRecording : false,
+			activeRecording : null,
+			
+			emitEventPaused : 0,
+			recordingPaused : 0
 		};
 		
 		// Dynamic configuration (try to remove this for cleanness)
@@ -53,6 +60,12 @@
 
 		function setCustomCanRead(value) {
 			customCanRead = value;
+		}
+		
+		let postPulseHooks = [];
+		
+		function addPostPulseAction(callback) {
+			postPulseHooks.push(callback);
 		}
 
 
@@ -298,7 +311,7 @@
 		function forAllIncoming(object, property, callback, filter) {
 			if(trace.incoming) log("forAllIncoming");
 			if(trace.incoming) log(object.const.incoming, 2);
-			if (inActiveRecording) registerAnyChangeObserver(getSpecifier(getSpecifier(getSpecifier(object.const, "incoming"), property), "observers"));
+			if (state.inActiveRecording) registerAnyChangeObserver(getSpecifier(getSpecifier(getSpecifier(object.const, "incoming"), property), "observers"));
 			withoutRecording(function() { // This is needed for setups where incoming structures are made out of causality objects. 
 				if (typeof(object.const.incoming) !== 'undefined') {
 					if(trace.incoming) log("incoming exists!");
@@ -948,7 +961,7 @@
 			} else if (typeof(this.const[key]) !== 'undefined') {
 				return this.const[key];
 			} else {
-				if (inActiveRecording) {
+				if (state.inActiveRecording) {
 					registerChangeObserver(getSpecifier(this.const.object, "_arrayObservers"));//object
 				}
 				return target[key];
@@ -970,7 +983,7 @@
 			} else if (constArrayOverrides[key]) {
 				return constArrayOverrides[key].bind(this);
 			} else {
-				if (inActiveRecording) {
+				if (state.inActiveRecording) {
 					registerChangeObserver(getSpecifier(this.const, "_arrayObservers"));//object
 				}
 				return target[key];
@@ -1071,7 +1084,7 @@
 
 			ensureInitialized(this, target);
 			
-			if (inActiveRecording) {
+			if (state.inActiveRecording) {
 				registerChangeObserver(getSpecifier(this.const, "_arrayObservers"));
 			}
 			let result   = Object.keys(target);
@@ -1087,7 +1100,7 @@
 			
 			ensureInitialized(this, target);
 			
-			if (inActiveRecording) {
+			if (state.inActiveRecording) {
 				registerChangeObserver(getSpecifier(this.const, "_arrayObservers"));
 			}
 			return key in target;
@@ -1119,7 +1132,7 @@
 
 			ensureInitialized(this, target);
 			
-			if (inActiveRecording) {
+			if (state.inActiveRecording) {
 				registerChangeObserver(getSpecifier(this.const, "_arrayObservers"));
 			}
 			return Object.getOwnPropertyDescriptor(target, key);
@@ -1173,7 +1186,7 @@
 						scan = Object.getPrototypeOf( scan );
 					}
 					let keyInTarget = key in target;
-					if (inActiveRecording) {
+					if (state.inActiveRecording) {
 						if (keyInTarget) {
 							registerChangeObserver(getSpecifier(getSpecifier(this.const, "_propertyObservers"), key));
 						} else {
@@ -1380,7 +1393,7 @@
 			
 			ensureInitialized(this, target);
 			
-			if (inActiveRecording) {
+			if (state.inActiveRecording) {
 				registerChangeObserver(getSpecifier(this.const, "_enumerateObservers"));
 			}
 			let keys = Object.keys(target);
@@ -1395,7 +1408,7 @@
 			
 			ensureInitialized(this, target);
 			
-			if (inActiveRecording) {
+			if (state.inActiveRecording) {
 				registerChangeObserver(getSpecifier(this.const, "_enumerateObservers"));
 			}
 			return (key in target);
@@ -1430,7 +1443,7 @@
 			
 			ensureInitialized(this, target);
 			
-			if (inActiveRecording) {
+			if (state.inActiveRecording) {
 				registerChangeObserver(getSpecifier(this.const, '_enumerateObservers'));
 			}
 			return Object.getOwnPropertyDescriptor(target, key);
@@ -1786,17 +1799,14 @@
 			return state.context === null;
 		}
 
-		let inActiveRecording = false;
-		let activeRecording = null;
-
 		function updateInActiveRecording() {
-			inActiveRecording = (state.microContext === null) ? false : ((state.microContext.type === "recording") && recordingPaused === 0);
-			activeRecording = inActiveRecording ? state.microContext : null;
+			state.inActiveRecording = (state.microContext === null) ? false : ((state.microContext.type === "recording") && state.recordingPaused === 0);
+			state.activeRecording = state.inActiveRecording ? state.microContext : null;
 		}
 
 		function getActiveRecording() {
-			return activeRecording;
-			// if ((state.microContext === null) ? false : ((state.microContext.type === "recording") && recordingPaused === 0)) {
+			return state.activeRecording;
+			// if ((state.microContext === null) ? false : ((state.microContext.type === "recording") && state.recordingPaused === 0)) {
 				// return state.microContext;
 			// } else {
 				// return null;
@@ -1804,11 +1814,11 @@
 		}
 
 		function inActiveRepetition() {
-			return (state.microContext === null) ? false : ((state.microContext.type === "repeater") && recordingPaused === 0);
+			return (state.microContext === null) ? false : ((state.microContext.type === "repeater") && state.recordingPaused === 0);
 		}
 
 		function getActiveRepeater() {
-			if ((state.microContext === null) ? false : ((state.microContext.type === "repeater") && recordingPaused === 0)) {
+			if ((state.microContext === null) ? false : ((state.microContext.type === "repeater") && state.recordingPaused === 0)) {
 				return state.microContext;
 			} else {
 				return null;
@@ -1923,20 +1933,18 @@
 			if (--state.inPulse === 0) postPulseCleanup();
 		}
 
-		let contextsScheduledForPossibleDestruction = [];
-
 		function postPulseCleanup() {
 			state.inPulse++; // block new pulses!			
 			state.inPostPulseProcess++; // Blocks any model writing during post pulse cleanup
 
-			contextsScheduledForPossibleDestruction.forEach(function(context) {
+			state.contextsScheduledForPossibleDestruction.forEach(function(context) {
 				if (!context.directlyInvokedByApplication) {
 					if (emptyObserverSet(context.contextObservers)) {
 						context.remove();
 					}
 				}
 			});
-			contextsScheduledForPossibleDestruction = [];
+			state.contextsScheduledForPossibleDestruction = [];
 			postPulseHooks.forEach(function(callback) {
 				callback(state.pulseEvents);
 			});
@@ -1946,11 +1954,6 @@
 			state.inPulse--;
 		}
 
-		let postPulseHooks = [];
-		function addPostPulseAction(callback) {
-			postPulseHooks.push(callback);
-		}
-
 
 		/**********************************
 		 *  Observe
@@ -1958,11 +1961,9 @@
 		 *
 		 **********************************/
 		
-		let emitEventPaused = 0;
-
 		function withoutEmittingEvents(action) {
 			state.inPulse++;
-			emitEventPaused++;
+			state.emitEventPaused++;
 			// log(configuration.name + "pause emitting events");
 			// logGroup();
 			// log(configuration.name + " state.inPulse: " + state.inPulse);
@@ -1970,7 +1971,7 @@
 			// log("state.inPulse: " + state.inPulse);
 			// log(configuration.name + " state.inPulse: " + state.inPulse);
 			// logUngroup();
-			emitEventPaused--;
+			state.emitEventPaused--;
 			if (--state.inPulse === 0) postPulseCleanup();
 		}
 
@@ -2022,9 +2023,9 @@
 			if (trace.basic) {
 				log("emitEvent: ");// + event.type + " " + event.property);
 				log(event);
-				log("emitEventPaused: " + emitEventPaused);
+				log("state.emitEventPaused: " + state.emitEventPaused);
 			}
-			if (emitEventPaused === 0) {
+			if (state.emitEventPaused === 0) {
 				// log("EMIT EVENT " + configuration.name + " " + event.type + " " + event.property + "=...");
 				event.object = handler.const.object; 
 				// event.isConsequence = state.refreshingRepeater;
@@ -2188,19 +2189,17 @@
 			return returnValue;
 		}
 
-		let recordingPaused = 0;
-		
 		function assertNotRecording() {
-			if (inActiveRecording) {
+			if (state.inActiveRecording) {
 				throw new Error("Should not be in a recording right now...");
 			}
 		}
 		
 		function withoutRecording(action) {
-			recordingPaused++;
+			state.recordingPaused++;
 			updateInActiveRecording();
 			action();
-			recordingPaused--;
+			state.recordingPaused--;
 			updateInActiveRecording();
 		}
 
@@ -2209,7 +2208,7 @@
 		}
 
 		function registerAnyChangeObserver(observerSet) { // instance can be a cached method if observing its return value, object
-			if (inActiveRecording) {
+			if (state.inActiveRecording) {
 				registerChangeObserver(observerSet);
 			}
 		}
@@ -2218,15 +2217,15 @@
 		function registerChangeObserver(observerSet) {
 			// Find right place in the incoming structure.
 			let activeRecordingId; 
-			if (typeof(activeRecording.const) !== 'undefined') {
-				activeRecordingId = activeRecording.const.id;
+			if (typeof(state.activeRecording.const) !== 'undefined') {
+				activeRecordingId = state.activeRecording.const.id;
 			} else {
-				if (typeof(activeRecording.id) === 'undefined') activeRecording.id = nextObserverSetId++;
-				activeRecordingId = activeRecording.id;
+				if (typeof(state.activeRecording.id) === 'undefined') state.activeRecording.id = nextObserverSetId++;
+				activeRecordingId = state.activeRecording.id;
 			}
-			let incomingRelationChunk = intitializeAndConstructIncomingStructure(observerSet, activeRecording, activeRecordingId);
+			let incomingRelationChunk = intitializeAndConstructIncomingStructure(observerSet, state.activeRecording, activeRecordingId);
 			if (incomingRelationChunk !== null) {
-				activeRecording.sources.push(incomingRelationChunk);
+				state.activeRecording.sources.push(incomingRelationChunk);
 			}
 		}
 
@@ -2623,7 +2622,7 @@
 					cacheRecord.micro.remove();
 				};
 				getSpecifier(cacheRecord, "contextObservers").noMoreObserversCallback = function() {
-					contextsScheduledForPossibleDestruction.push(cacheRecord);
+					state.contextsScheduledForPossibleDestruction.push(cacheRecord);
 				};
 				enterContext('cached_repeater', cacheRecord);
 				state.nextIsMicroContext = true;
@@ -2736,7 +2735,7 @@
 				leaveContext();
 				cacheRecord.returnValue = returnValue;
 				getSpecifier(cacheRecord, "contextObservers").noMoreObserversCallback = function() {
-					contextsScheduledForPossibleDestruction.push(cacheRecord);
+					state.contextsScheduledForPossibleDestruction.push(cacheRecord);
 				};
 				registerAnyChangeObserver(cacheRecord.contextObservers);
 				return returnValue;
@@ -2761,7 +2760,7 @@
 			if (functionCacher.cacheRecordExists()) {
 				let cacheRecord = functionCacher.getExistingRecord();
 				cacheRecord.directlyInvokedByApplication = false;
-				contextsScheduledForPossibleDestruction.push(cacheRecord);
+				state.contextsScheduledForPossibleDestruction.push(cacheRecord);
 			}
 
 			// Re cached
@@ -2771,7 +2770,7 @@
 			if (functionCacher.cacheRecordExists()) {
 				let cacheRecord = functionCacher.getExistingRecord();
 				cacheRecord.directlyInvokedByApplication = false;
-				contextsScheduledForPossibleDestruction.push(cacheRecord);
+				state.contextsScheduledForPossibleDestruction.push(cacheRecord);
 			}
 		}
 
@@ -2968,7 +2967,7 @@
 				enterContext('reCache', cacheRecord);
 				state.nextIsMicroContext = true;
 				getSpecifier(cacheRecord, 'contextObservers').noMoreObserversCallback = function() {
-					contextsScheduledForPossibleDestruction.push(cacheRecord);
+					state.contextsScheduledForPossibleDestruction.push(cacheRecord);
 				};
 				cacheRecord.repeaterHandler = repeatOnChange(
 					function () {
