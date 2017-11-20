@@ -21,13 +21,13 @@
 		
 		// State
 		let state = { 
-			nextId : 0,
-
 			inPulse : 0,
 			inPostPulseProcess : 0,
 			pulseEvents : [],
 			
 			causalityStack : [],
+			writeRestriction : null,
+			sideEffectBlockStack : [],
 			context : null,
 			microContext : null,
 			nextIsMicroContext : false,
@@ -47,17 +47,9 @@
 			
 			emitEventPaused : 0,
 			recordingPaused : 0,
-			
-			observersToNotifyChange : [],
-			nextObserverToNotifyChange : null,
-			lastObserverToNotifyChange : null,
 
-			observerNotificationPostponed : 0,
-			observerNotificationNullified : 0,
-			
-			throwErrorUponSideEffect : false,
-			writeRestriction : null,
-			sideEffectBlockStack : []
+			observerNotificationPostponed : 0, // This is used to make synchrounous change of incoming/outgoing references.
+			observerNotificationNullified : 0
 		};
 		
 		// Dynamic configuration (try to remove this for cleanness)
@@ -780,35 +772,45 @@
 			pop : function() {
 				if (!canWrite(this.const.object)) return;
 				state.inPulse++;
+				state.observerNotificationPostponed++;
 
 				let index = this.target.length - 1;
 				// state.observerNotificationNullified++;
-				let result = this.target.pop();
+				let removedOrIncomingStructure = this.target.pop();
+				let removed = getReferredObject(removedOrIncomingStructure);
 				// state.observerNotificationNullified--;
+				
+				if (state.incomingStructuresDisabled === 0) {
+					state.incomingStructuresDisabled++;
+					createAndRemoveIncomingRelations(this.const.object, null, null, removed, removedOrIncomingStructure);
+					state.incomingStructuresDisabled--;
+				}
+				
 				if (typeof(this.const._arrayObservers) !== 'undefined') {
 					notifyChangeObservers(this.const._arrayObservers);
 				}
-				emitSpliceEvent(this, index, [result], null);
+				
+				emitSpliceEvent(this, index, [(state.incomingStructuresDisabled === 0 && configuration.incomingStructuresAsCausalityObjects) ? removedOrIncomingStructure : removed], null);
+				if (--state.observerNotificationPostponed === 0) proceedWithPostponedNotifications();
 				if (--state.inPulse === 0) postPulseCleanup();
-				return result;
+				return configuration.incomingStructuresAsCausalityObjects ? removedOrIncomingStructure : removed;
 			},
 
 			push : function() {
 				if (!canWrite(this.const.object)) return;
 				state.inPulse++;
+				state.observerNotificationPostponed++;
 
 				let index = this.target.length;
 				let argumentsArray = argumentsToArray(arguments);
 				
-				let removed = null;
 				let added = argumentsArray;
+				let addedOrIncomingStructures; 
 				
 				// TODO: configuration.incomingReferenceCounters || .... 
 				if (state.incomingStructuresDisabled === 0) {
 					state.incomingStructuresDisabled++;
-					added = createAndRemoveArrayIncomingRelations(this.const.object, index, removed, added); // TODO: implement for other array manipulators as well. 
-					// TODO: What about removed adjusted? 
-					// TODO: What about the events? 
+					addedOrIncomingStructures = createAndRemoveArrayIncomingRelations(this.const.object, index, null, added); // TODO: implement for other array manipulators as well. 
 					state.incomingStructuresDisabled--;
 				}
 				
@@ -818,7 +820,15 @@
 				if (typeof(this.const._arrayObservers) !== 'undefined') {
 					notifyChangeObservers(this.const._arrayObservers);
 				}
-				emitSpliceEvent(this, index, removed, added);
+				
+				// Emit event 
+				if (state.incomingStructuresDisabled === 0 && state.incomingStructuresAsCausalityObjects) {
+					emitSpliceEvent(this, index, null, addedOrIncomingStructures);
+				} else {
+					emitSpliceEvent(this, index, null, added);
+				}
+				
+				if (--state.observerNotificationPostponed === 0) proceedWithPostponedNotifications();
 				if (--state.inPulse === 0) postPulseCleanup();
 				// logUngroup();
 				return this.target.length;
@@ -1323,7 +1333,7 @@
 			}
 
 			// Emit event 
-			if (state.incomingStructuresAsCausalityObjects) {
+			if (state.incomingStructuresDisabled === 0 && state.incomingStructuresAsCausalityObjects) {
 				emitSetEvent(this, key, valueOrIncomingStructure, previousValueOrIncomingStructure);
 			} else {
 				emitSetEvent(this, key, value, previousValue);
@@ -1466,7 +1476,8 @@
 		 *  Create
 		 *
 		 ***************************************************************/
-		
+		 
+		let nextId = 0;
 		// classRegistry = {};
 		
 		function addClasses(classes) {
@@ -1484,11 +1495,11 @@
 			state.inPulse++;
 			if (typeof(initial.const) === 'undefined') {			
 				initial.const = {
-					id : state.nextId++,
+					id : nextId++,
 					causalityInstance : causalityInstance
 				};
 			} else {
-				initial.const.id = state.nextId++;
+				initial.const.id = nextId++;
 				initial.const.causalityInstance = causalityInstance;
 			}
 			
@@ -1498,7 +1509,7 @@
 		} 
 
 		function resetObjectIds() {
-			state.nextId = 0;
+			nextId = 0;
 		}
 		 
 		function create(createdTarget, cacheIdOrInitData) {
@@ -1508,7 +1519,7 @@
 			}
 			
 			state.inPulse++;
-			let id = state.nextId++;
+			let id = nextId++;
 			
 			let initializer = null;
 			if (typeof(createdTarget) === 'undefined') {
@@ -2245,16 +2256,19 @@
 		 *  Upon change
 		 * -------------- */
 
+		let nextObserverToNotifyChange = null;
+		let lastObserverToNotifyChange = null;
+		
 		function proceedWithPostponedNotifications() {
 			if (state.observerNotificationPostponed == 0) {
-				while (state.nextObserverToNotifyChange !== null) {
-					let recorder = state.nextObserverToNotifyChange;
-					state.nextObserverToNotifyChange = state.nextObserverToNotifyChange.nextToNotify;
+				while (nextObserverToNotifyChange !== null) {
+					let recorder = nextObserverToNotifyChange;
+					nextObserverToNotifyChange = nextObserverToNotifyChange.nextToNotify;
 					// blockSideEffects(function() {
 					performAction(recorder.uponChangeAction);
 					// });
 				}
-				state.lastObserverToNotifyChange = null;
+				lastObserverToNotifyChange = null;
 			}
 		}
 
@@ -2297,12 +2311,12 @@
 					observer.remove(); // Cannot be any more dirty than it already is!					
 				}
 				if (state.observerNotificationPostponed > 0) {
-					if (state.lastObserverToNotifyChange !== null) {
-						state.lastObserverToNotifyChange.nextToNotify = observer;
+					if (lastObserverToNotifyChange !== null) {
+						lastObserverToNotifyChange.nextToNotify = observer;
 					} else {
-						state.nextObserverToNotifyChange = observer;
+						nextObserverToNotifyChange = observer;
 					}
-					state.lastObserverToNotifyChange = observer;
+					lastObserverToNotifyChange = observer;
 				} else {
 					// blockSideEffects(function() {
 					performAction(observer.uponChangeAction);

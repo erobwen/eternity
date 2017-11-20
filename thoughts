@@ -26,6 +26,11 @@ Next Major Step:
 
 Thoughts:
 
+TODO: What about modifying incoming without actually loading it... this could make it easier to synch incoming/outgoing pairs without the risk of preemption in the middle, that expose incoming/outgoing imbalance.... 
+TODO: What about if we are observing while modifying a reference when we have incoming structures as objects. We need to turn off recording while we modify the incoming structures...
+
+
+
 General back references are needed in order to solve the doctor/patient problem.
 Back references are not automatically streamed. 
 forAllIncoming will loop through all available incoming. 
