@@ -56,7 +56,7 @@ describe("classes", function () {
 		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
 		
 		assert.equal("Array", Object.getPrototypeOf(persistent.x).constructor.name);
-		assert.equal(42, persistent.x.shift());
+		assert.equal(42, persistent.x[0]); //.shift()
 		clearDatabaseAndClearMemory();
 	});	  
 });

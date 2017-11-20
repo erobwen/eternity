@@ -277,6 +277,15 @@
 			return referredItem;
 		}
 		
+		
+		function getReferredObjects(array) {
+			let newArray = [];
+			array.forEach(function(objectOrIncomingStructure) {
+				newArray.push(getReferredObject(objectOrIncomingStructure));
+			})
+			return newArray;
+		}
+		
 		function getSingleIncomingReference(object, property, filter) {
 			trace.incoming && log("getSingleIncomingReference");
 			let result = null;
@@ -473,7 +482,7 @@
 			}
 		}
 		
-		function createAndRemoveArrayIncomingRelations(arrayProxy, index, removed, added) {
+		function createAndRemoveArrayIncomingRelations(arrayProxy, index, removedOrIncomingStructures, added) {
 			// Get refering object 
 			// log("createAndRemoveArrayIncomingRelations");
 			// logGroup();
@@ -500,13 +509,13 @@
 			});
 			
 			// Remove incoming relations for removed
-			if (removed !== null) {
-				removed.forEach(function(removedElement) {
-					if (isObject(removedElement)) {
+			if (removedOrIncomingStructures !== null) {
+				removedOrIncomingStructures.forEach(function(removedOrIncomingStructure) {
+					if (isObject(removedOrIncomingStructure)) {
 						if ((previousValue.const.incomingReferences -= 1) === 0)  removedLastIncomingRelation(removedElement);
-						removeIncomingStructure(proxy.const.id, removedElement);
-						if (typeof(removedElement.const.incoming[referringRelation].observers) !== 'undefined') {
-							notifyChangeObservers(removedElement.const.incoming[referringRelation].observers);
+						removeIncomingStructure(proxy.const.id, removedOrIncomingStructure);
+						if (typeof(removedOrIncomingStructure.const.incoming[referringRelation].observers) !== 'undefined') {
+							notifyChangeObservers(removedOrIncomingStructure.const.incoming[referringRelation].observers);
 						}
 					}					
 				});					
@@ -790,10 +799,10 @@
 					notifyChangeObservers(this.const._arrayObservers);
 				}
 				
-				emitSpliceEvent(this, index, [(state.incomingStructuresDisabled === 0 && configuration.incomingStructuresAsCausalityObjects) ? removedOrIncomingStructure : removed], null);
+				emitSpliceEvent(this, index, [(state.incomingStructuresDisabled === 0 && !configuration.incomingStructuresAsCausalityObjects) ?  removed : removedOrIncomingStructure], null);
 				if (--state.observerNotificationPostponed === 0) proceedWithPostponedNotifications();
 				if (--state.inPulse === 0) postPulseCleanup();
-				return configuration.incomingStructuresAsCausalityObjects ? removedOrIncomingStructure : removed;
+				return removed;
 			},
 
 			push : function() {
@@ -812,16 +821,15 @@
 					state.incomingStructuresDisabled++;
 					addedOrIncomingStructures = createAndRemoveArrayIncomingRelations(this.const.object, index, null, added); // TODO: implement for other array manipulators as well. 
 					state.incomingStructuresDisabled--;
+					this.target.push.apply(this.target, addedOrIncomingStructures);
+				} else {
+					this.target.push.apply(this.target, added);
 				}
 				
-				// state.observerNotificationNullified++;
-				this.target.push.apply(this.target, argumentsArray);
-				// state.observerNotificationNullified--;
+				// Notify and emit event
 				if (typeof(this.const._arrayObservers) !== 'undefined') {
 					notifyChangeObservers(this.const._arrayObservers);
 				}
-				
-				// Emit event 
 				if (state.incomingStructuresDisabled === 0 && state.incomingStructuresAsCausalityObjects) {
 					emitSpliceEvent(this, index, null, addedOrIncomingStructures);
 				} else {
@@ -837,36 +845,64 @@
 			shift : function() {
 				if (!canWrite(this.const.object)) return;
 				state.inPulse++;
-
-				// state.observerNotificationNullified++;
-				let result = this.target.shift();
-				// state.observerNotificationNullified--;
+				state.observerNotificationPostponed++;
+				
+				let removedOrIncomingStructure = this.target.shift();
+				let removed;
+				if (state.incomingStructuresDisabled === 0) {
+					removed = getReferredObject(removedOrIncomingStructure);
+					state.incomingStructuresDisabled++;
+					createAndRemoveIncomingRelations(this.const.object, null, null, removed, removedOrIncomingStructure);
+					state.incomingStructuresDisabled--;
+				}
+				
+				// Notify and emit event
 				if (typeof(this.const._arrayObservers) !== 'undefined') {
 					notifyChangeObservers(this.const._arrayObservers);
 				}
-				emitSpliceEvent(this, 0, [result], null);
+				if (state.incomingStructuresDisabled === 0 && !state.incomingStructuresAsCausalityObjects) {
+					emitSpliceEvent(this, 0, removed, null);
+				} else {
+					emitSpliceEvent(this, 0, removedOrIncomingStructure, null);
+				}
+				
+				if (--state.observerNotificationPostponed === 0) proceedWithPostponedNotifications();
 				if (--state.inPulse === 0) postPulseCleanup();
-				return result;
-
+				return removed;
 			},
 
 			unshift : function() {
 				if (!canWrite(this.const.object)) return;
 				state.inPulse++;
+				state.observerNotificationPostponed++;
 
-				let index = this.target.length;
-				let argumentsArray = argumentsToArray(arguments);
-				state.observerNotificationNullified++;
-				this.target.unshift.apply(this.target, argumentsArray);
-				state.observerNotificationNullified--;
+				let added = argumentsToArray(arguments);
+				let addedOrIncomingStructures;
+				
+				if (state.incomingStructuresDisabled === 0) {
+					state.incomingStructuresDisabled++;
+					addedOrIncomingStructures = createAndRemoveArrayIncomingRelations(this.const.object, 0, null, added); // TODO: implement for other array manipulators as well. 
+					state.incomingStructuresDisabled--;
+					this.target.unshift.apply(this.target, addedOrIncomingStructures);
+				} else {
+					this.target.unshift.apply(this.target, added);
+				}
+				
+				// Notify and emit event
 				if (typeof(this.const._arrayObservers) !== 'undefined') {
 					notifyChangeObservers(this.const._arrayObservers);
+				}				
+				if (state.incomingStructuresDisabled === 0 && state.incomingStructuresAsCausalityObjects) {
+					emitSpliceEvent(this, 0, null, addedOrIncomingStructures);
+				} else {
+					emitSpliceEvent(this, 0, null, added);
 				}
-				emitSpliceEvent(this, 0, null, argumentsArray);
+				
+				if (--state.observerNotificationPostponed === 0) proceedWithPostponedNotifications();
 				if (--state.inPulse === 0) postPulseCleanup();
 				return this.target.length;
 			},
-
+			
 			splice : function() {
 				if (!canWrite(this.const.object)) return;
 				state.inPulse++;
@@ -878,9 +914,9 @@
 					removedCount = this.target.length - index;
 				let added = argumentsArray.slice(2);
 				let removed = this.target.slice(index, index + removedCount);
-				state.observerNotificationNullified++;
+
 				let result = this.target.splice.apply(this.target, argumentsArray);
-				state.observerNotificationNullified--;
+
 				if (typeof(this.const._arrayObservers) !== 'undefined') {
 					notifyChangeObservers(this.const._arrayObservers);
 				}
@@ -888,6 +924,50 @@
 				if (--state.inPulse === 0) postPulseCleanup();
 				return result; // equivalent to removed
 			},
+			// splice : function() {
+				// if (!canWrite(this.const.object)) return;
+				// state.inPulse++;
+				// state.observerNotificationPostponed++;
+
+				// let argumentsArray = argumentsToArray(arguments);
+				// let index = argumentsArray[0];
+				// let removedCount = argumentsArray[1];
+				// if( typeof argumentsArray[1] === 'undefined' )
+					// removedCount = this.target.length - index;
+				// let added = argumentsArray.slice(2);
+				// let addedOrIncomingStructures;
+				
+				// let removedOrIncomingStructures = this.target.slice(index, index + removedCount);
+				// let removed;
+				// let result;
+				// if (state.incomingStructuresDisabled === 0) {
+					// state.incomingStructuresDisabled++;
+					// addedOrIncomingStructures = createAndRemoveArrayIncomingRelations(this.const.object, index, removedOrIncomingStructures, added);
+					// state.incomingStructuresDisabled--;
+					// let i = 2;
+					// added.forEach(function(addedOrIncomingStructure) {
+						// argumentsArray[i++] = addedOrIncomingStructure; 
+					// })
+					// result = this.target.splice.apply(this.target, argumentsArray);
+					// result = getReferredObjects(result);
+				// } else {
+					// result = this.target.splice.apply(this.target, argumentsArray);
+				// }
+				
+				// // Notify and emit event
+				// if (typeof(this.const._arrayObservers) !== 'undefined') {
+					// notifyChangeObservers(this.const._arrayObservers);
+				// }
+				// if (state.incomingStructuresDisabled === 0 && !state.incomingStructuresAsCausalityObjects) {
+					// emitSpliceEvent(this, 0, removed);
+				// } else {
+					// emitSpliceEvent(this, 0, removedOrIncomingStructures);											
+				// }
+				
+				// if (--state.observerNotificationPostponed === 0) proceedWithPostponedNotifications();
+				// if (--state.inPulse === 0) postPulseCleanup();
+				// return result; // equivalent to removed
+			// },
 
 			copyWithin: function(target, start, end) {
 				if (!canWrite(this.const.object)) return;
