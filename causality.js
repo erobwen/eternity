@@ -27,21 +27,21 @@
 			inPostPulseProcess : 0,
 			pulseEvents : [],
 			
-			blockingInitialize : 0,
-			
-			incomingStructuresDisabled : configuration.useIncomingStructures ? 0 : 1,
-			blockInitialize : false,
-			refreshingRepeater : false,
-			
-			cachedCallsCount : 0, // Mostly for testing... 
-			refreshingAllDirtyRepeaters : false,
-			
 			causalityStack : [],
 			context : null,
 			microContext : null,
 			nextIsMicroContext : false,
 			contextsScheduledForPossibleDestruction : [],
 			
+			blockingInitialize : 0,
+			
+			incomingStructuresDisabled : configuration.useIncomingStructures ? 0 : 1,
+			
+			refreshingRepeater : false,
+			refreshingAllDirtyRepeaters : false,
+			
+			cachedCallsCount : 0, // Mostly for testing... 
+						
 			inActiveRecording : false,
 			activeRecording : null,
 			
