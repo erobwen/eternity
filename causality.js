@@ -786,10 +786,11 @@
 				let index = this.target.length - 1;
 				// state.observerNotificationNullified++;
 				let removedOrIncomingStructure = this.target.pop();
-				let removed = getReferredObject(removedOrIncomingStructure);
+				let removed;
 				// state.observerNotificationNullified--;
 				
 				if (state.incomingStructuresDisabled === 0) {
+					removed = getReferredObject(removedOrIncomingStructure);
 					state.incomingStructuresDisabled++;
 					createAndRemoveIncomingRelations(this.const.object, null, null, removed, removedOrIncomingStructure);
 					state.incomingStructuresDisabled--;
@@ -802,7 +803,7 @@
 				emitSpliceEvent(this, index, [(state.incomingStructuresDisabled === 0 && !configuration.incomingStructuresAsCausalityObjects) ?  removed : removedOrIncomingStructure], null);
 				if (--state.observerNotificationPostponed === 0) proceedWithPostponedNotifications();
 				if (--state.inPulse === 0) postPulseCleanup();
-				return removed;
+				return (state.incomingStructuresDisabled === 0 && !state.incomingStructuresAsCausalityObjects) ? removed : removedOrIncomingStructure;
 			},
 
 			push : function() {
@@ -868,7 +869,7 @@
 				
 				if (--state.observerNotificationPostponed === 0) proceedWithPostponedNotifications();
 				if (--state.inPulse === 0) postPulseCleanup();
-				return removed;
+				return (state.incomingStructuresDisabled === 0 && !state.incomingStructuresAsCausalityObjects) ? removed : removedOrIncomingStructure;
 			},
 
 			unshift : function() {
