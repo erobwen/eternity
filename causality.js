@@ -803,7 +803,7 @@
 				emitSpliceEvent(this, index, [(state.incomingStructuresDisabled === 0 && !configuration.incomingStructuresAsCausalityObjects) ?  removed : removedOrIncomingStructure], null);
 				if (--state.observerNotificationPostponed === 0) proceedWithPostponedNotifications();
 				if (--state.inPulse === 0) postPulseCleanup();
-				return (state.incomingStructuresDisabled === 0 && !state.incomingStructuresAsCausalityObjects) ? removed : removedOrIncomingStructure;
+				return (state.incomingStructuresDisabled === 0 && !configuration.incomingStructuresAsCausalityObjects) ? removed : removedOrIncomingStructure;
 			},
 
 			push : function() {
@@ -831,7 +831,7 @@
 				if (typeof(this.const._arrayObservers) !== 'undefined') {
 					notifyChangeObservers(this.const._arrayObservers);
 				}
-				if (state.incomingStructuresDisabled === 0 && state.incomingStructuresAsCausalityObjects) {
+				if (state.incomingStructuresDisabled === 0 && configuration.incomingStructuresAsCausalityObjects) {
 					emitSpliceEvent(this, index, null, addedOrIncomingStructures);
 				} else {
 					emitSpliceEvent(this, index, null, added);
@@ -861,7 +861,7 @@
 				if (typeof(this.const._arrayObservers) !== 'undefined') {
 					notifyChangeObservers(this.const._arrayObservers);
 				}
-				if (state.incomingStructuresDisabled === 0 && !state.incomingStructuresAsCausalityObjects) {
+				if (state.incomingStructuresDisabled === 0 && !configuration.incomingStructuresAsCausalityObjects) {
 					emitSpliceEvent(this, 0, removed, null);
 				} else {
 					emitSpliceEvent(this, 0, removedOrIncomingStructure, null);
@@ -869,7 +869,7 @@
 				
 				if (--state.observerNotificationPostponed === 0) proceedWithPostponedNotifications();
 				if (--state.inPulse === 0) postPulseCleanup();
-				return (state.incomingStructuresDisabled === 0 && !state.incomingStructuresAsCausalityObjects) ? removed : removedOrIncomingStructure;
+				return (state.incomingStructuresDisabled === 0 && !configuration.incomingStructuresAsCausalityObjects) ? removed : removedOrIncomingStructure;
 			},
 
 			unshift : function() {
@@ -893,7 +893,7 @@
 				if (typeof(this.const._arrayObservers) !== 'undefined') {
 					notifyChangeObservers(this.const._arrayObservers);
 				}				
-				if (state.incomingStructuresDisabled === 0 && state.incomingStructuresAsCausalityObjects) {
+				if (state.incomingStructuresDisabled === 0 && configuration.incomingStructuresAsCausalityObjects) {
 					emitSpliceEvent(this, 0, null, addedOrIncomingStructures);
 				} else {
 					emitSpliceEvent(this, 0, null, added);
@@ -907,6 +907,7 @@
 			splice : function() {
 				if (!canWrite(this.const.object)) return;
 				state.inPulse++;
+				state.observerNotificationPostponed++;
 
 				let argumentsArray = argumentsToArray(arguments);
 				let index = argumentsArray[0];
@@ -914,21 +915,46 @@
 				if( typeof argumentsArray[1] === 'undefined' )
 					removedCount = this.target.length - index;
 				let added = argumentsArray.slice(2);
-				let removed = this.target.slice(index, index + removedCount);
+				let removedOrIncomingStructures;
+				let removed; 
 
-				let result = this.target.splice.apply(this.target, argumentsArray);
+				if (state.incomingStructuresDisabled === 0) {
+					removedOrIncomingStructures = this.target.slice(index, removedCount);
+					state.incomingStructuresDisabled++;
+					addedOrIncomingStructures = createAndRemoveArrayIncomingRelations(this.const.object, index, removedOrIncomingStructures, added);
+					state.incomingStructuresDisabled--;
+					let i = 2;
+					addedOrIncomingStructures.forEach(function(addedOrIncomingStructure) {
+						argumentsArray[i++] = addedOrIncomingStructure; 
+					})
+					result = this.target.splice.apply(this.target, argumentsArray);
+					removed = getReferredObjects(removedOrIncomingStructures);
+				} else {
+					removedOrIncomingStructures = this.target.splice.apply(this.target, argumentsArray);
+				}
 
 				if (typeof(this.const._arrayObservers) !== 'undefined') {
 					notifyChangeObservers(this.const._arrayObservers);
 				}
-				emitSpliceEvent(this, index, removed, added);
+				if (state.incomingStructuresDisabled === 0) {
+					if (configuration.incomingStructuresAsCausalityObjects) {
+						emitSpliceEvent(this, 0, removedOrIncomingStructures, addedOrIncomingStructures);
+					} else {
+						emitSpliceEvent(this, 0, removed, added);
+					}
+				} else {
+					// emitSpliceEvent(this, 0, null, added);
+					emitSpliceEvent(this, index, removedOrIncomingStructures, added);
+				}
+				
+				if (--state.observerNotificationPostponed === 0) proceedWithPostponedNotifications();
 				if (--state.inPulse === 0) postPulseCleanup();
-				return result; // equivalent to removed
+				return (state.incomingStructuresDisabled === 0 && !configuration.incomingStructuresAsCausalityObjects) ? removed : removedOrIncomingStructures; // equivalent to removed
 			},
 			// splice : function() {
 				// if (!canWrite(this.const.object)) return;
 				// state.inPulse++;
-				// state.observerNotificationPostponed++;
+				// 
 
 				// let argumentsArray = argumentsToArray(arguments);
 				// let index = argumentsArray[0];
@@ -959,13 +985,13 @@
 				// if (typeof(this.const._arrayObservers) !== 'undefined') {
 					// notifyChangeObservers(this.const._arrayObservers);
 				// }
-				// if (state.incomingStructuresDisabled === 0 && !state.incomingStructuresAsCausalityObjects) {
+				// if (state.incomingStructuresDisabled === 0 && !configuration.incomingStructuresAsCausalityObjects) {
 					// emitSpliceEvent(this, 0, removed);
 				// } else {
 					// emitSpliceEvent(this, 0, removedOrIncomingStructures);											
 				// }
 				
-				// if (--state.observerNotificationPostponed === 0) proceedWithPostponedNotifications();
+				// 
 				// if (--state.inPulse === 0) postPulseCleanup();
 				// return result; // equivalent to removed
 			// },
@@ -1414,7 +1440,7 @@
 			}
 
 			// Emit event 
-			if (state.incomingStructuresDisabled === 0 && state.incomingStructuresAsCausalityObjects) {
+			if (state.incomingStructuresDisabled === 0 && configuration.incomingStructuresAsCausalityObjects) {
 				emitSetEvent(this, key, valueOrIncomingStructure, previousValueOrIncomingStructure);
 			} else {
 				emitSetEvent(this, key, value, previousValue);
@@ -1475,7 +1501,7 @@
 						notifyChangeObservers(this.const._enumerateObservers);
 					}
 					
-					if (state.incomingStructuresAsCausalityObjects) {
+					if (configuration.incomingStructuresAsCausalityObjects) {
 						emitDeleteEvent(this, key, previousValueOrIncomingStructure);
 					} else {
 						emitDeleteEvent(this, key, previousValue);
