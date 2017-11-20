@@ -46,7 +46,18 @@
 			activeRecording : null,
 			
 			emitEventPaused : 0,
-			recordingPaused : 0
+			recordingPaused : 0,
+			
+			observersToNotifyChange : [],
+			nextObserverToNotifyChange : null,
+			lastObserverToNotifyChange : null,
+
+			observerNotificationPostponed : 0,
+			observerNotificationNullified : 0,
+			
+			throwErrorUponSideEffect : false,
+			writeRestriction : null,
+			sideEffectBlockStack : []
 		};
 		
 		// Dynamic configuration (try to remove this for cleanness)
@@ -771,9 +782,9 @@
 				state.inPulse++;
 
 				let index = this.target.length - 1;
-				// observerNotificationNullified++;
+				// state.observerNotificationNullified++;
 				let result = this.target.pop();
-				// observerNotificationNullified--;
+				// state.observerNotificationNullified--;
 				if (typeof(this.const._arrayObservers) !== 'undefined') {
 					notifyChangeObservers(this.const._arrayObservers);
 				}
@@ -801,9 +812,9 @@
 					state.incomingStructuresDisabled--;
 				}
 				
-				// observerNotificationNullified++;
+				// state.observerNotificationNullified++;
 				this.target.push.apply(this.target, argumentsArray);
-				// observerNotificationNullified--;
+				// state.observerNotificationNullified--;
 				if (typeof(this.const._arrayObservers) !== 'undefined') {
 					notifyChangeObservers(this.const._arrayObservers);
 				}
@@ -817,9 +828,9 @@
 				if (!canWrite(this.const.object)) return;
 				state.inPulse++;
 
-				// observerNotificationNullified++;
+				// state.observerNotificationNullified++;
 				let result = this.target.shift();
-				// observerNotificationNullified--;
+				// state.observerNotificationNullified--;
 				if (typeof(this.const._arrayObservers) !== 'undefined') {
 					notifyChangeObservers(this.const._arrayObservers);
 				}
@@ -835,9 +846,9 @@
 
 				let index = this.target.length;
 				let argumentsArray = argumentsToArray(arguments);
-				observerNotificationNullified++;
+				state.observerNotificationNullified++;
 				this.target.unshift.apply(this.target, argumentsArray);
-				observerNotificationNullified--;
+				state.observerNotificationNullified--;
 				if (typeof(this.const._arrayObservers) !== 'undefined') {
 					notifyChangeObservers(this.const._arrayObservers);
 				}
@@ -857,9 +868,9 @@
 					removedCount = this.target.length - index;
 				let added = argumentsArray.slice(2);
 				let removed = this.target.slice(index, index + removedCount);
-				observerNotificationNullified++;
+				state.observerNotificationNullified++;
 				let result = this.target.splice.apply(this.target, argumentsArray);
-				observerNotificationNullified--;
+				state.observerNotificationNullified--;
 				if (typeof(this.const._arrayObservers) !== 'undefined') {
 					notifyChangeObservers(this.const._arrayObservers);
 				}
@@ -883,9 +894,9 @@
 				let removed = this.target.slice(index, index + end - start);
 				let added = this.target.slice(start, end);
 
-				observerNotificationNullified++;
+				state.observerNotificationNullified++;
 				let result = this.target.copyWithin(target, start, end);
-				observerNotificationNullified--;
+				state.observerNotificationNullified--;
 				if (typeof(this.const._arrayObservers) !== 'undefined') {
 					notifyChangeObservers(this.const._arrayObservers);
 				}
@@ -904,9 +915,9 @@
 				let argumentsArray = argumentsToArray(arguments);
 				let removed = this.target.slice(0);
 
-				observerNotificationNullified++;
+				state.observerNotificationNullified++;
 				let result = this.target[functionName].apply(this.target, argumentsArray);
-				observerNotificationNullified--;
+				state.observerNotificationNullified--;
 				if (typeof(this.const._arrayObservers) !== 'undefined') {
 					notifyChangeObservers(this.const._arrayObservers);
 				}
@@ -927,9 +938,9 @@
 				let index = this.target.length;
 				let argumentsArray = argumentsToArray(arguments);
 				
-				observerNotificationNullified++;
+				state.observerNotificationNullified++;
 				this.target.push.apply(this.target, argumentsArray);
-				observerNotificationNullified--;
+				state.observerNotificationNullified--;
 				if (typeof(this.const._arrayObservers) !== 'undefined') {
 					notifyChangeObservers(this.const._arrayObservers);
 				}
@@ -1015,7 +1026,7 @@
 			// Start pulse if can write
 			if (!canWrite(this.const.object)) return;
 			state.inPulse++;
-			observerNotificationPostponed++; // TODO: Do this for backwards references from arrays as well...
+			state.observerNotificationPostponed++; // TODO: Do this for backwards references from arrays as well...
 
 
 			if (!isNaN(key)) {
@@ -1041,7 +1052,7 @@
 				}
 			}
 
-			observerNotificationPostponed--;
+			state.observerNotificationPostponed--;
 			proceedWithPostponedNotifications();
 			if (--state.inPulse === 0) postPulseCleanup();
 
@@ -1273,7 +1284,7 @@
 			
 			// Pulse start
 			state.inPulse++;
-			observerNotificationPostponed++;
+			state.observerNotificationPostponed++;
 					
 			// Perform assignment with regards to incoming structures.
 			let valueOrIncomingStructure;
@@ -1319,7 +1330,7 @@
 			}
 			
 			// End pulse 
-			if (--observerNotificationPostponed === 0) proceedWithPostponedNotifications();
+			if (--state.observerNotificationPostponed === 0) proceedWithPostponedNotifications();
 			if (--state.inPulse === 0) postPulseCleanup();
 			if (trace.basic > 0) logUngroup();
 			activityListFrozen--;
@@ -1667,8 +1678,8 @@
 				}
 			}
 
-			if (writeRestriction !== null) {
-				writeRestriction[proxy.const.id] = true;
+			if (state.writeRestriction !== null) {
+				state.writeRestriction[proxy.const.id] = true;
 			}
 			
 			emitCreationEvent(handler);
@@ -1756,7 +1767,7 @@
 			// log("CANNOT WRITE IN POST PULSE");
 				// return false;
 			// }
-			if (writeRestriction !== null && typeof(writeRestriction[object.const.id]) === 'undefined') {
+			if (state.writeRestriction !== null && typeof(state.writeRestriction[object.const.id]) === 'undefined') {
 				return false;
 			}
 			if (customCanWrite !== null) {
@@ -1926,9 +1937,9 @@
 
 		function postponeObserverNotification(action) {
 			state.inPulse++;
-			observerNotificationPostponed++;
+			state.observerNotificationPostponed++;
 			action();
-			observerNotificationPostponed--;
+			state.observerNotificationPostponed--;
 			proceedWithPostponedNotifications();
 			if (--state.inPulse === 0) postPulseCleanup();
 		}
@@ -2234,30 +2245,23 @@
 		 *  Upon change
 		 * -------------- */
 
-		let observersToNotifyChange = [];
-		let nextObserverToNotifyChange = null;
-		let lastObserverToNotifyChange = null;
-
-		let observerNotificationPostponed = 0;
-		let observerNotificationNullified = 0;
-
 		function proceedWithPostponedNotifications() {
-			if (observerNotificationPostponed == 0) {
-				while (nextObserverToNotifyChange !== null) {
-					let recorder = nextObserverToNotifyChange;
-					nextObserverToNotifyChange = nextObserverToNotifyChange.nextToNotify;
+			if (state.observerNotificationPostponed == 0) {
+				while (state.nextObserverToNotifyChange !== null) {
+					let recorder = state.nextObserverToNotifyChange;
+					state.nextObserverToNotifyChange = state.nextObserverToNotifyChange.nextToNotify;
 					// blockSideEffects(function() {
 					performAction(recorder.uponChangeAction);
 					// });
 				}
-				lastObserverToNotifyChange = null;
+				state.lastObserverToNotifyChange = null;
 			}
 		}
 
 		function nullifyObserverNotification(callback) {
-			observerNotificationNullified++;
+			state.observerNotificationNullified++;
 			callback();
-			observerNotificationNullified--;
+			state.observerNotificationNullified--;
 		}
 
 
@@ -2265,7 +2269,7 @@
 		// A bit like "for all incoming"...
 		function notifyChangeObservers(observers) {
 			if (typeof(observers.initialized) !== 'undefined') {
-				if (observerNotificationNullified > 0) {
+				if (state.observerNotificationNullified > 0) {
 					return;
 				}
 
@@ -2292,13 +2296,13 @@
 				if (typeof(observer.remove) === 'function') {
 					observer.remove(); // Cannot be any more dirty than it already is!					
 				}
-				if (observerNotificationPostponed > 0) {
-					if (lastObserverToNotifyChange !== null) {
-						lastObserverToNotifyChange.nextToNotify = observer;
+				if (state.observerNotificationPostponed > 0) {
+					if (state.lastObserverToNotifyChange !== null) {
+						state.lastObserverToNotifyChange.nextToNotify = observer;
 					} else {
-						nextObserverToNotifyChange = observer;
+						state.nextObserverToNotifyChange = observer;
 					}
-					lastObserverToNotifyChange = observer;
+					state.lastObserverToNotifyChange = observer;
 				} else {
 					// blockSideEffects(function() {
 					performAction(observer.uponChangeAction);
@@ -2313,14 +2317,14 @@
 		 *   Repetition
 		 *
 		 **********************************/
-
-		let firstDirtyRepeater = null;
+		
+		let firstDirtyRepeater = null; 
 		let lastDirtyRepeater = null;
 
 		function clearRepeaterLists() {
 			recorderId = 0;
-			let firstDirtyRepeater = null;
-			let lastDirtyRepeater = null;
+			firstDirtyRepeater = null;
+			lastDirtyRepeater = null;
 		}
 
 		function detatchRepeater(repeater) {
@@ -3020,11 +3024,6 @@
 		 *
 		 ************************************************************************/
 
-
-		let throwErrorUponSideEffect = false;
-		let writeRestriction = null;
-		let sideEffectBlockStack = [];
-
 		/**
 		 * Block side effects
 		 */
@@ -3033,13 +3032,13 @@
 			//    createdObjects : {}
 			// });
 			let restriction = {};
-			sideEffectBlockStack.push({});
-			writeRestriction = restriction
+			state.sideEffectBlockStack.push({});
+			state.writeRestriction = restriction
 			let returnValue = action();
 			// leaveContext();
-			sideEffectBlockStack.pop();
-			if (sideEffectBlockStack.length > 0) {
-				writeRestriction = sideEffectBlockStack[sideEffectBlockStack.length - 1];
+			state.sideEffectBlockStack.pop();
+			if (state.sideEffectBlockStack.length > 0) {
+				state.writeRestriction = state.sideEffectBlockStack[state.sideEffectBlockStack.length - 1];
 			}
 			return returnValue;
 		}
