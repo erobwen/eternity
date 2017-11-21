@@ -799,8 +799,11 @@
 				if (typeof(this.const._arrayObservers) !== 'undefined') {
 					notifyChangeObservers(this.const._arrayObservers);
 				}
-				
-				emitSpliceEvent(this, index, [(state.incomingStructuresDisabled === 0 && !configuration.incomingStructuresAsCausalityObjects) ?  removed : removedOrIncomingStructure], null);
+				if (state.incomingStructuresDisabled === 0 && !configuration.incomingStructuresAsCausalityObjects) {
+					emitSpliceEvent(this, index, [removed], null);					
+				} else {
+					emitSpliceEvent(this, index, [removedOrIncomingStructure], null);					
+				}
 				if (--state.observerNotificationPostponed === 0) proceedWithPostponedNotifications();
 				if (--state.inPulse === 0) postPulseCleanup();
 				return (state.incomingStructuresDisabled === 0 && !configuration.incomingStructuresAsCausalityObjects) ? removed : removedOrIncomingStructure;
@@ -862,9 +865,9 @@
 					notifyChangeObservers(this.const._arrayObservers);
 				}
 				if (state.incomingStructuresDisabled === 0 && !configuration.incomingStructuresAsCausalityObjects) {
-					emitSpliceEvent(this, 0, removed, null);
+					emitSpliceEvent(this, 0, [removed], null);
 				} else {
-					emitSpliceEvent(this, 0, removedOrIncomingStructure, null);
+					emitSpliceEvent(this, 0, [removedOrIncomingStructure], null);
 				}
 				
 				if (--state.observerNotificationPostponed === 0) proceedWithPostponedNotifications();
@@ -997,8 +1000,10 @@
 			// },
 
 			copyWithin: function(target, start, end) {
+				if (state.incomingStructuresDisabled === 0) throw new Error("Not supported yet!");
 				if (!canWrite(this.const.object)) return;
 				state.inPulse++;
+				
 
 				if (target < 0) { start = this.target.length - target; }
 				if (start < 0) { start = this.target.length - start; }
@@ -1026,6 +1031,7 @@
 
 		['reverse', 'sort', 'fill'].forEach(function(functionName) {
 			constArrayOverrides[functionName] = function() {
+				if (state.incomingStructuresDisabled === 0) throw new Error("Not supported yet!");
 				if (!canWrite(this.const.object)) return;
 				state.inPulse++;
 
@@ -1044,58 +1050,12 @@
 			};
 		});
 
-		let constArrayOverridesOptimized = {};
-		for(functionName in constArrayOverrides) {
-			constArrayOverridesOptimized[functionName] = constArrayOverrides[functionName];
-		}
-		Object.assign(constArrayOverridesOptimized, {
-			push : function() {
-				if (!canWrite(this.const.object)) return;
-				state.inPulse++;
-				let index = this.target.length;
-				let argumentsArray = argumentsToArray(arguments);
-				
-				state.observerNotificationNullified++;
-				this.target.push.apply(this.target, argumentsArray);
-				state.observerNotificationNullified--;
-				if (typeof(this.const._arrayObservers) !== 'undefined') {
-					notifyChangeObservers(this.const._arrayObservers);
-				}
-				emitSpliceEvent(this, index, null, argumentsArray);
-				if (--state.inPulse === 0) postPulseCleanup();
-				return this.target.length;
-			}	
-		});
-		
-
 
 		/***************************************************************
 		 *
 		 *  Array Handlers
 		 *
 		 ***************************************************************/
-		 
-		/*
-		function getHandlerArrayOptimized(target, key) {
-			if (this.const.forwardsTo !== null && key !== 'nonForwardConst') { //  && (typeof(overlayBypass[key]) === 'undefined')
-				let overlayHandler = this.const.forwardsTo.const.handler;
-				return overlayHandler.get.apply(overlayHandler, [overlayHandler.target, key]);
-			}
-			
-			ensureInitialized(this, target);
-			
-			if (constArrayOverridesOptimized[key]) {
-				return constArrayOverridesOptimized[key].bind(this);
-			} else if (typeof(this.const[key]) !== 'undefined') {
-				return this.const[key];
-			} else {
-				if (state.inActiveRecording) {
-					registerChangeObserver(getSpecifier(this.const.object, "_arrayObservers"));//object
-				}
-				return target[key];
-			}
-		}
-		*/
 		
 		function getHandlerArray(target, key) {
 			if (this.const.forwardsTo !== null && key !== 'nonForwardConst') { // && (typeof(overlayBypass[key]) === 'undefined')
