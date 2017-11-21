@@ -1281,7 +1281,7 @@
 							registerChangeObserver(getSpecifier(this.const, "_enumerateObservers"));
 						}
 					}
-					if (state.incomingStructuresDisabled === 0 && keyInTarget && key !== 'incoming') {
+					if (state.incomingStructuresDisabled === 0) {
 						// console.log("find referred object");
 						// console.log(key);
 						if (trace.get > 0) logUngroup();
