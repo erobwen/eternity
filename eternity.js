@@ -1831,25 +1831,26 @@
 							imageCausality.state.incomingStructuresDisabled--;
 						}
 					}
-					addFirstToList(gcState, deallocationZone, toDestroy);
+					// addFirstToList(gcState, deallocationZone, toDestroy);
+					deallocateInDatabase(toDestroy);
 					loadedObjects--;
 					    // toDestroy._eternityDismanteled = true;
 					return false;
 				}
 				
-				// Destroy those left in the destruction list. 
-				if (!isEmptyList(gcState, deallocationZone)) {
-					// log("<<<<                    >>>>>");
-					// log("<<<< Deallocate ......  >>>>>");
-					// log("<<<<                    >>>>>");
+				// // Destroy those left in the destruction list. 
+				// if (!isEmptyList(gcState, deallocationZone)) {
+					// // log("<<<<                    >>>>>");
+					// // log("<<<< Deallocate ......  >>>>>");
+					// // log("<<<<                    >>>>>");
 					
-					let toDeallocate = removeFirstFromList(gcState, deallocationZone);
-					// Make sure that object beeing destroyed is loaded.
-					deallocateInDatabase(toDeallocate);
+					// let toDeallocate = removeFirstFromList(gcState, deallocationZone);
+					// // Make sure that object beeing destroyed is loaded.
+					// deallocateInDatabase(toDeallocate);
 					
-					loadedObjects--;
-					return false;
-				}
+					// loadedObjects--;
+					// return false;
+				// }
 				
 				
 							

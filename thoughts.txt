@@ -1,8 +1,6 @@
 TODO:
 
 Eternity work in progress:
-* Shakedown of GC amost done
-    * Make it possible to deallocate "on the fly" when not referred anymore...? (skip? dellocation list is robust/good enought)
 * Create a B-tree for the index. IMPORTANT BUT CAN WAIT
 * Incoming structures enhandement:
 	* Refactor and create the incoming observation interface. IMPORTANT
