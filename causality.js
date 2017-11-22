@@ -155,9 +155,10 @@
 		 
 		function getSpecifier(javascriptObject, specifierName) {
 			if (typeof(javascriptObject[specifierName]) === 'undefined' || javascriptObject[specifierName] === null) {
-				let specifier = { 
+				let specifier = {
+					isIncomingStructure : true,
 					specifierProperty : specifierName, 
-					isIncomingStructure : true,   // This is a reuse of this object as incoming node as well.
+					isIncomingPropertyStructure : true,   // This is a reuse of this object as incoming node as well.
 					referredObject : javascriptObject
 					// name : "incomingStructure" // This fucked up things for incoming relations of name "name"
 				}
@@ -263,6 +264,10 @@
 		 *
 		 ***************************************************************/
 		 
+		function isIncomingStructure(entity) {
+			return typeof(entity) === 'object' && typeof(entity.isIncomingStructure) !== 'undefined';
+		} 
+		 
 		/**
 		 * Traverse the incoming relation structure foobar
 		 */
@@ -356,7 +361,7 @@
 		
 		// TODO: 
 		// Cannot do this unless we have a neat way to iterate over all incoming relations.
-		// Right now the structure is: { name: "isIncomingStructures", isIncomingStructures : true, referredObject: referencedObject, last: null, first: null };
+		// Right now the structure is: { name: "isIncomingPropertyStructures", isIncomingPropertyStructures : true, referredObject: referencedObject, last: null, first: null };
 		// function forEveryIncoming(object, callback, filter) {
 			// ...
 		// }
@@ -364,7 +369,7 @@
 		// function hasIncomingRelationArray(array, index) { // Maybe not needed???
 			// state.incomingStructuresDisabled++;
 			// let result = array[index];
-			// if (typeof(result.isIncomingStructure)) {
+			// if (typeof(result.isIncomingPropertyStructure)) {
 				// return true;
 			// } else {
 				// // Check if there is an internal incoming relation.
@@ -376,7 +381,7 @@
 		function hasIncomingRelation(object, property) {
 			state.incomingStructuresDisabled++;
 			let result = object[property];
-			if (typeof(result.isIncomingStructure)) {
+			if (typeof(result.isIncomingPropertyStructure)) {
 				return true;
 			} else {
 				// Check if there is an internal incoming relation.
@@ -553,7 +558,7 @@
 			// Create incoming structure
 			let incomingStructures;
 			if (typeof(referencedObject.const.incoming) === 'undefined') {
-				incomingStructures = { name: "isIncomingStructures", isIncomingStructures : true, referredObject: referencedObject, last: null, first: null };
+				incomingStructures = { isIncomingStructure : true,  name: "isIncomingPropertyStructures", isIncomingPropertyStructures : true, referredObject: referencedObject, last: null, first: null };
 				if (configuration.incomingStructuresAsCausalityObjects) {
 					incomingStructures = create(incomingStructures);
 				}
@@ -564,7 +569,7 @@
 			
 			// Create incoming for this particular property
 			if (typeof(incomingStructures[property]) === 'undefined') {
-				let incomingStructure = { property : property, isIncomingStructure : true, referredObject: referencedObject, incomingStructures : incomingStructures, next: null, previous: incomingStructures.last };
+				let incomingStructure = { isIncomingStructure : true, property : property, isIncomingPropertyStructure : true, referredObject: referencedObject, incomingStructures : incomingStructures, next: null, previous: incomingStructures.last };
 				if (incomingStructures.first === null) {
 					incomingStructures.first = incomingStructure;
 					incomingStructures.last = incomingStructure;
@@ -598,7 +603,7 @@
 				log(refererId);
 				log(referedEntity, 3);
 			}
-			if (typeof(referedEntity.isIncomingStructure) !== 'undefined') {
+			if (typeof(referedEntity.isIncomingPropertyStructure) !== 'undefined') {
 				let incomingRelation = referedEntity;
 				let incomingRelationContents = incomingRelation['contents'];
 				delete incomingRelationContents[idExpression(refererId)];
@@ -683,8 +688,9 @@
 					// Last chunk is either full or nonexistent....
 					// log("newChunk!!!");
 					let newChunk = {
-						referredObject : incomingStructureRoot.referredObject,
 						isIncomingStructure : true,
+						referredObject : incomingStructureRoot.referredObject,
+						isIncomingPropertyStructure : true,
 						isRoot : false,
 						contents: {},
 						contentsCounter: 0,
