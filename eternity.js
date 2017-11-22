@@ -311,7 +311,7 @@
 				// Incoming structures or root incoming structure
 				currentIncomingStructure = nextIncomingStructure;
 				let referedDbImage;
-				if (typeof(currentIncomingStructure.isIncomingPropertyStructure) !== 'undefined') {
+				if (imageCausality.isIncomingStructure(currentIncomingStructure)) {
 					// We were at the root incoming structure, proceed to the main incoming structure
 					nextIncomingStructure = currentIncomingStructure.incomingStructures;
 				} else {
@@ -2208,7 +2208,7 @@
 			// log(dbImage.const.isObjectImage);
 			// log(dbImage.const.dbId);
 			if (!dbImage.const.isObjectImage) {
-				if (!dbImage.isIncomingPropertyStructures && !dbImage.isIncomingPropertyStructure) {
+				if (!imageCausality.isIncomingStructure(dbImage)) {
 					// log("killing spree");
 					if (killImageIfDissconnectedAndNonReferred(dbImage)) {
 						deallocateInDatabase(dbImage);

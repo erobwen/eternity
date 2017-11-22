@@ -8,7 +8,7 @@ Eternity work in progress:
 	* Refactor and create the incoming observation interface. IMPORTANT
 	* Make sure incoming structures are removed+deallocated when not needed. IMPORTANT BUT CAN WAIT
 	* Make sure loaded incoming references is updated upon adding and removal of persistent objects.  IMPORTANT BUT CAN WAIT
-* Make it possible to run incoming references without incoming structures as causality objects IMPORTANT
+* Make it possible to run incoming references without incoming structures as causality objects IMPORTANT (done?)... 
 
 
 Next Major Step:

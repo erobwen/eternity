@@ -3327,7 +3327,8 @@
 			getIncomingReferencesMap : getIncomingReferencesMap,
 			getSingleIncomingReference : getSingleIncomingReference, 
 			createArrayIndex : createArrayIndex,
-			setIndex : setIndex
+			setIndex : setIndex,
+			isIncomingStructure : isIncomingStructure
 		}
 		
 		// Debugging and testing
