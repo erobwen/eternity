@@ -2,7 +2,6 @@ TODO:
 
 Eternity work in progress:
 * Shakedown of GC amost done
-	* Make sure deallocations occur within the same pulse. IMPORTANT
     * Make it possible to deallocate "on the fly" when not referred anymore...? (skip? dellocation list is robust/good enought)
 * Create an index class. IMPORTANT
 * Incoming structures enhandement:
@@ -26,6 +25,7 @@ Next Major Step:
 
 Thoughts:
 
+TODO: A zombie has no incoming references, but what happens when you refer a zombie object... ?
 TODO: What about modifying incoming without actually loading it... this could make it easier to synch incoming/outgoing pairs without the risk of preemption in the middle, that expose incoming/outgoing imbalance.... 
 TODO: What about if we are observing while modifying a reference when we have incoming structures as objects. We need to turn off recording while we modify the incoming structures...
 

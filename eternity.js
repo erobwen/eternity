@@ -503,8 +503,16 @@
 				tmpDbIdToDbId = {};
 				pendingUpdate = {
 					imageCreations : {},
+					imageDeallocations : {},
 					imageUpdates : {}
 				}
+				
+				// Find all deallocations.
+				events.forEach(function(event) {
+					if (event.type === 'set' && event.property === eternityTag + "_to_deallocate") {
+						pendingUpdate.imageDeallocations[event.value] = true;
+					}
+				});
 
 				// Extract updates and creations to be done.
 				events.forEach(function(event) {
@@ -532,7 +540,7 @@
 						
 						}
 					} else if (event.type === 'set') {
-						if (typeof(dbImage.const.dbId) !== 'undefined' && dbImage.const.dbId !== null) { // 
+						if (typeof(dbImage.const.dbId) !== 'undefined' && dbImage.const.dbId !== null && typeof(dbImage[eternityTag + "_to_deallocate"]) === 'undefined') { // 
 							// Maintain image structure
 							increaseLoadedIncomingMacroReferenceCounters(dbImage, event.property);
 							// decreaseLoadedIncomingMacroReferenceCounters(dbImage, event.); // TODO: Decrease counters here? Get the previousIncomingStructure... 
@@ -555,7 +563,7 @@
 							} 
 						}
 					} else if (event.type === 'delete') {
-						if (typeof(dbImage.const.dbId) !== 'undefined' && dbImage.const.dbId !== null) { // 
+						if (typeof(dbImage.const.dbId) !== 'undefined' && dbImage.const.dbId !== null && typeof(dbImage[eternityTag + "_to_deallocate"]) === 'undefined') { // 
 							// Maintain image structure
 							// decreaseLoadedIncomingMacroReferenceCounters(dbImage, event.); // TODO: Decrease counters here?
 							
@@ -700,6 +708,10 @@
 			for (let tmpDbId in imageCreations) {
 				writeSerializedImageToDatabase(tmpDbIdToDbId[tmpDbId], replaceTmpDbIdsWithDbIds(imageCreations[tmpDbId]));
 			}
+			for (let tmpDbId in pendingUpdate.imageDeallocations) {
+				mockMongoDB.deallocate(tmpDbId);
+			}			
+			
 			
 			// TODO: Update entire record if the number of updates are more than half of fields.
 			if(trace.eternity) log("pendingUpdate.imageUpdates:" + Object.keys(pendingUpdate.imageUpdates).length);
@@ -1508,8 +1520,9 @@
 		 *-----------------------------------------------*/
 		
 		function deallocateInDatabase(dbImage) {
+			dbImage[eternityTag + "_to_deallocate"] = dbImage.const.dbId;
 			// dbImage._eternityDeallocate = true;
-			mockMongoDB.deallocate(dbImage.const.dbId);
+			// mockMongoDB.deallocate(dbImage.const.dbId);
 			delete dbImage.const.correspondingObject.const.dbImage;
 			delete dbImage.const.correspondingObject.const.dbId;
 			delete dbImage.const.correspondingObject;

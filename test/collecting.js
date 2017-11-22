@@ -35,8 +35,12 @@ describe("garbage-collection", function () {
 		eternity.oneStepCollection();
 		eternity.oneStepCollection();
 		eternity.oneStepCollection();
+		// log("----------------------------------------")
+		// eternity.trace.eternity = true;
 		eternity.oneStepCollection();		
 		eternity.oneStepCollection();
+		// eternity.trace.eternity = false;
+		// log("----------------------------------------")
 	
 		assert.equal(typeof(a.const.dbImage) === 'undefined', true);
 		
