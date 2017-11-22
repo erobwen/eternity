@@ -265,7 +265,7 @@
 		 ***************************************************************/
 		 
 		function isIncomingStructure(entity) {
-			return typeof(entity) === 'object' && typeof(entity.isIncomingStructure) !== 'undefined';
+			return typeof(entity) === 'object' && entity !== null && typeof(entity.isIncomingStructure) !== 'undefined';
 		} 
 		 
 		/**
@@ -440,14 +440,10 @@
 			}
 			
 			// Tear down structure to old value
-			if (isObject(previousValue)) {
-				if (trace.incoming) log("tear down previous... ");
+			if (isObject(previousValue) && isIncomingStructure(previousStructure)) {
+				if (trace.incoming) log("tear down previous incoming... ");
 				if (configuration.blockInitializeForIncomingStructures) state.blockingInitialize++;
-				// if (typeof(previousStructure) === 'undefined') {
-					// log(previousValue);
-					// throw new Error("Waaaaaaaaaaaaat");
-				// }
-				if (typeof(previousStructure) !== 'undefined') removeIncomingStructure(objectProxy.const.id, previousStructure);
+				removeIncomingStructure(objectProxy.const.id, previousStructure);
 				if (previousValue.const.incoming && previousValue.const.incoming[referringRelation]&& previousValue.const.incoming[referringRelation].observers) {
 					notifyChangeObservers(previousValue.const.incoming[referringRelation]);
 				}
@@ -476,10 +472,9 @@
 			}
 			
 			// Tear down structure to old value
-			if (isObject(removedValue)) {
+			if (isObject(removedValue) && isIncomingStructure(previousStructure)) {
 				if (configuration.blockInitializeForIncomingStructures) state.blockingInitialize++;
 				removeIncomingStructure(objectProxy.const.id, previousStructure);
-				// removeIncomingStructure(objectProxy.const.id, removedValue);
 				if (removedValue.const && removedValue.const.incoming && removedValue.const.incoming[referringRelation].observers) {
 					notifyChangeObservers(removedValue.const.incoming[referringRelation].observers);
 				}
@@ -501,7 +496,7 @@
 			let addedAdjusted = [];
 			added.forEach(function(addedElement) {
 				if (isObject(addedElement)) {
-					addedElement.const.incomingReferences++;
+					addedElement.const.incomingReferences++; // TODO: Move elsewhere... 
 					// log("added element is object");
 					let referencedValue = createIncomingStructure(arrayProxy, arrayProxy.const.id, referringRelation, addedElement);
 					if (typeof(addedElement.const.incoming[referringRelation].observers) !== 'undefined') {
@@ -516,8 +511,8 @@
 			// Remove incoming relations for removed
 			if (removedOrIncomingStructures !== null) {
 				removedOrIncomingStructures.forEach(function(removedOrIncomingStructure) {
-					if (isObject(removedOrIncomingStructure)) {
-						if ((previousValue.const.incomingReferences -= 1) === 0)  removedLastIncomingRelation(removedElement);
+					if (isIncomingStructure(previousStructure)) {
+						if ((previousValue.const.incomingReferences -= 1) === 0)  removedLastIncomingRelation(removedElement); // TODO: Move elsewhere... 
 						removeIncomingStructure(proxy.const.id, removedOrIncomingStructure);
 						if (typeof(removedOrIncomingStructure.const.incoming[referringRelation].observers) !== 'undefined') {
 							notifyChangeObservers(removedOrIncomingStructure.const.incoming[referringRelation].observers);
