@@ -156,10 +156,14 @@
 		function getSpecifier(javascriptObject, specifierName) {
 			if (typeof(javascriptObject[specifierName]) === 'undefined' || javascriptObject[specifierName] === null) {
 				let specifier = {
+					// Incoming structure
 					isIncomingStructure : true,
-					specifierProperty : specifierName, 
+					referredObject : javascriptObject,
 					isIncomingPropertyStructure : true,   // This is a reuse of this object as incoming node as well.
-					referredObject : javascriptObject
+					
+					// Specifier
+					isSpecifier : true,
+					specifierProperty : specifierName
 					// name : "incomingStructure" // This fucked up things for incoming relations of name "name"
 				}
 				if (configuration.incomingStructuresAsCausalityObjects) specifier = createImmutable(specifier);
@@ -273,7 +277,7 @@
 		 */
 		function getReferredObject(referredItem) {
 			if (typeof(referredItem) === 'object' && referredItem !== null) {
-				if (typeof(referredItem.referredObject) !== 'undefined') {	
+				if (typeof(referredItem.referredObject) !== 'undefined' && typeof(referredItem.isSpecifier) === 'undefined') {
 					return referredItem.referredObject;
 				} else {
 					return referredItem;
@@ -1078,8 +1082,8 @@
 				let overlayHandler = this.const.forwardsTo.const.handler;
 				return overlayHandler.get.apply(overlayHandler, [overlayHandler.target, key]);
 			}
-			
 			ensureInitialized(this, target);
+			// if (state.incomingStructuresDisabled === 0) throw new Error("Not supported yet!");
 			
 			if (key === "const" || key === "nonForwardConst") {
 				return this.const;
@@ -1105,7 +1109,8 @@
 			}
 
 			ensureInitialized(this, target);
-			
+			// if (state.incomingStructuresDisabled === 0) throw new Error("Not supported yet!");
+
 			let previousValue = target[key];
 
 			// If same value as already set, do nothing.
@@ -1163,6 +1168,7 @@
 			if (!canWrite(this.const.object)) return true;
 			
 			ensureInitialized(this, target);
+			// if (state.incomingStructuresDisabled === 0) throw new Error("Not supported yet!");
 			
 			state.inPulse++;
 
@@ -1186,7 +1192,8 @@
 			}
 
 			ensureInitialized(this, target);
-			
+			// if (state.incomingStructuresDisabled === 0) throw new Error("Not supported yet!");
+
 			if (state.inActiveRecording) {
 				registerChangeObserver(getSpecifier(this.const, "_arrayObservers"));
 			}
@@ -1202,7 +1209,8 @@
 			}
 			
 			ensureInitialized(this, target);
-			
+			// if (state.incomingStructuresDisabled === 0) throw new Error("Not supported yet!");
+
 			if (state.inActiveRecording) {
 				registerChangeObserver(getSpecifier(this.const, "_arrayObservers"));
 			}
@@ -1217,7 +1225,8 @@
 			if (!canWrite(this.const.object)) return;
 			
 			ensureInitialized(this, target);
-			
+			// if (state.incomingStructuresDisabled === 0) throw new Error("Not supported yet!");
+
 			state.inPulse++;
 			// TODO: Elaborate here?
 			if (typeof(this.const._arrayObservers) !== 'undefined') {

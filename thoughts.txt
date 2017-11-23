@@ -3,11 +3,11 @@ TODO:
 Eternity work in progress:
 * Create a B-tree for the index. IMPORTANT BUT CAN WAIT
 * Incoming structures enhandement:
+	* Should we really use getSpecifier to create incoming structure???... 
+	* Make sure incoming structures are removed+deallocated when not needed. IMPORTANT
 	* Refactor and create the incoming observation interface. IMPORTANT
-	* Make sure incoming structures are removed+deallocated when not needed. IMPORTANT BUT CAN WAIT
 	* Make sure loaded incoming references is updated upon adding and removal of persistent objects.  IMPORTANT BUT CAN WAIT
 * Make it possible to run incoming references without incoming structures as causality objects IMPORTANT (done?)... 
-* Should we really use getSpecifier to create incoming structure???... 
 
 Next Major Step:
 * Convert old Liquid In progress.... 
