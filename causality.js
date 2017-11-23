@@ -264,7 +264,7 @@
 		
 		/***************************************************************
 		 *
-		 *  Incoming relations. 
+		 *  Incoming properties 
 		 *
 		 ***************************************************************/
 		 
@@ -416,7 +416,7 @@
 		
 		
 		/*-----------------------------------------------
-		 *            Relation structures
+		 *            Incoming structures
 		 *-----------------------------------------------*/
 		
 		
@@ -441,13 +441,8 @@
 			}
 			referringRelation = "property:" + referringRelation;
 			
-			if (!isObject(objectProxy)) {
-				// log(objectProxy);
-				throw new Error("object proxy not an object!");
-			}
-			
 			// Tear down structure to old value
-			if (isObject(previousValue) && isIncomingStructure(previousStructure)) {
+			if (isReferencesChunk(previousStructure)) {
 				if (trace.incoming) log("tear down previous incoming... ");
 				if (configuration.blockInitializeForIncomingStructures) state.blockingInitialize++;
 				removeReverseReference(objectProxy.const.id, previousStructure);
@@ -461,7 +456,7 @@
 			if (isObject(value)) {
 				if (trace.basic) log("really creating incoming structure");
 				
-				let referencedValue = createIncomingStructure(objectProxy, objectProxy.const.id, referringRelation, value);
+				let referencedValue = createAndAddReverseReferenceToIncomingStructure(objectProxy, objectProxy.const.id, referringRelation, value);
 				if (trace.basic) log(referringRelation);
 				if (trace.basic) log(value.const.incoming);
 				
@@ -511,7 +506,7 @@
 				if (isObject(addedElement)) {
 					addedElement.const.incomingReferences++; // TODO: Move elsewhere... 
 					// log("added element is object");
-					let referencedValue = createIncomingStructure(arrayProxy, arrayProxy.const.id, referringRelation, addedElement);
+					let referencedValue = createAndAddReverseReferenceToIncomingStructure(arrayProxy, arrayProxy.const.id, referringRelation, addedElement);
 					if (typeof(addedElement.const.incoming[referringRelation].observers) !== 'undefined') {
 						notifyChangeObservers(addedElement.const.incoming[referringRelation].observers);
 					}
@@ -539,14 +534,11 @@
 		
 		
 		
-		function createIncomingStructure(referingObject, referingObjectId, propertyKey, object) {
-			trace.incoming && log("createIncomingStructure");
-			let incomingStructure = getIncomingRelationStructure(object, propertyKey);
+		function createAndAddReverseReferenceToIncomingStructure(referingObject, referingObjectId, propertyKey, object) {
+			trace.incoming && log("createAndAddReverseReferenceToIncomingStructure");
+			let incomingStructure = getIncomingPropertyStructure(object, propertyKey);
 
-			trace.incoming && log(incomingStructure);
-			if (typeof(incomingStructure) === 'undefined') throw new Error("WTF");
-
-			let incomingRelationChunk = intitializeAsReverseReferencesChunkList(incomingStructure, referingObject, referingObjectId);
+			let incomingRelationChunk = intitializeAsReverseReferencesChunkListThenAddIfNeeded(incomingStructure, referingObject, referingObjectId);
 			if (incomingRelationChunk !== null) {
 				return incomingRelationChunk;
 			} else {
@@ -555,51 +547,46 @@
 		} 
 		
 		
-		function getIncomingRelationStructure(referencedObject, propertyKey) {
-			trace.incoming && log("getIncomingRelationStructure");
-			
-			// Sanity test TODO: remove 
-			if (state.incomingStructuresDisabled === 0) {
-				referencedObject.foo.bar;
-			}
+		function getIncomingPropertyStructure(referencedObject, propertyKey) {
+			trace.incoming && log("getIncomingPropertyStructure");
 			
 			// Create incoming structure
-			let incomingStructures;
+			let incomingPropertiesStructure;
 			if (typeof(referencedObject.const.incoming) === 'undefined') {
-				incomingStructures = {
+				incomingPropertiesStructure = {
 					isIncomingStructure : true, 
 					referredObject: referencedObject, 
 					last: null, 
 					first: null };
 				if (configuration.incomingStructuresAsCausalityObjects) {
-					incomingStructures = create(incomingStructures);
+					incomingPropertiesStructure = create(incomingPropertiesStructure);
 				}
-				referencedObject.const.incoming = incomingStructures;
+				referencedObject.const.incoming = incomingPropertiesStructure;
 			} else {
-				incomingStructures = referencedObject.const.incoming;
+				incomingPropertiesStructure = referencedObject.const.incoming;
 			}
 			
 			// Create incoming for this particular property
 			if (trace.incoming) {
-				log(incomingStructures);
+				log(incomingPropertiesStructure);
 				log(propertyKey);
-				log(incomingStructures[propertyKey]);
+				log(incomingPropertiesStructure[propertyKey]);
 			}
-			if (typeof(incomingStructures[propertyKey]) === 'undefined') {
+			if (typeof(incomingPropertiesStructure[propertyKey]) === 'undefined') {
 				let incomingStructure = { 
 					isIncomingStructure : true, 
 					propertyKey : propertyKey,
 					referredObject: referencedObject, 
-					incomingStructures : incomingStructures, 
+					incomingStructures : incomingPropertiesStructure, 
 					next: null, 
-					previous: incomingStructures.last 
+					previous: incomingPropertiesStructure.last 
 				};
-				if (incomingStructures.first === null) {
-					incomingStructures.first = incomingStructure;
-					incomingStructures.last = incomingStructure;
+				if (incomingPropertiesStructure.first === null) {
+					incomingPropertiesStructure.first = incomingStructure;
+					incomingPropertiesStructure.last = incomingStructure;
 				} else {					
-					incomingStructures.last.next = incomingStructure;
-					incomingStructures.last = incomingStructure;
+					incomingPropertiesStructure.last.next = incomingStructure;
+					incomingPropertiesStructure.last = incomingStructure;
 				}
 				
 				if (configuration.incomingStructuresAsCausalityObjects) {
@@ -611,78 +598,89 @@
 					// log("CREATED INCOMING STRUCTURE THAT IS AN OBJECT");
 					// log(incomingStructure);
 				}
-				incomingStructures[propertyKey] = incomingStructure;
+				incomingPropertiesStructure[propertyKey] = incomingStructure;
 			}
 			
-			return incomingStructures[propertyKey];
+			return incomingPropertiesStructure[propertyKey];
 		}
 		
+		
+		/**************************************************************
+		 *
+		 *  Reverse references chunk list
+		 *
+		 ***************************************************************/
+		
+		function isReferencesChunk(entity) {
+			return typeof(entity) === 'object' && entity !== null && typeof(entity.isReferencesChunk) !== 'undefined';
+		}
 		
 		/**
 		* Structure helpers
 		*/				
-		function removeReverseReference(refererId, chunkList) {
+		function removeReverseReference(refererId, referencesChunk) {
 			if (trace.incoming) {
 				log("removeReverseReference");
 				log(refererId);
-				log(chunkList, 3);
+				// log(chunkList, 3);
 			}
 			// if (typeof(chunkList.isIncomingPropertyStructure) !== 'undefined') {
-				let incomingRelation = chunkList;
-				let incomingRelationContents = incomingRelation['contents'];
-				delete incomingRelationContents[idExpression(refererId)];
+				// let referencesChunk = chunkList;
+				let referencesChunkContents = referencesChunk['contents'];
+				delete referencesChunkContents[idExpression(refererId)];
 				let noMoreObservers = false;
-				incomingRelation.contentsCounter--;
-				if (incomingRelation.contentsCounter == 0) {
-					if (incomingRelation.isChunkListHead) {
-						if (incomingRelation.first === null && incomingRelation.last === null) {
+				referencesChunk.contentsCounter--;
+				if (referencesChunk.contentsCounter == 0) {
+					if (typeof(referencesChunk.isChunkListHead) !== 'undefined') {
+						if (referencesChunk.first === null && referencesChunk.last === null) {
 							noMoreObservers = true;
 						}
 					} else {
-						if (incomingRelation.parent.first === incomingRelation) {
-							incomingRelation.parent.first === incomingRelation.next;
+						if (referencesChunk.parent.first === referencesChunk) {
+							referencesChunk.parent.first === referencesChunk.next;
 						}
 
-						if (incomingRelation.parent.last === incomingRelation) {
-							incomingRelation.parent.last === incomingRelation.previous;
+						if (referencesChunk.parent.last === referencesChunk) {
+							referencesChunk.parent.last === referencesChunk.previous;
 						}
 
-						if (incomingRelation.next !== null) {
-							incomingRelation.next.previous = incomingRelation.previous;
+						if (referencesChunk.next !== null) {
+							referencesChunk.next.previous = referencesChunk.previous;
 						}
 
-						if (incomingRelation.previous !== null) {
-							incomingRelation.previous.next = incomingRelation.next;
+						if (referencesChunk.previous !== null) {
+							referencesChunk.previous.next = referencesChunk.next;
 						}
 
 						if (configuration.incomingChunkRemovedCallback !== null) {
-							configuration.incomingChunkRemovedCallback(incomingRelation);
+							configuration.incomingChunkRemovedCallback(referencesChunk);
 						}
-						incomingRelation.previous = null;
-						incomingRelation.next = null;
+						referencesChunk.previous = null;
+						referencesChunk.next = null;
 
-						let root = incomingRelation.parent;
+						let root = referencesChunk.parent;
 						if (root.first === null && root.last === null && root.contentsCounter === 0) {
 							noMoreObservers = true;
 						}
 					}
 
-					if (noMoreObservers && typeof(incomingRelation.noMoreObserversCallback) !== 'undefined') {
-						incomingRelation.noMoreObserversCallback();
+					if (noMoreObservers && typeof(referencesChunk.noMoreObserversCallback) !== 'undefined') {
+						referencesChunk.noMoreObserversCallback();
 					}
 				}
 			// }
 		}
 		
-		function intitializeAsReverseReferencesChunkList(incomingStructure, referingObject, referingObjectId) {
+		function intitializeAsReverseReferencesChunkListThenAddIfNeeded(incomingStructure, referingObject, referingObjectId) {
 			let refererId = idExpression(referingObjectId);
-			// console.log("intitializeAsReverseReferencesChunkList:");
+			// console.log("intitializeAsReverseReferencesChunkListThenAddIfNeeded:");
 			// console.log(referingObject);
 
 			
 			// console.log(activeRecorder);
 			if (typeof(incomingStructure.initialized) === 'undefined') {
 				incomingStructure.isChunkListHead = true;
+				incomingStructure.isReferencesChunk = true;
 				// incomingStructure.contents = { name: "contents" };
 				incomingStructure.contents = {};
 				incomingStructure.contentsCounter = 0;
@@ -713,13 +711,14 @@
 					// log("newChunk!!!");
 					let newChunk = {
 						isIncomingStructure : true,
-						referredObject : incomingStructure.referredObject,
+						isReferencesChunk : true,
 						isChunkListHead : false,
-						contents: {},
-						contentsCounter: 0,
-						next: null,
-						previous: null,
-						parent: null
+						referredObject : incomingStructure.referredObject,
+						contents : {},
+						contentsCounter : 0,
+						next : null,
+						previous : null,
+						parent : null
 					};
 					if (configuration.incomingStructuresAsCausalityObjects) {
 						newChunk.contents = create(newChunk.contents);
@@ -2359,7 +2358,7 @@
 				if (typeof(state.activeRecording.id) === 'undefined') state.activeRecording.id = nextObserverSetId++;
 				activeRecordingId = state.activeRecording.id;
 			}
-			let incomingRelationChunk = intitializeAsReverseReferencesChunkList(observerSet, state.activeRecording, activeRecordingId);
+			let incomingRelationChunk = intitializeAsReverseReferencesChunkListThenAddIfNeeded(observerSet, state.activeRecording, activeRecordingId);
 			if (incomingRelationChunk !== null) {
 				state.activeRecording.sources.push(incomingRelationChunk);
 			}
