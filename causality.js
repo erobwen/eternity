@@ -378,17 +378,17 @@
 			// state.incomingStructuresDisabled--;			
 		// }
 		
-		function hasIncomingRelation(object, property) {
-			state.incomingStructuresDisabled++;
-			let result = object[property];
-			if (typeof(result.isIncomingPropertyStructure)) {
-				return true;
-			} else {
-				// Check if there is an internal incoming relation.
-			}
-			return false;
-			state.incomingStructuresDisabled--;			
-		}
+		// function hasIncomingRelation(object, property) {
+			// state.incomingStructuresDisabled++;
+			// let result = object[property];
+			// if (typeof(result.isIncomingPropertyStructure)) {
+				// return true;
+			// } else {
+				// // Check if there is an internal incoming relation.
+			// }
+			// return false;
+			// state.incomingStructuresDisabled--;			
+		// }
 
 		function disableIncomingRelations(action) {
 			state.inPulse++;
