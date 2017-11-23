@@ -328,14 +328,15 @@
 		function forAllIncoming(object, property, callback, filter) {
 			if(trace.incoming) log("forAllIncoming");
 			if(trace.incoming) log(object.const.incoming, 2);
-			if (state.inActiveRecording) registerAnyChangeObserver(getSpecifier(getSpecifier(getSpecifier(object.const, "incoming"), property), "observers"));
+			if (state.inActiveRecording) registerAnyChangeObserver(getSpecifier(getSpecifier(getSpecifier(object.const, "incoming"), "property:" + property), "observers"));
 			withoutRecording(function() { // This is needed for setups where incoming structures are made out of causality objects. 
 				if (typeof(object.const.incoming) !== 'undefined') {
 					if(trace.incoming) log("incoming exists!");
 					let relations = object.const.incoming;
-					if (typeof(relations[property]) !== 'undefined') {
+					let propertyKey = "property:" + property;
+					if (typeof(relations[propertyKey]) !== 'undefined') {
 						trace.incoming && log("property exists");
-						let relation = relations[property];
+						let relation = relations[propertyKey];
 						if (relation.initialized === true) {							
 							let contents = relation.contents;
 							for (id in contents) {
@@ -434,6 +435,8 @@
 					log(objectProxy);
 				}
 			}
+			referringRelation = "property:" + referringRelation;
+			
 			if (!isObject(objectProxy)) {
 				// log(objectProxy);
 				throw new Error("object proxy not an object!");
@@ -453,7 +456,11 @@
 			// Setup structure to new value
 			if (isObject(value)) {
 				if (trace.basic) log("really creating incoming structure");
+				
 				let referencedValue = createIncomingStructure(objectProxy, objectProxy.const.id, referringRelation, value);
+				if (trace.basic) log(referringRelation);
+				if (trace.basic) log(value.const.incoming);
+				
 				if (value.const.incoming && value.const.incoming[referringRelation].observers) {
 					notifyChangeObservers(value.const.incoming[referringRelation].observers);
 				}
@@ -470,6 +477,7 @@
 				referringRelation = objectProxy.indexParentRelation;
 				objectProxy = objectProxy.indexParent;
 			}
+			referringRelation = "property:" + referringRelation;
 			
 			// Tear down structure to old value
 			if (isObject(removedValue) && isIncomingStructure(previousStructure)) {
@@ -491,6 +499,7 @@
 				referringRelation = arrayProxy.indexParentRelation;
 				arrayProxy = arrayProxy.indexParent;
 			}
+			referringRelation = "property:" + referringRelation;
 			
 			// Create incoming relations for added
 			let addedAdjusted = [];
@@ -526,9 +535,9 @@
 		
 		
 		
-		function createIncomingStructure(referingObject, referingObjectId, property, object) {
+		function createIncomingStructure(referingObject, referingObjectId, propertyKey, object) {
 			trace.incoming && log("createIncomingStructure");
-			let incomingStructure = getIncomingRelationStructure(object, property);
+			let incomingStructure = getIncomingRelationStructure(object, propertyKey);
 
 			trace.incoming && log(incomingStructure);
 			if (typeof(incomingStructure) === 'undefined') throw new Error("WTF");
@@ -542,7 +551,7 @@
 		} 
 		
 		
-		function getIncomingRelationStructure(referencedObject, property) {
+		function getIncomingRelationStructure(referencedObject, propertyKey) {
 			trace.incoming && log("getIncomingRelationStructure");
 			
 			// Sanity test TODO: remove 
@@ -563,8 +572,13 @@
 			}
 			
 			// Create incoming for this particular property
-			if (typeof(incomingStructures[property]) === 'undefined') {
-				let incomingStructure = { isIncomingStructure : true, property : property, isIncomingPropertyStructure : true, referredObject: referencedObject, incomingStructures : incomingStructures, next: null, previous: incomingStructures.last };
+			if (trace.incoming) {
+				log(incomingStructures);
+				log(propertyKey);
+				log(incomingStructures[propertyKey]);
+			}
+			if (typeof(incomingStructures[propertyKey]) === 'undefined') {
+				let incomingStructure = { isIncomingStructure : true, propertyKey : propertyKey, isIncomingPropertyStructure : true, referredObject: referencedObject, incomingStructures : incomingStructures, next: null, previous: incomingStructures.last };
 				if (incomingStructures.first === null) {
 					incomingStructures.first = incomingStructure;
 					incomingStructures.last = incomingStructure;
@@ -576,16 +590,16 @@
 				if (configuration.incomingStructuresAsCausalityObjects) {
 					// Disable incoming relations here? otherwise we might end up with incoming structures between 
 					incomingStructure = create(incomingStructure);
-					if (incomingStructure.property === "indexParent") {
+					if (incomingStructure.propertyKey === "property:indexParent") {
 						throw new Error("What is this, should not have incoming structure for indexParent....");
 					}
 					// log("CREATED INCOMING STRUCTURE THAT IS AN OBJECT");
 					// log(incomingStructure);
 				}
-				incomingStructures[property] = incomingStructure;
+				incomingStructures[propertyKey] = incomingStructure;
 			}
 			
-			return incomingStructures[property];
+			return incomingStructures[propertyKey];
 		}
 		
 		
@@ -2230,6 +2244,19 @@
 					return action.object[action.methodName].apply(action.object, action.arglist);
 				}
 			}
+		}
+		
+		/**********************************
+		 *    Basic observation
+		 *   
+		 *
+		 **********************************/
+		
+		function observe(action, observer) {
+			enterContext('recording', context);
+			let returnValue = performAction(action);
+			leaveContext();
+			return returnValue;
 		}
 		
 

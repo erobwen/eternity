@@ -1996,8 +1996,9 @@
 						let relations = dbImage.const.incoming;
 						// log(relations, 3);
 						// log("here");
-						if (typeof(relations[property]) !== 'undefined') {
-							let relation = relations[property];
+						let propertyKey = "property:" + property;
+						if (typeof(relations[propertyKey]) !== 'undefined') {
+							let relation = relations[propertyKey];
 							
 							// Iterate root
 							let contents = relation.contents;
@@ -2123,8 +2124,9 @@
 						let relations = dbImage.const.incoming;
 						// log(relations, 3);
 						// log("here");
-						if (typeof(relations[property]) !== 'undefined') {
-							let relation = relations[property];
+						let propertyKey = "property:" + property;
+						if (typeof(relations[propertyKey]) !== 'undefined') {
+							let relation = relations[propertyKey];
 														
 							// Iterate the root
 							let contents = relation.contents;

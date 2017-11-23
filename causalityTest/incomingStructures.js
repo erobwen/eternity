@@ -159,9 +159,14 @@ describe("Incoming Relations", function(){
 			updateYIncomingFoo();
 		});
 		assert.equal(yIncomingFoo.length, 0);
-		
+		// log("===========================================");
+		// causality.trace.basic++;
+		// causality.trace.incoming++;
 		// Assign x.foo
 		x.foo = y;
+		// causality.trace.basic--;
+		// causality.trace.incoming--;
+		// log("===========================================");
 
 		assert.equal(yIncomingFoo.length, 1);
 		assert.equal(yIncomingFoo[0], x);
