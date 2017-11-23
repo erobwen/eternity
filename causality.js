@@ -153,14 +153,14 @@
 		 *
 		 ***************************************************************/
 		 
+		 // TODO: Specifiers needs a reference to its causality object... 
 		function getSpecifier(javascriptObject, specifierName) {
 			if (typeof(javascriptObject[specifierName]) === 'undefined' || javascriptObject[specifierName] === null) {
 				let specifier = {
 					// Incoming structure
 					isIncomingStructure : true,
-					referredObject : javascriptObject,
-					isIncomingPropertyStructure : true,   // This is a reuse of this object as incoming node as well.
-					
+					referredObject : javascriptObject, // should be object instead.... 
+
 					// Specifier
 					isSpecifier : true,
 					specifierProperty : specifierName
@@ -366,7 +366,7 @@
 		
 		// TODO: 
 		// Cannot do this unless we have a neat way to iterate over all incoming relations.
-		// Right now the structure is: { name: "isIncomingPropertyStructures", isIncomingPropertyStructures : true, referredObject: referencedObject, last: null, first: null };
+		// Right now the structure is: { referredObject: referencedObject, last: null, first: null };
 		// function forEveryIncoming(object, callback, filter) {
 			// ...
 		// }
@@ -450,7 +450,7 @@
 			if (isObject(previousValue) && isIncomingStructure(previousStructure)) {
 				if (trace.incoming) log("tear down previous incoming... ");
 				if (configuration.blockInitializeForIncomingStructures) state.blockingInitialize++;
-				removeIncomingStructure(objectProxy.const.id, previousStructure);
+				removeReverseReference(objectProxy.const.id, previousStructure);
 				if (previousValue.const.incoming && previousValue.const.incoming[referringRelation]&& previousValue.const.incoming[referringRelation].observers) {
 					notifyChangeObservers(previousValue.const.incoming[referringRelation]);
 				}
@@ -486,7 +486,7 @@
 			// Tear down structure to old value
 			if (isObject(removedValue) && isIncomingStructure(previousStructure)) {
 				if (configuration.blockInitializeForIncomingStructures) state.blockingInitialize++;
-				removeIncomingStructure(objectProxy.const.id, previousStructure);
+				removeReverseReference(objectProxy.const.id, previousStructure);
 				if (removedValue.const && removedValue.const.incoming && removedValue.const.incoming[referringRelation].observers) {
 					notifyChangeObservers(removedValue.const.incoming[referringRelation].observers);
 				}
@@ -526,7 +526,7 @@
 				removedOrIncomingStructures.forEach(function(removedOrIncomingStructure) {
 					if (isIncomingStructure(previousStructure)) {
 						if ((previousValue.const.incomingReferences -= 1) === 0)  removedLastIncomingRelation(removedElement); // TODO: Move elsewhere... 
-						removeIncomingStructure(proxy.const.id, removedOrIncomingStructure);
+						removeReverseReference(proxy.const.id, removedOrIncomingStructure);
 						if (typeof(removedOrIncomingStructure.const.incoming[referringRelation].observers) !== 'undefined') {
 							notifyChangeObservers(removedOrIncomingStructure.const.incoming[referringRelation].observers);
 						}
@@ -546,7 +546,7 @@
 			trace.incoming && log(incomingStructure);
 			if (typeof(incomingStructure) === 'undefined') throw new Error("WTF");
 
-			let incomingRelationChunk = intitializeAndConstructIncomingStructure(incomingStructure, referingObject, referingObjectId);
+			let incomingRelationChunk = intitializeAsReverseReferencesChunkList(incomingStructure, referingObject, referingObjectId);
 			if (incomingRelationChunk !== null) {
 				return incomingRelationChunk;
 			} else {
@@ -566,7 +566,11 @@
 			// Create incoming structure
 			let incomingStructures;
 			if (typeof(referencedObject.const.incoming) === 'undefined') {
-				incomingStructures = { isIncomingStructure : true,  name: "isIncomingPropertyStructures", isIncomingPropertyStructures : true, referredObject: referencedObject, last: null, first: null };
+				incomingStructures = {
+					isIncomingStructure : true, 
+					referredObject: referencedObject, 
+					last: null, 
+					first: null };
 				if (configuration.incomingStructuresAsCausalityObjects) {
 					incomingStructures = create(incomingStructures);
 				}
@@ -582,7 +586,14 @@
 				log(incomingStructures[propertyKey]);
 			}
 			if (typeof(incomingStructures[propertyKey]) === 'undefined') {
-				let incomingStructure = { isIncomingStructure : true, propertyKey : propertyKey, isIncomingPropertyStructure : true, referredObject: referencedObject, incomingStructures : incomingStructures, next: null, previous: incomingStructures.last };
+				let incomingStructure = { 
+					isIncomingStructure : true, 
+					propertyKey : propertyKey,
+					referredObject: referencedObject, 
+					incomingStructures : incomingStructures, 
+					next: null, 
+					previous: incomingStructures.last 
+				};
 				if (incomingStructures.first === null) {
 					incomingStructures.first = incomingStructure;
 					incomingStructures.last = incomingStructure;
@@ -610,20 +621,20 @@
 		/**
 		* Structure helpers
 		*/				
-		function removeIncomingStructure(refererId, referedEntity) {
+		function removeReverseReference(refererId, chunkList) {
 			if (trace.incoming) {
-				log("removeIncomingStructure");
+				log("removeReverseReference");
 				log(refererId);
-				log(referedEntity, 3);
+				log(chunkList, 3);
 			}
-			if (typeof(referedEntity.isIncomingPropertyStructure) !== 'undefined') {
-				let incomingRelation = referedEntity;
+			// if (typeof(chunkList.isIncomingPropertyStructure) !== 'undefined') {
+				let incomingRelation = chunkList;
 				let incomingRelationContents = incomingRelation['contents'];
 				delete incomingRelationContents[idExpression(refererId)];
 				let noMoreObservers = false;
 				incomingRelation.contentsCounter--;
 				if (incomingRelation.contentsCounter == 0) {
-					if (incomingRelation.isRoot) {
+					if (incomingRelation.isChunkListHead) {
 						if (incomingRelation.first === null && incomingRelation.last === null) {
 							noMoreObservers = true;
 						}
@@ -660,51 +671,50 @@
 						incomingRelation.noMoreObserversCallback();
 					}
 				}
-			}
+			// }
 		}
 		
-		function intitializeAndConstructIncomingStructure(incomingStructureRoot, referingObject, referingObjectId) {
+		function intitializeAsReverseReferencesChunkList(incomingStructure, referingObject, referingObjectId) {
 			let refererId = idExpression(referingObjectId);
-			// console.log("intitializeAndConstructIncomingStructure:");
+			// console.log("intitializeAsReverseReferencesChunkList:");
 			// console.log(referingObject);
 
 			
 			// console.log(activeRecorder);
-			if (typeof(incomingStructureRoot.initialized) === 'undefined') {
-				incomingStructureRoot.isRoot = true;
-				// incomingStructureRoot.contents = { name: "contents" };
-				incomingStructureRoot.contents = {};
-				incomingStructureRoot.contentsCounter = 0;
-				incomingStructureRoot.initialized = true;
-				incomingStructureRoot.first = null;
-				incomingStructureRoot.last = null;
+			if (typeof(incomingStructure.initialized) === 'undefined') {
+				incomingStructure.isChunkListHead = true;
+				// incomingStructure.contents = { name: "contents" };
+				incomingStructure.contents = {};
+				incomingStructure.contentsCounter = 0;
+				incomingStructure.initialized = true;
+				incomingStructure.first = null;
+				incomingStructure.last = null;
 				if (configuration.incomingStructuresAsCausalityObjects) {
-					incomingStructureRoot.contents = create(incomingStructureRoot.contents);
+					incomingStructure.contents = create(incomingStructure.contents);
 				}
 			}
 
 			// Already added in the root
-			if (typeof(incomingStructureRoot.contents[refererId]) !== 'undefined') {
+			if (typeof(incomingStructure.contents[refererId]) !== 'undefined') {
 				return null;
 			}
 			
 			let finalIncomingStructure;			
-			if (incomingStructureRoot.contentsCounter === configuration.incomingStructureChunkSize) {
+			if (incomingStructure.contentsCounter === configuration.incomingStructureChunkSize) {
 				// Root node is full
 				// log("Root node is full...")
 				
 				// Move on to new chunk?
-				if (incomingStructureRoot.last !== null && incomingStructureRoot.contentsCounter !== configuration.incomingStructureChunkSize) {
+				if (incomingStructure.last !== null && incomingStructure.contentsCounter !== configuration.incomingStructureChunkSize) {
 					// There is a non-full last chunk.
-					finalIncomingStructure = incomingStructureRoot.last;
+					finalIncomingStructure = incomingStructure.last;
 				} else {
 					// Last chunk is either full or nonexistent....
 					// log("newChunk!!!");
 					let newChunk = {
 						isIncomingStructure : true,
-						referredObject : incomingStructureRoot.referredObject,
-						isIncomingPropertyStructure : true,
-						isRoot : false,
+						referredObject : incomingStructure.referredObject,
+						isChunkListHead : false,
 						contents: {},
 						contentsCounter: 0,
 						next: null,
@@ -715,24 +725,24 @@
 						newChunk.contents = create(newChunk.contents);
 						newChunk = create(newChunk);
 					}
-					if (incomingStructureRoot.first === null) {
+					if (incomingStructure.first === null) {
 						// log("creting a lonley child...");
-						newChunk.parent = incomingStructureRoot;
-						incomingStructureRoot.first = newChunk;
-						incomingStructureRoot.last = newChunk;
+						newChunk.parent = incomingStructure;
+						incomingStructure.first = newChunk;
+						incomingStructure.last = newChunk;
 					} else {
 						// log("appending sibling...");
-						let last = incomingStructureRoot.last;
+						let last = incomingStructure.last;
 						last.next = newChunk;
 						newChunk.previous = last;
-						newChunk.parent = incomingStructureRoot;
-						incomingStructureRoot.last = newChunk;
+						newChunk.parent = incomingStructure;
+						incomingStructure.last = newChunk;
 					}
 					finalIncomingStructure = newChunk;
 				}
 				
 			} else {
-				finalIncomingStructure = incomingStructureRoot;
+				finalIncomingStructure = incomingStructure;
 			}
 
 			// Add repeater on object beeing observed, if not already added before
@@ -2298,7 +2308,7 @@
 				remove : function() {
 					let id = typeof(this.const) !== 'undefined' ? this.const.id : this.id;
 					this.sources.forEach(function(observerSet) {
-						removeIncomingStructure(id, observerSet);
+						removeReverseReference(id, observerSet);
 					});
 					this.sources.lenght = 0;  // From repeater itself.
 				}
@@ -2349,7 +2359,7 @@
 				if (typeof(state.activeRecording.id) === 'undefined') state.activeRecording.id = nextObserverSetId++;
 				activeRecordingId = state.activeRecording.id;
 			}
-			let incomingRelationChunk = intitializeAndConstructIncomingStructure(observerSet, state.activeRecording, activeRecordingId);
+			let incomingRelationChunk = intitializeAsReverseReferencesChunkList(observerSet, state.activeRecording, activeRecordingId);
 			if (incomingRelationChunk !== null) {
 				state.activeRecording.sources.push(incomingRelationChunk);
 			}
