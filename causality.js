@@ -582,6 +582,8 @@
 				let incomingStructure = { 
 					isIncomingStructure : true, 
 					referredObject: referencedObject,
+					isIncomingPropertyStructure : true,
+					propertyKey : propertyKey,
 					
 					// Is list element
 					isListElement : true,
@@ -629,6 +631,8 @@
 					structure.removedCallback();
 				}
 				
+				let tryRemoveParent = false;
+				
 				if (typeof(structure.isListElement) !== 'undefined') {
 					if (structure.parent.first === structure) {
 						structure.parent.first === structure.next;
@@ -646,9 +650,20 @@
 					structure.previous = null;
 					
 					if (structure.parent.first === null && structure.parent.last === null) {
-						tryRemoveIncomingStructure(structure.parent);						
+						tryRemoveParent = true;
 					}
 				}
+				
+				// TODO: Make this work... 
+				// if (typeof(structure.isIncomingPropertyStructure) !== 'undefined') {
+					// delete structure.parent[structure.propertyKey];
+				// }
+				
+				if (tryRemoveParent) {
+					tryRemoveIncomingStructure(structure.parent);
+				}
+				
+				structure.parent = null;
 			}
 		}
 	
