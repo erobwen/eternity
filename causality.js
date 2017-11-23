@@ -652,21 +652,6 @@
 			}
 		}
 	
-		// /**
-		// * Structure helpers
-		// */				
-		// function removeReverseReference(refererId, referencesChunk) {
-			// if (trace.incoming) {
-				// log("removeReverseReference");
-				// log(refererId);
-				// log(referencesChunk, 3);
-			// }
-			// let referencesChunkContents = referencesChunk['contents'];
-			// delete referencesChunkContents[idExpression(refererId)];
-			// referencesChunk.contentsCounter--;
-			// tryRemoveIncomingStructure(referencesChunk);
-		// }
-		
 		/**
 		* Structure helpers
 		*/				
@@ -674,54 +659,14 @@
 			if (trace.incoming) {
 				log("removeReverseReference");
 				log(refererId);
-				// log(chunkList, 3);
+				log(referencesChunk, 3);
 			}
-			// if (typeof(chunkList.isIncomingPropertyStructure) !== 'undefined') {
-				// let referencesChunk = chunkList;
-				let referencesChunkContents = referencesChunk['contents'];
-				delete referencesChunkContents[idExpression(refererId)];
-				let noMoreObservers = false;
-				referencesChunk.contentsCounter--;
-				if (referencesChunk.contentsCounter == 0) {
-					if (typeof(referencesChunk.isChunkListHead) !== 'undefined') {
-						if (referencesChunk.first === null && referencesChunk.last === null) {
-							noMoreObservers = true;
-						}
-					} else {
-						if (referencesChunk.parent.first === referencesChunk) {
-							referencesChunk.parent.first === referencesChunk.next;
-						}
-
-						if (referencesChunk.parent.last === referencesChunk) {
-							referencesChunk.parent.last === referencesChunk.previous;
-						}
-
-						if (referencesChunk.next !== null) {
-							referencesChunk.next.previous = referencesChunk.previous;
-						}
-
-						if (referencesChunk.previous !== null) {
-							referencesChunk.previous.next = referencesChunk.next;
-						}
-
-						if (configuration.incomingChunkRemovedCallback !== null) {
-							configuration.incomingChunkRemovedCallback(referencesChunk);
-						}
-						referencesChunk.previous = null;
-						referencesChunk.next = null;
-
-						let root = referencesChunk.parent;
-						if (root.first === null && root.last === null && root.contentsCounter === 0) {
-							noMoreObservers = true;
-						}
-					}
-
-					if (noMoreObservers && typeof(referencesChunk.removedCallback) !== 'undefined') {
-						referencesChunk.removedCallback();
-					}
-				}
-			// }
+			let referencesChunkContents = referencesChunk['contents'];
+			delete referencesChunkContents[idExpression(refererId)];
+			referencesChunk.contentsCounter--;
+			tryRemoveIncomingStructure(referencesChunk);
 		}
+		
 		
 		function intitializeAsReverseReferencesChunkListThenAddIfNeeded(incomingStructure, referingObject, referingObjectId) {
 			let refererId = idExpression(referingObjectId);
@@ -730,7 +675,7 @@
 
 			
 			// console.log(activeRecorder);
-			if (typeof(incomingStructure.initialized) === 'undefined') {
+			if (typeof(incomingStructure.isChunkListHead) === 'undefined') {
 				incomingStructure.isChunkListHead = true;
 				// incomingStructure.contents = { name: "contents" };
 				
@@ -2453,7 +2398,7 @@
 		// Recorders is a map from id => recorder
 		// A bit like "for all incoming"...
 		function notifyChangeObservers(observers) {
-			if (typeof(observers.initialized) !== 'undefined') {
+			if (typeof(observers.isChunkListHead) !== 'undefined') {
 				if (state.observerNotificationNullified > 0) {
 					return;
 				}
