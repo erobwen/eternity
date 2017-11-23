@@ -160,10 +160,11 @@
 					// Incoming structure
 					isIncomingStructure : true,
 					referredObject : javascriptObject, // should be object instead.... 
+					referredObjectProperty : specifierName,
+					parent : null,
 
 					// Specifier
 					isSpecifier : true,
-					specifierProperty : specifierName
 					// name : "incomingStructure" // This fucked up things for incoming relations of name "name"
 				}
 				if (configuration.incomingStructuresAsCausalityObjects) specifier = createImmutable(specifier);
@@ -555,7 +556,12 @@
 			if (typeof(referencedObject.const.incoming) === 'undefined') {
 				incomingPropertiesStructure = {
 					isIncomingStructure : true, 
-					referredObject: referencedObject, 
+					referredObject: referencedObject,
+					
+					isIncomingStructureRoot : true,
+					propertyInRoot : 'incoming',
+					
+					isList : true,
 					last: null, 
 					first: null };
 				if (configuration.incomingStructuresAsCausalityObjects) {
@@ -575,9 +581,11 @@
 			if (typeof(incomingPropertiesStructure[propertyKey]) === 'undefined') {
 				let incomingStructure = { 
 					isIncomingStructure : true, 
-					propertyKey : propertyKey,
-					referredObject: referencedObject, 
-					incomingStructures : incomingPropertiesStructure, 
+					referredObject: referencedObject,
+					
+					// Is list element
+					isListElement : true,
+					parent : incomingPropertiesStructure,
 					next: null, 
 					previous: incomingPropertiesStructure.last 
 				};
@@ -614,6 +622,50 @@
 		function isReferencesChunk(entity) {
 			return typeof(entity) === 'object' && entity !== null && typeof(entity.isReferencesChunk) !== 'undefined';
 		}
+		
+		function tryRemoveIncomingStructure(structure) {
+			if (typeof(structure.contentsCounter) === 'undefined' || structure.contentsCounter === 0) {
+				if (typeof(structure.removedCallback) !== 'undefined') { // referencesChunk.removedCallback this is probably wrong!
+					structure.removedCallback();
+				}
+				
+				if (typeof(structure.isListElement) !== 'undefined') {
+					if (structure.parent.first === structure) {
+						structure.parent.first === structure.next;
+					}
+					if (structure.parent.last === structure) {
+						structure.parent.last === structure.previous;
+					}
+					if (structure.next !== null) {
+						structure.next.previous = structure.previous;
+					}
+					if (structure.previous !== null) {
+						structure.previous.next = structure.next;
+					}
+					structure.next = null;
+					structure.previous = null;
+					
+					if (structure.parent.first === null && structure.parent.last === null) {
+						tryRemoveIncomingStructure(structure.parent);						
+					}
+				}
+			}
+		}
+	
+		// /**
+		// * Structure helpers
+		// */				
+		// function removeReverseReference(refererId, referencesChunk) {
+			// if (trace.incoming) {
+				// log("removeReverseReference");
+				// log(refererId);
+				// log(referencesChunk, 3);
+			// }
+			// let referencesChunkContents = referencesChunk['contents'];
+			// delete referencesChunkContents[idExpression(refererId)];
+			// referencesChunk.contentsCounter--;
+			// tryRemoveIncomingStructure(referencesChunk);
+		// }
 		
 		/**
 		* Structure helpers
@@ -664,8 +716,8 @@
 						}
 					}
 
-					if (noMoreObservers && typeof(referencesChunk.noMoreObserversCallback) !== 'undefined') {
-						referencesChunk.noMoreObserversCallback();
+					if (noMoreObservers && typeof(referencesChunk.removedCallback) !== 'undefined') {
+						referencesChunk.removedCallback();
 					}
 				}
 			// }
@@ -680,13 +732,17 @@
 			// console.log(activeRecorder);
 			if (typeof(incomingStructure.initialized) === 'undefined') {
 				incomingStructure.isChunkListHead = true;
-				incomingStructure.isReferencesChunk = true;
 				// incomingStructure.contents = { name: "contents" };
+				
+				incomingStructure.isReferencesChunk = true;
 				incomingStructure.contents = {};
 				incomingStructure.contentsCounter = 0;
 				incomingStructure.initialized = true;
+				
+				incomingStructure.isList = true;
 				incomingStructure.first = null;
 				incomingStructure.last = null;
+				
 				if (configuration.incomingStructuresAsCausalityObjects) {
 					incomingStructure.contents = create(incomingStructure.contents);
 				}
@@ -711,11 +767,13 @@
 					// log("newChunk!!!");
 					let newChunk = {
 						isIncomingStructure : true,
-						isReferencesChunk : true,
-						isChunkListHead : false,
 						referredObject : incomingStructure.referredObject,
+						
+						isReferencesChunk : true,
 						contents : {},
 						contentsCounter : 0,
+						
+						isListElement : true, 
 						next : null,
 						previous : null,
 						parent : null
@@ -2752,7 +2810,7 @@
 					functionCacher.deleteExistingRecord();
 					cacheRecord.micro.remove();
 				};
-				getSpecifier(cacheRecord, "contextObservers").noMoreObserversCallback = function() {
+				getSpecifier(cacheRecord, "contextObservers").removedCallback = function() {
 					state.contextsScheduledForPossibleDestruction.push(cacheRecord);
 				};
 				enterContext('cached_repeater', cacheRecord);
@@ -2865,7 +2923,7 @@
 					
 				leaveContext();
 				cacheRecord.returnValue = returnValue;
-				getSpecifier(cacheRecord, "contextObservers").noMoreObserversCallback = function() {
+				getSpecifier(cacheRecord, "contextObservers").removedCallback = function() {
 					state.contextsScheduledForPossibleDestruction.push(cacheRecord);
 				};
 				registerAnyChangeObserver(cacheRecord.contextObservers);
@@ -3097,7 +3155,7 @@
 				// Never encountered these arguments before, make a new cache
 				enterContext('reCache', cacheRecord);
 				state.nextIsMicroContext = true;
-				getSpecifier(cacheRecord, 'contextObservers').noMoreObserversCallback = function() {
+				getSpecifier(cacheRecord, 'contextObservers').removedCallback = function() {
 					state.contextsScheduledForPossibleDestruction.push(cacheRecord);
 				};
 				cacheRecord.repeaterHandler = repeatOnChange(
