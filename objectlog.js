@@ -9,7 +9,7 @@
     }
 }(this, function () {
 	
-	let bufferWidth = 100;
+	let bufferWidth = 56;
 	
 	let indentLevel = 0;
 
@@ -21,8 +21,9 @@
 		return string;
 	}
 
-	function createContext() {
+	function createContext(toString) {
 		return {
+			result : "",
 			rootLevel : true,
 			horizontal : false,
 			indentLevel : indentLevel,
@@ -39,11 +40,19 @@
 			// },
 			log : function(string) {
 				if (this.unfinishedLine) {
-					process.stdout.write(string); 
+					if (toString) {
+						this.result += string;
+					} else {
+						process.stdout.write(string); 						
+					}
 					this.unfinishedLine = true;
 				} else {
 					let indent = indentString(this.indentLevel);
-					process.stdout.write(indent + string); 
+					if (toString) {
+						this.result += indent + string;
+					} else {
+						process.stdout.write(indent + string); 						
+					}
 					this.unfinishedLine = true;
 				}
 			},
@@ -186,15 +195,44 @@
 		if (outer) context.finishOpenLine();
 	}
 	
-	return {
-		log : logPattern,
-		enter : function() {
-			indentLevel++;
+	
+	let objectlog = {
+		toString: function(entity, pattern) {
+			let context = createContext(true);
+			logPattern(entity, pattern, context);
+			return context.result;
+		}, 
+		findLogs : false,
+		useConsoleDefault : false,
+		log : function(entity, pattern) {
+			if (objectlog.findLogs) throw new Error("No logs allowed!");
+			if (objectlog.useConsoleDefault) {
+				console.log(entity);
+			} else {
+				logPattern(entity, pattern);
+			}
+		},
+		enter : function(entity, pattern) {
+			if (objectlog.findLogs) throw new Error("No logs allowed!");
+			if (objectlog.useConsoleDefault) {
+				console.group(entity);
+			} else {
+				if (typeof(entity) !== 'undefined') {
+					logPattern(entity, pattern);
+				}
+				indentLevel++;
+			}
 		},
 		exit : function() {
-			indentLevel--;
-		} 
-	};
+			if (objectlog.findLogs) throw new Error("No logs allowed!");
+			if (objectlog.useConsoleDefault) {
+				console.groupEnd();
+			} else {
+				indentLevel--;
+			}
+		} 		
+	}
+	return objectlog;
 }));
 
 

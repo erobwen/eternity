@@ -28,6 +28,16 @@ describe("loading, unloading & zombiefication", function () {
 			return result;
 		}
 
+		function incomingCount(object) {
+			let result = null;
+			eternity.state.blockingInitialize++;
+			eternity.freezeActivityList(function() {
+				result = object.const.incomingReferencesCount;
+			});
+			eternity.state.blockingInitialize--;
+			return result;
+		}
+		
         function isDead(object) {
             let result;
             eternity.blockInitialize(function() {
@@ -95,14 +105,18 @@ describe("loading, unloading & zombiefication", function () {
 
 		// Start building a structure
 		persistent.name = "persistent";
-		persistent.const.name = "persistent"
-		// log("---------------------------- persistent.A = A; ----------------------------------");
+		persistent.const.name = "persistent";
+		
+		log("---------------------------- persistent.A = A; ----------------------------------");
+		
 		persistent.A = A;
-		// log("---------------------------- A.persistent = persistent; ----------------------------------");		
+		
+		log("---------------------------- A.persistent = persistent; ----------------------------------");		
+		
 		A.persistent = persistent;
 		
 		// Exceed the memory limit (3 objects loaded is too much)
-		// log("---------------------------- A.B = B; ----------------------------------");
+		log("---------------------------- A.B = B; ----------------------------------");
 		
 		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
 		A.B = B;
@@ -115,9 +129,18 @@ describe("loading, unloading & zombiefication", function () {
 		
 		// Exceed the memory limit again, persistent and A no longer has any incoming references and will be killed
 		log("--------------------------- B.C = C; -----------------------------------");
-		eternity.trace.basic++;
+		
+		eternity.trace.refCount++;
+		eternity.trace.set++;
+		eternity.trace.pulse++;
+		eternity.trace.event++;
 		B.C = C;
-		eternity.trace.basic--;
+		eternity.trace.refCount--;
+		eternity.trace.set--;
+		eternity.trace.pulse--;
+		eternity.trace.event--;
+		log("persistent.incomingCount: " + incomingCount(persistent));
+		log("A.incomingCount: " + incomingCount(A));
 		log("-----");
 		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);
 		

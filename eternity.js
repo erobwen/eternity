@@ -1162,25 +1162,25 @@
 			if (loadedObjects > maxNumberOfLoadedObjects) {
 				// log("Too many objects, unload some... ");
 				logGroup();
-				objectCausality.withoutEmittingEvents(function() {
+				objectCausality.freezeActivityList(function() {
+				// objectCausality.withoutEmittingEvents(function() {
 					imageCausality.withoutEmittingEvents(function() {
 						let leastActiveObject = objectCausality.getActivityListLast();
-						objectCausality.freezeActivityList(function() {
-							while (leastActiveObject !== null && loadedObjects > maxNumberOfLoadedObjects) {
-								// log("considering object for unload...");
-								// while(leastActiveObject !== null && typeof(leastActiveObject.const.dbImage) === 'undefined') { // Warning! can this wake a killed object to life? ... no should not be here!
-									// // log("skipping unsaved object (cannot unload something not saved)...");
-									// objectCausality.removeFromActivityList(leastActiveObject); // Just remove them and make GC possible. Consider pre-filter for activity list.... 
-									// leastActiveObject = objectCausality.getActivityListLast();
-								// }
-								// if (leastActiveObject !== null) {
-									// log("remove it!!");
-									objectCausality.removeFromActivityList(leastActiveObject);
-									unloadObject(leastActiveObject);
-								// }
-							}
-						});
+						while (leastActiveObject !== null && loadedObjects > maxNumberOfLoadedObjects) {
+							// log("considering object for unload...");
+							// while(leastActiveObject !== null && typeof(leastActiveObject.const.dbImage) === 'undefined') { // Warning! can this wake a killed object to life? ... no should not be here!
+								// // log("skipping unsaved object (cannot unload something not saved)...");
+								// objectCausality.removeFromActivityList(leastActiveObject); // Just remove them and make GC possible. Consider pre-filter for activity list.... 
+								// leastActiveObject = objectCausality.getActivityListLast();
+							// }
+							// if (leastActiveObject !== null) {
+								// log("remove it!!");
+								objectCausality.removeFromActivityList(leastActiveObject);
+								unloadObject(leastActiveObject);
+							// }
+						}
 					});
+				// });
 				});
 				logUngroup();
 			} else {
@@ -1242,8 +1242,8 @@
 		}
 		
 		function tryKillObject(object) {
-            log("tryKillObject: " + objName(object));
-			logGroup();
+            trace.killing && log("tryKillObject: " + objName(object));
+			trace.killing && logGroup();
 			// logObj(object);
             objectCausality.blockInitialize(function() {
                 objectCausality.freezeActivityList(function() {
@@ -1251,10 +1251,9 @@
 					let isPersistentlyStored = typeof(object.const.dbImage) !== 'undefined';
 					let isUnloaded = typeof(object.const.initializer) === 'function'
 					let hasNoIncoming = object.const.incomingReferencesCount  === 0;
-					log("is unloaded: " + isUnloaded);
-					log("has no incoming: " + hasNoIncoming);
-                    log(object.const.incomingReferencesCount);
-					log("is persistently stored: " + isPersistentlyStored);
+					trace.killing && log("is unloaded: " + isUnloaded);
+					trace.killing && log("has no incoming: " + hasNoIncoming + " (count=" + object.const.incomingReferencesCount + ")");
+					trace.killing && log("is persistently stored: " + isPersistentlyStored);
 					
 					if (isPersistentlyStored && isUnloaded && hasNoIncoming) {
 						// log("kill it!");
@@ -1267,7 +1266,7 @@
 					}
                 });
             });
-			logUngroup();
+			trace.killing && logUngroup();
         }
 
 		
@@ -2257,7 +2256,7 @@
 			blockInitializeForIncomingReferenceCounters: true
 			// TODO: make it possible to run these following in conjunction with eternity.... as of now it will totally confuse eternity.... 
 			// incomingRelations : true, // this works only in conjunction with incomingStructuresAsCausalityObjects, otherwise isObject fails.... Note: this only seems to be a problem with eternity, and not with plain causality. 
-			// incomingStructuresAsCausalityObjects : true
+			// incomingStructuresAsCausalityObjects : true  // This can no longer work anymore???... at least not until we have gotten a fool proof way of deleting incoming structures, but what about observser in incoming structures holding them alive???... 
 		});
 		let objectCausality = require("./causality.js")(objectCausalityConfiguration);
 		
@@ -2307,7 +2306,10 @@
 			// TODO: Add and remove to activity list as we persist/unpersist this object....
 		});
 		let trace = objectCausality.trace;
-
+		trace.killing = 0;
+		trace.loading = 0;
+		trace.zombies = 0;
+		trace.eternity = false;
 		
 		// Setup database
 		setupDatabase();
