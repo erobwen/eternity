@@ -44,7 +44,6 @@
 						
 			inActiveRecording : false,
 			activeRecording : null,
-			postPulseModifier : configuration.useIncomingStructures ? (function() {})  : null,
 			
 			emitEventPaused : 0,
 			recordingPaused : 0,
@@ -785,6 +784,50 @@
 		 *
 		 ***************************************************************/
 
+		function updateIncomingReferenceCounters(events) {
+			return;
+			let createdObjects = {};
+			events.forEach(function(event) {
+				if (event.type === 'create') {
+					createdObjects[event.object.const.id] = true;
+					Object.keys(event.object).forEach(function(key) {
+						let value = object[key];
+						if (isObject(value)) {
+							value.const.incomingReferencesCount++;
+						}
+					});
+				}
+			});
+			events.forEach(function(event) {
+				if (typeof(createdObjects[event.object.const.id]) === 'undefined') {
+					if (event.type === 'create') {
+						
+					} else if (event.type === 'set') {
+						if (isObject(event.value)) {
+							event.value.const.incomingReferencesCount--;
+						}
+						if (isObject(event.previousValue)) {
+							event.previousValue.const.incomingReferencesCount--;
+						}
+					} else if (event.type === 'delete') {
+						if (isObject(event.previousValue)) {
+							event.previousValue.const.incomingReferencesCount--;
+						}						
+					} else if (event.type === 'splice') {
+						event.added.forEach(function(element) {
+							if(isObject(element)) {
+								element.const.incomingReferencesCount++;
+							}
+						});
+						event.removed.forEach(function(element) {
+							if(isObject(element)) {
+								element.const.incomingReferencesCount--;
+							}
+						});
+					}					
+				}
+			});
+		}
 		
 		function increaseIncomingCounter(value) {
 			if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize++;
@@ -2077,10 +2120,10 @@
 		
 		
 		function postPulseCleanup() {
-			if (state.postPulseModifier !== null) {
-				state.postPulseModifier(state.pulseEvents);
-			}
-				
+			if (configuration.useIncomingStructures && configuration.incomingStructuresAsCausalityObjects) {
+				updateIncomingReferenceCounters(state.pulseEvents);
+			};
+
 			state.inPulse++; // block new pulses!			
 			state.inPostPulseProcess++; // Blocks any model writing during post pulse cleanup
 			
