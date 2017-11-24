@@ -12,10 +12,20 @@
 	let objectlog = require('./objectlog.js');
 	let log = objectlog.log;
 	let logGroup = objectlog.enter;
-	let logUngroup = objectlog.exit;
-	let trace = { basic : 0, incoming: 0}; 
+	let logUngroup = objectlog.exit; 
 	
 	function createCausalityInstance(configuration) {
+		// Tracing per instance 
+		let trace = { 
+			basic : 0, 
+			incoming: 0,
+			set: 0,
+			get: 0,
+			refCount : 0,
+			pulse : 0,
+			event : 0
+		};
+		
 		// Class registry
 		let classRegistry =  {};
 		
@@ -486,6 +496,7 @@
 				if (removedValue.const && removedValue.const.incoming && removedValue.const.incoming[referringRelation].observers) {
 					notifyChangeObservers(removedValue.const.incoming[referringRelation].observers);
 				}
+				// if (removedValue.const && removedValue.const.incoming && removedValue.const.incoming[referringRelation] && removedValue.const.incoming[referringRelation].observers) {
 				if (configuration.blockInitializeForIncomingStructures) state.blockingInitialize--;
 			}
 		}
@@ -1351,7 +1362,7 @@
 			if (configuration.reactiveStructuresAsCausalityObjects && key === '_cachedCalls') throw new Error("Should not be happening!");
 			
 			// Ensure initialized
-			if (trace.basic > 0) {
+			if (trace.set > 0) {
 				log("setHandlerObject: " + this.const.name + "." + key + "= ");
 				// throw new Error("What the actual fuck, I mean jesuz..!!!");
 				logGroup();
@@ -1360,28 +1371,28 @@
 			
 			// Overlays
 			if (this.const.forwardsTo !== null) {
-				if (trace.basic > 0) log("forward");
+				if (trace.set > 0) log("forward");
 				let overlayHandler = this.const.forwardsTo.const.handler;
-				if (trace.basic > 0) logUngroup();
+				if (trace.set > 0) logUngroup();
 				return overlayHandler.set.apply(overlayHandler, [overlayHandler.target, key, value]);
 			} else {
-				trace.basic && log("no forward");
+				trace.set && log("no forward");
 			}
 			
 			// Write protection
 			if (!canWrite(this.const.object)) {
-				if (trace.basic > 0) logUngroup();
+				if (trace.set > 0) logUngroup();
 				return;
 			}
-			if (trace.basic > 0) log("can write!");
+			if (trace.set > 0) log("can write!");
 			
 			// Check if setting a property
 			let scan = target;
 			while ( scan !== null && typeof(scan) !== 'undefined' ) {
 				let descriptor = Object.getOwnPropertyDescriptor(scan, key);
 				if (typeof(descriptor) !== 'undefined' && typeof(descriptor.get) !== 'undefined') {
-					if (trace.basic > 0) logUngroup();
-					if (trace.basic) log("Calling setter!...");
+					if (trace.set > 0) logUngroup();
+					if (trace.set) log("Calling setter!...");
 					return descriptor.set.apply(this.const.object, [value]);
 				}
 				scan = Object.getPrototypeOf( scan );
@@ -1400,8 +1411,8 @@
 			// If same value as already set, do nothing.
 			if (keyDefined) {
 				if (previousValue === value || (Number.isNaN(previousValue) && Number.isNaN(value)) ) {
-					trace.basic && log("cannot set same value");
-					if (trace.basic > 0) logUngroup();
+					trace.set && log("cannot set same value");
+					if (trace.set > 0) logUngroup();
 					return true;
 				}
 			}
@@ -1417,13 +1428,13 @@
 			// Perform assignment with regards to incoming structures.
 			let valueOrIncomingStructure;
 			if (state.incomingStructuresDisabled === 0) {
-				trace.basic && log("use incoming structures...");
+				trace.set && log("use incoming structures...");
 				state.incomingStructuresDisabled++;
 				valueOrIncomingStructure = createAndRemoveIncomingRelations(this.const.object, key, value, previousValue, previousValueOrIncomingStructure);
 				target[key] = valueOrIncomingStructure;
 				state.incomingStructuresDisabled--;
 			} else {
-				trace.basic && log("plain assignment... ");
+				trace.set && log("plain assignment... ");
 				target[key] = value;				
 			}
 			
@@ -1460,7 +1471,7 @@
 			// End pulse 
 			if (--state.observerNotificationPostponed === 0) proceedWithPostponedNotifications();
 			if (--state.inPulse === 0) postPulseCleanup();
-			if (trace.basic > 0) logUngroup();
+			if (trace.set > 0) logUngroup();
 			activityListFrozen--;
 			return true;
 		}
@@ -2056,9 +2067,12 @@
 		 **********************************/
 		
 		function pulse(action) {
+			trace.pulse && logGroup("pulse");
+			
 			state.inPulse++;
 			let result = action();
 			if (--state.inPulse === 0) postPulseCleanup();
+			trace.pulse && logUngroup();
 			return result;
 		}
 
@@ -2074,9 +2088,11 @@
 		}
 
 		function postPulseCleanup() {
+			trace.pulse && logGroup("postPulseCleanup");
 			state.inPulse++; // block new pulses!			
-			state.inPostPulseProcess++; // Blocks any model writing during post pulse cleanup
-
+			state.inPostPulseProcess++;
+			
+			// Cleanup reactive structures no longer needed
 			state.contextsScheduledForPossibleDestruction.forEach(function(context) {
 				if (!context.directlyInvokedByApplication) {
 					if (emptyObserverSet(context.contextObservers)) {
@@ -2085,13 +2101,21 @@
 				}
 			});
 			state.contextsScheduledForPossibleDestruction = [];
+			
+
+			// Custom post pulse hooks... insert your framework here...
+			trace.pulse && logGroup("postPulseHooks");
 			postPulseHooks.forEach(function(callback) {
 				callback(state.pulseEvents);
 			});
-
+			trace.pulse && logUngroup();
+			
+			
+			// Prepare for next pulse.
 			state.pulseEvents = [];
 			state.inPostPulseProcess--;
 			state.inPulse--;
+			trace.pulse && logUngroup();
 		}
 
 
@@ -2143,11 +2167,11 @@
 		}
 
 		function emitSetEvent(handler, key, value, previousValue) {
-			if (trace.basic) {
-				log("emitSetEvent");
-				log(configuration);
+			// if (trace.basic) {
+				// log("emitSetEvent");
+				// log(configuration);
 				
-			}
+			// }
 			if (configuration.recordPulseEvents || typeof(handler.observers) !== 'undefined') {
 				emitEvent(handler, {type: 'set', property: key, value: value, oldValue: previousValue});
 			}
@@ -2160,16 +2184,17 @@
 		}
 
 		function emitEvent(handler, event) {
-			if (trace.basic) {
-				log("emitEvent: ");// + event.type + " " + event.property);
+			if (trace.event) {
+				logGroup("emitEvent: ");// + event.type + " " + event.property);
 				log(event);
-				log("state.emitEventPaused: " + state.emitEventPaused);
+				// log("state.emitEventPaused: " + state.emitEventPaused);
 			}
 			if (state.emitEventPaused === 0) {
 				// log("EMIT EVENT " + configuration.name + " " + event.type + " " + event.property + "=...");
 				event.object = handler.const.object; 
 				// event.isConsequence = state.refreshingRepeater;
 				if (configuration.recordPulseEvents) {
+					trace.event && log("store in pulse....");
 					state.pulseEvents.push(event);
 				}
 				if (typeof(handler.observers) !== 'undefined') {
@@ -2177,7 +2202,10 @@
 						observerFunction(event);
 					});
 				}
+			} else {
+				trace.event && log("emit event paused....");
 			}
+			trace.event && logUngroup();
 		}
 		
 		function emitUnobservableEvent(event) { // TODO: move reactiveStructuresAsCausalityObjects upstream in the call chain..  
