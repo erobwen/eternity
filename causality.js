@@ -44,7 +44,7 @@
 						
 			inActiveRecording : false,
 			activeRecording : null,
-			postPulseModifier : null,
+			postPulseModifier : configuration.useIncomingStructures ? (function() {})  : null,
 			
 			emitEventPaused : 0,
 			recordingPaused : 0,
