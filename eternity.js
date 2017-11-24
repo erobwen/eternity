@@ -1161,7 +1161,7 @@
 			// log("unloadAndKillObjects");
 			if (loadedObjects > maxNumberOfLoadedObjects) {
 				// log("Too many objects, unload some... ");
-				logGroup();
+				trace.unload && logGroup("unloadAndKillObjects");
 				objectCausality.withoutEmittingEvents(function() {
 					imageCausality.withoutEmittingEvents(function() {
 						let leastActiveObject = objectCausality.getActivityListLast();
@@ -1182,7 +1182,7 @@
 						});
 					});
 				});
-				logUngroup();
+				trace.unload && logUngroup();
 			} else {
 				// log("... still room for all loaded... ");
 			}
@@ -1190,8 +1190,7 @@
 		
 		function unloadObject(object) {
 			objectCausality.freezeActivityList(function() {				
-				// log("unloadObject " + object.const.name);
-				logGroup();
+				trace.unload && logGroup("unloadObject " + object.const.name);
 				// without emitting events.
 				
 				for (let property in object) {
@@ -1216,7 +1215,7 @@
 						// killObject(object);
 					// }
 				// });
-				logUngroup();
+				trace.unload && logUngroup();
 			});
 		}
 		
@@ -1242,8 +1241,8 @@
 		}
 		
 		function tryKillObject(object) {
-            // log("tryKillObject: " + objName(object));
-			logGroup();
+            trace.killing && log("tryKillObject: " + objName(object));
+			trace.killing && logGroup();
 			// logObj(object);
             objectCausality.blockInitialize(function() {
                 objectCausality.freezeActivityList(function() {
@@ -1251,10 +1250,9 @@
 					let isPersistentlyStored = typeof(object.const.dbImage) !== 'undefined';
 					let isUnloaded = typeof(object.const.initializer) === 'function'
 					let hasNoIncoming = object.const.incomingReferencesCount  === 0;
-                    
-					// log("is unloaded: " + isUnloaded);
-					// log("has incoming: " + !hasNoIncoming);
-					// log("is persistently stored: " + isPersistentlyStored);
+					trace.killing && log("is unloaded: " + isUnloaded);
+					trace.killing && log("has no incoming: " + hasNoIncoming + " (count=" + object.const.incomingReferencesCount + ")");
+					trace.killing && log("is persistently stored: " + isPersistentlyStored);
 					
 					if (isPersistentlyStored && isUnloaded && hasNoIncoming) {
 						// log("kill it!");
@@ -1267,7 +1265,7 @@
 					}
                 });
             });
-			logUngroup();
+			trace.killing && logUngroup();
         }
 
 		
@@ -2305,7 +2303,10 @@
 			// TODO: Add and remove to activity list as we persist/unpersist this object....
 		});
 		let trace = objectCausality.trace;
-
+		trace.killing = 0;
+		trace.loading = 0;
+		trace.zombies = 0;
+		trace.eternity = false;
 		
 		// Setup database
 		setupDatabase();

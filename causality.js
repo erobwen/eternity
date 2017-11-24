@@ -795,6 +795,71 @@
 		 *
 		 ***************************************************************/
 
+		function checkIfNoMoreReferences(object) {
+			if (object.const.incomingReferencesCount === 0 && removedLastIncomingRelationCallback) {
+				trace.refCount && log("removed last reference... ");
+				removedLastIncomingRelationCallback(object);
+			}
+		} 
+		 
+		function updateIncomingReferenceCounters(events) {
+			let newEvents = events.slice();
+			trace.refCount && logGroup("updateIncomingReferenceCounters");
+			// trace.basic && log(configuration, 3);
+			trace.refCount && log(events, 3);
+			if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize++;
+			// return;
+			let createdObjects = {};
+			newEvents.forEach(function(event) {
+				if (event.type === 'create') {
+					createdObjects[event.object.const.id] = true;
+					Object.keys(event.object).forEach(function(key) {
+						let value = object[key];
+						if (isObject(value)) {
+							value.const.incomingReferencesCount++;
+						}
+					});
+				}
+			});
+			newEvents.forEach(function(event) {
+				if (typeof(createdObjects[event.object.const.id]) === 'undefined') {
+					if (event.type === 'set') {
+						if (isObject(event.value)) {
+							event.value.const.incomingReferencesCount++;
+						}
+						if (isObject(event.oldValue)) {
+							event.oldValue.const.incomingReferencesCount--;
+							checkIfNoMoreReferences(event.oldValue);
+						}
+					} else if (event.type === 'delete') {
+						if (isObject(event.oldValue)) {
+							event.oldValue.const.incomingReferencesCount--;
+							checkIfNoMoreReferences(event.oldValue);
+						}						
+					} else if (event.type === 'splice') {
+						if (event.added !== null) {
+							event.added.forEach(function(element) {
+								if(isObject(element)) {
+									element.const.incomingReferencesCount++;
+								}
+							});							
+						}
+						if (event.removed !== null) {
+							event.removed.forEach(function(element) {
+								if(isObject(element)) {
+									element.const.incomingReferencesCount--;
+									checkIfNoMoreReferences(element);
+								}
+							});							
+						}
+					}					
+				}
+			});
+			trace.refCount && logUngroup();
+			// log(events, 3);
+			if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize--;
+		}
+		
 		
 		function increaseIncomingCounter(value) {
 			if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize++;
