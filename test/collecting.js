@@ -28,19 +28,23 @@ describe("garbage-collection", function () {
 		persistent.a = a;
 		assert.equal(typeof(a.const.dbImage) !== 'undefined', true);
 
+		// log("----------------------------------------")
+		// eternity.trace.eternity = true;
+		// eternity.trace.incoming++;
+		// eternity.trace.basic++;
 		persistent.a = null;
+		// eternity.trace.eternity = false;
+		// eternity.trace.incoming--;
+		// eternity.trace.basic--;
+		// log("----------------------------------------")
 
 		// GC in 6 steps
 		eternity.oneStepCollection();
 		eternity.oneStepCollection();
 		eternity.oneStepCollection();
 		eternity.oneStepCollection();
-		// log("----------------------------------------")
-		// eternity.trace.eternity = true;
 		eternity.oneStepCollection();		
 		eternity.oneStepCollection();
-		// eternity.trace.eternity = false;
-		// log("----------------------------------------")
 	
 		assert.equal(typeof(a.const.dbImage) === 'undefined', true);
 		

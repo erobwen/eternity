@@ -44,6 +44,7 @@
 						
 			inActiveRecording : false,
 			activeRecording : null,
+			postPulseModifier : null,
 			
 			emitEventPaused : 0,
 			recordingPaused : 0,
@@ -483,7 +484,7 @@
 			if (isObject(removedValue) && isIncomingStructure(previousStructure)) {
 				if (configuration.blockInitializeForIncomingStructures) state.blockingInitialize++;
 				removeReverseReference(objectProxy.const.id, previousStructure);
-				if (removedValue.const && removedValue.const.incoming && removedValue.const.incoming[referringRelation].observers) {
+				if (removedValue.const && removedValue.const.incoming && removedValue.const.incoming[referringRelation] && removedValue.const.incoming[referringRelation].observers) {
 					notifyChangeObservers(removedValue.const.incoming[referringRelation].observers);
 				}
 				if (configuration.blockInitializeForIncomingStructures) state.blockingInitialize--;
@@ -2073,9 +2074,16 @@
 			if (--state.inPulse === 0) postPulseCleanup();
 		}
 
+		
+		
 		function postPulseCleanup() {
+			if (state.postPulseModifier !== null) {
+				state.postPulseModifier(state.pulseEvents);
+			}
+				
 			state.inPulse++; // block new pulses!			
 			state.inPostPulseProcess++; // Blocks any model writing during post pulse cleanup
+			
 
 			state.contextsScheduledForPossibleDestruction.forEach(function(context) {
 				if (!context.directlyInvokedByApplication) {
@@ -2143,11 +2151,11 @@
 		}
 
 		function emitSetEvent(handler, key, value, previousValue) {
-			if (trace.basic) {
-				log("emitSetEvent");
-				log(configuration);
+			// if (trace.basic) {
+				// log("emitSetEvent");
+				// log(configuration);
 				
-			}
+			// }
 			if (configuration.recordPulseEvents || typeof(handler.observers) !== 'undefined') {
 				emitEvent(handler, {type: 'set', property: key, value: value, oldValue: previousValue});
 			}
@@ -2163,7 +2171,7 @@
 			if (trace.basic) {
 				log("emitEvent: ");// + event.type + " " + event.property);
 				log(event);
-				log("state.emitEventPaused: " + state.emitEventPaused);
+				// log("state.emitEventPaused: " + state.emitEventPaused);
 			}
 			if (state.emitEventPaused === 0) {
 				// log("EMIT EVENT " + configuration.name + " " + event.type + " " + event.property + "=...");
