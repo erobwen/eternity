@@ -114,119 +114,119 @@ describe("loading, unloading & zombiefication", function () {
 		assert.equal(isLoaded(B), true);
 		
 		// Exceed the memory limit again, persistent and A no longer has any incoming references and will be killed
-		// log("--------------------------- B.C = C; -----------------------------------");
-		// eternity.trace.basic++;
+		log("--------------------------- B.C = C; -----------------------------------");
+		eternity.trace.basic++;
 		B.C = C;
-		// eternity.trace.basic--;
-		// log("-----");
+		eternity.trace.basic--;
+		log("-----");
 		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);
 		
 		assert.equal(isLoaded(persistent), false);
         assert.equal(isDead(persistent), true);
 		
-		assert.equal(isLoaded(A), false);
-        assert.equal(isDead(A), true);
+		// assert.equal(isLoaded(A), false);
+        // assert.equal(isDead(A), true);
 		
-		assert.equal(isLoaded(B), true);
+		// assert.equal(isLoaded(B), true);
 		
-		assert.equal(isLoaded(C), true);
+		// assert.equal(isLoaded(C), true);
 		
-		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);
-		// log("--------------------------- Touch A -----------------------------------");
-		let dummy = A.name;
+		// // log(eternity.mockMongoDB.getAllRecordsParsed(), 3);
+		// // log("--------------------------- Touch A -----------------------------------");
+		// let dummy = A.name;
 		
-		assert.equal(isLoaded(persistent), false);
-        assert.equal(isDead(persistent), true);
+		// assert.equal(isLoaded(persistent), false);
+        // assert.equal(isDead(persistent), true);
 		
-		// A becomes a zombie
-		assert.equal(isLoaded(A), true);
-		assert.equal(isDead(A), false);
-		assert.equal(isZombie(A), true);
-
-		assert.equal(isLoaded(B), false);
-		
-		assert.equal(isLoaded(C), true);
-		
-		
-		// log("--------------------------- Touch persistent -----------------------------------");
-		let persistentA = persistent.A;
-		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);
-		
-		// Persistent becomes a zombie
-		assert.equal(isLoaded(persistent), true);
-        assert.equal(isDead(persistent), false);
-		assert.equal(isZombie(persistent), true);
-		
-		// A is still a zombie
-		assert.equal(isLoaded(A), true);
-		assert.equal(isDead(A), false);
-		assert.equal(isZombie(A), true);
-
-		assert.equal(isLoaded(B), false);
-		
-		assert.equal(isLoaded(C), false);
-		
-		// Examine zombie properties 
-		assert.equal(A === persistent.A, false);  // Equality without const does not work anymore, becuase one of them is a zombie. 
-		assert.equal(A.const === persistent.A.const, true);
-		
-		// Persistent is also a zombie, but A.persistent refers to its non-zombie version. 
-		logZombie(A);
-		logZombie(persistent);
-		assert.equal(A.persistent === persistent, false);  // Equality without const does not work anymore, becuase one of them is a zombie. 
-		// log(A.persistent);
-		// log(A.persistent.const);
-		// log(persistent.const);
-		assert.equal(A.persistent.const === persistent.const, true);
-		
-		// log("--------------------------- Touch B -----------------------------------");
-		dummy = B.name;
-		// log("--------------------------- Touch C -----------------------------------");
-		// eternity.trace.basic++;
-		dummy = C.name;
-		// eternity.trace.basic--;
-		// log("----------------------------------");
-		
-		// Persistent becomes a zombie
-		assert.equal(isLoaded(persistent), false);
-		assert.equal(isDead(persistent), true);
-		// assert.equal(isZombie(persistent), true);
-		// log(zombieLevel(persistent));
-		
-		// A is still a zombie
-		assert.equal(isLoaded(A), false);
-		assert.equal(isDead(A), true);
+		// // A becomes a zombie
+		// assert.equal(isLoaded(A), true);
+		// assert.equal(isDead(A), false);
 		// assert.equal(isZombie(A), true);
-		// log(zombieLevel(A));
 
-		assert.equal(isLoaded(B), true);
-		assert.equal(isDead(B), false);
-		assert.equal(isZombie(B), true);
-		// log(zombieLevel(B));
+		// assert.equal(isLoaded(B), false);
 		
-		assert.equal(isLoaded(C), true);
-		assert.equal(isDead(C), false);
-		assert.equal(isZombie(C), true);
+		// assert.equal(isLoaded(C), true);
 		
-		// log("--------------------------- Touch A -----------------------------------");
-		dummy = A.name;
 		
-		// Persistent becomes a zombie
-		assert.equal(isLoaded(persistent), false);
-		assert.equal(isDead(persistent), true);
-		// log(zombieLevel(persistent));
+		// // log("--------------------------- Touch persistent -----------------------------------");
+		// let persistentA = persistent.A;
+		// // log(eternity.mockMongoDB.getAllRecordsParsed(), 3);
 		
-		// A is still a zombie
-		assert.equal(isLoaded(A), true);
-		assert.equal(isDead(A), false);
-		assert.equal(isZombie(A), true);
-		assert.equal(zombieLevel(A), 2);
+		// // Persistent becomes a zombie
+		// assert.equal(isLoaded(persistent), true);
+        // assert.equal(isDead(persistent), false);
+		// assert.equal(isZombie(persistent), true);
+		
+		// // A is still a zombie
+		// assert.equal(isLoaded(A), true);
+		// assert.equal(isDead(A), false);
+		// assert.equal(isZombie(A), true);
 
-		assert.equal(isLoaded(B), false);
+		// assert.equal(isLoaded(B), false);
 		
-		assert.equal(isLoaded(C), true);
-		assert.equal(isDead(C), false);
-		assert.equal(isZombie(C), true);
+		// assert.equal(isLoaded(C), false);
+		
+		// // Examine zombie properties 
+		// assert.equal(A === persistent.A, false);  // Equality without const does not work anymore, becuase one of them is a zombie. 
+		// assert.equal(A.const === persistent.A.const, true);
+		
+		// // Persistent is also a zombie, but A.persistent refers to its non-zombie version. 
+		// logZombie(A);
+		// logZombie(persistent);
+		// assert.equal(A.persistent === persistent, false);  // Equality without const does not work anymore, becuase one of them is a zombie. 
+		// // log(A.persistent);
+		// // log(A.persistent.const);
+		// // log(persistent.const);
+		// assert.equal(A.persistent.const === persistent.const, true);
+		
+		// // log("--------------------------- Touch B -----------------------------------");
+		// dummy = B.name;
+		// // log("--------------------------- Touch C -----------------------------------");
+		// // eternity.trace.basic++;
+		// dummy = C.name;
+		// // eternity.trace.basic--;
+		// // log("----------------------------------");
+		
+		// // Persistent becomes a zombie
+		// assert.equal(isLoaded(persistent), false);
+		// assert.equal(isDead(persistent), true);
+		// // assert.equal(isZombie(persistent), true);
+		// // log(zombieLevel(persistent));
+		
+		// // A is still a zombie
+		// assert.equal(isLoaded(A), false);
+		// assert.equal(isDead(A), true);
+		// // assert.equal(isZombie(A), true);
+		// // log(zombieLevel(A));
+
+		// assert.equal(isLoaded(B), true);
+		// assert.equal(isDead(B), false);
+		// assert.equal(isZombie(B), true);
+		// // log(zombieLevel(B));
+		
+		// assert.equal(isLoaded(C), true);
+		// assert.equal(isDead(C), false);
+		// assert.equal(isZombie(C), true);
+		
+		// // log("--------------------------- Touch A -----------------------------------");
+		// dummy = A.name;
+		
+		// // Persistent becomes a zombie
+		// assert.equal(isLoaded(persistent), false);
+		// assert.equal(isDead(persistent), true);
+		// // log(zombieLevel(persistent));
+		
+		// // A is still a zombie
+		// assert.equal(isLoaded(A), true);
+		// assert.equal(isDead(A), false);
+		// assert.equal(isZombie(A), true);
+		// assert.equal(zombieLevel(A), 2);
+
+		// assert.equal(isLoaded(B), false);
+		
+		// assert.equal(isLoaded(C), true);
+		// assert.equal(isDead(C), false);
+		// assert.equal(isZombie(C), true);
 	});
 });
 

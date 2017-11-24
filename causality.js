@@ -784,10 +784,21 @@
 		 *
 		 ***************************************************************/
 
+		function checkIfNoMoreReferences(object) {
+			if (object.const.incomingReferencesCount === 0 && removedLastIncomingRelationCallback) {
+				trace.basic && log("removed last reference... ");
+				removedLastIncomingRelationCallback(object);
+			}
+		} 
+		 
 		function updateIncomingReferenceCounters(events) {
-			return;
+			let newEvents = events.slice();
+			trace.basic && log("updateIncomingReferenceCounters");
+			trace.basic && log(events, 2);
+			if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize++;
+			// return;
 			let createdObjects = {};
-			events.forEach(function(event) {
+			newEvents.forEach(function(event) {
 				if (event.type === 'create') {
 					createdObjects[event.object.const.id] = true;
 					Object.keys(event.object).forEach(function(key) {
@@ -798,65 +809,72 @@
 					});
 				}
 			});
-			events.forEach(function(event) {
+			newEvents.forEach(function(event) {
 				if (typeof(createdObjects[event.object.const.id]) === 'undefined') {
-					if (event.type === 'create') {
-						
-					} else if (event.type === 'set') {
+					if (event.type === 'set') {
 						if (isObject(event.value)) {
-							event.value.const.incomingReferencesCount--;
+							event.value.const.incomingReferencesCount++;
 						}
-						if (isObject(event.previousValue)) {
-							event.previousValue.const.incomingReferencesCount--;
+						if (isObject(event.oldValue)) {
+							event.oldValue.const.incomingReferencesCount--;
+							checkIfNoMoreReferences(event.oldValue);
 						}
 					} else if (event.type === 'delete') {
-						if (isObject(event.previousValue)) {
-							event.previousValue.const.incomingReferencesCount--;
+						if (isObject(event.oldValue)) {
+							event.oldValue.const.incomingReferencesCount--;
+							checkIfNoMoreReferences(event.oldValue);
 						}						
 					} else if (event.type === 'splice') {
-						event.added.forEach(function(element) {
-							if(isObject(element)) {
-								element.const.incomingReferencesCount++;
-							}
-						});
-						event.removed.forEach(function(element) {
-							if(isObject(element)) {
-								element.const.incomingReferencesCount--;
-							}
-						});
+						if (event.added !== null) {
+							event.added.forEach(function(element) {
+								if(isObject(element)) {
+									element.const.incomingReferencesCount++;
+								}
+							});							
+						}
+						if (event.removed !== null) {
+							event.removed.forEach(function(element) {
+								if(isObject(element)) {
+									element.const.incomingReferencesCount--;
+									checkIfNoMoreReferences(element);
+								}
+							});							
+						}
 					}					
 				}
 			});
+			// log(events, 3);
+			if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize--;
 		}
 		
 		function increaseIncomingCounter(value) {
-			if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize++;
-			if (isObject(value)) {				
-				if (value.const.incomingReferencesCount < 0) {
-					log(value.const.incomingReferencesCount);
-					throw Error("WTAF");
-				} 
-				if (typeof(value.const.incomingReferencesCount) === 'undefined') {
-					value.const.incomingReferencesCount = 0;
-				}
-				value.const.incomingReferencesCount++;
-			}
-			if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize--;
+			// if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize++;
+			// if (isObject(value)) {				
+				// if (value.const.incomingReferencesCount < 0) {
+					// log(value.const.incomingReferencesCount);
+					// throw Error("WTAF");
+				// } 
+				// if (typeof(value.const.incomingReferencesCount) === 'undefined') {
+					// value.const.incomingReferencesCount = 0;
+				// }
+				// value.const.incomingReferencesCount++;
+			// }
+			// if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize--;
 		}
 		
 		function decreaseIncomingCounter(value) {
-			if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize++;
-			if (isObject(value)) {
-				value.const.incomingReferencesCount--;
-				if (value.const.incomingReferencesCount < 0) {
-					console.log(value);
-					throw Error("WTAF");					
-				}
-				if (value.const.incomingReferencesCount === 0) {
-					removedLastIncomingRelation(value);
-				}
-			}
-			if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize--;
+			// if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize++;
+			// if (isObject(value)) {
+				// value.const.incomingReferencesCount--;
+				// if (value.const.incomingReferencesCount < 0) {
+					// console.log(value);
+					// throw Error("WTAF");					
+				// }
+				// if (value.const.incomingReferencesCount === 0) {
+					// removedLastIncomingRelation(value);
+				// }
+			// }
+			// if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize--;
 		}
 		
 		
@@ -1664,7 +1682,7 @@
 				initial.const.id = nextId++;
 				initial.const.causalityInstance = causalityInstance;
 			}
-			
+			if (configuration.incomingReferenceCounters) initial.const.incomingReferencesCount = 0;
 			emitImmutableCreationEvent(initial);
 			if (--state.inPulse === 0) postPulseCleanup();
 			return initial;
@@ -1815,6 +1833,7 @@
 				removeForwarding : genericRemoveForwarding.bind(proxy),
 				mergeAndRemoveForwarding: genericMergeAndRemoveForwarding.bind(proxy)
 			};
+			if (configuration.incomingReferenceCounters) handler.const.incomingReferencesCount = 0;
 			for(property in initialConst) {
 				handler.const[property] = initialConst[property];
 			}
@@ -2120,7 +2139,8 @@
 		
 		
 		function postPulseCleanup() {
-			if (configuration.useIncomingStructures && configuration.incomingStructuresAsCausalityObjects) {
+			trace.basic && logGroup("postPulseCleanup");
+			if (configuration.incomingReferenceCounters) {
 				updateIncomingReferenceCounters(state.pulseEvents);
 			};
 
@@ -2139,7 +2159,8 @@
 			postPulseHooks.forEach(function(callback) {
 				callback(state.pulseEvents);
 			});
-
+			
+			trace.basic && logUngroup();
 			state.pulseEvents = [];
 			state.inPostPulseProcess--;
 			state.inPulse--;
@@ -3548,6 +3569,10 @@
 		if(typeof(requestedConfiguration) === 'undefined') {
 			requestedConfiguration = {};
 		}
+
+		// Configuration constraints
+		if (requestedConfiguration.incomingReferenceCounters)
+			requestedConfiguration.recordPulseEvents = true;
 		
 		// Create configuration 
 		let defaultConfiguration = getDefaultConfiguration();
@@ -3558,7 +3583,7 @@
 		}
 		if (anySet) {
 			defaultConfiguration.activateSpecialFeatures = true;
-		}
+		}		
 		
 		// Create configuration signature
 		let configuration = sortedKeys(defaultConfiguration);

@@ -2,6 +2,7 @@ const assert = require('assert');
 let causality = require('../causality')({incomingReferenceCounters : true});
 let create = causality.create;
 let log = require("../objectlog.js").log;
+let forAllIncoming = causality.forAllIncoming;
 
 
 describe("Incoming Relations", function(){
@@ -16,6 +17,8 @@ describe("Incoming Relations", function(){
 		y.fum = null;
 		assert.equal(y.const.incomingReferencesCount, 1);
     });
+	
+	// Do corresponding tests with counters: 
 	
 	// it("Testing incoming relation recursivley", function(){
 		// let x = create({name: 'x'});

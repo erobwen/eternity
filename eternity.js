@@ -1190,7 +1190,7 @@
 		
 		function unloadObject(object) {
 			objectCausality.freezeActivityList(function() {				
-				// log("unloadObject " + object.const.name);
+				log("unloadObject " + object.const.name);
 				logGroup();
 				// without emitting events.
 				
@@ -1242,7 +1242,7 @@
 		}
 		
 		function tryKillObject(object) {
-            // log("tryKillObject: " + objName(object));
+            log("tryKillObject: " + objName(object));
 			logGroup();
 			// logObj(object);
             objectCausality.blockInitialize(function() {
@@ -1251,10 +1251,10 @@
 					let isPersistentlyStored = typeof(object.const.dbImage) !== 'undefined';
 					let isUnloaded = typeof(object.const.initializer) === 'function'
 					let hasNoIncoming = object.const.incomingReferencesCount  === 0;
-                    
-					// log("is unloaded: " + isUnloaded);
-					// log("has incoming: " + !hasNoIncoming);
-					// log("is persistently stored: " + isPersistentlyStored);
+					log("is unloaded: " + isUnloaded);
+					log("has no incoming: " + hasNoIncoming);
+                    log(object.const.incomingReferencesCount);
+					log("is persistently stored: " + isPersistentlyStored);
 					
 					if (isPersistentlyStored && isUnloaded && hasNoIncoming) {
 						// log("kill it!");
@@ -2277,7 +2277,9 @@
 		objectCausality.oneStepCollection = oneStepCollection;
 		// TODO: install this... 
 		objectCausality.addRemovedLastIncomingRelationCallback(function(dbImage) {
-			// log("incoming relations reaced zero...");
+			log("");
+			log("HERE incoming relations reaced zero...");
+			log("");
             tryKillObject(dbImage);
         });
 		objectCausality.setActivityListFilter(function(object) {
