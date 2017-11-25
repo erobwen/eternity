@@ -493,7 +493,7 @@
 			if (isObject(removedValue) && isIncomingStructure(previousStructure)) {
 				if (configuration.blockInitializeForIncomingStructures) state.blockingInitialize++;
 				removeReverseReference(objectProxy.const.id, previousStructure);
-				if (removedValue.const && removedValue.const.incoming && removedValue.const.incoming[referringRelation].observers) {
+				if (removedValue.const && removedValue.const.incoming && removedValue.const.incoming[referringRelation] && removedValue.const.incoming[referringRelation].observers) {
 					notifyChangeObservers(removedValue.const.incoming[referringRelation].observers);
 				}
 				// if (removedValue.const && removedValue.const.incoming && removedValue.const.incoming[referringRelation] && removedValue.const.incoming[referringRelation].observers) {
@@ -666,9 +666,9 @@
 				}
 				
 				// TODO: Make this work... 
-				// if (typeof(structure.isIncomingPropertyStructure) !== 'undefined') {
-					// delete structure.parent[structure.propertyKey];
-				// }
+				if (typeof(structure.isIncomingPropertyStructure) !== 'undefined') {
+					delete structure.parent[structure.propertyKey];
+				}
 				
 				if (tryRemoveParent) {
 					tryRemoveIncomingStructure(structure.parent);
