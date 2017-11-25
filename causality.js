@@ -802,93 +802,41 @@
 			}
 		} 
 		 
-		function updateIncomingReferenceCounters(events) {
-			let newEvents = events.slice();
-			trace.refCount && logGroup("updateIncomingReferenceCounters");
-			// trace.basic && log(configuration, 3);
-			trace.refCount && log(events, 3);
-			if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize++;
-			// return;
-			let createdObjects = {};
-			newEvents.forEach(function(event) {
-				if (event.type === 'create') {
-					createdObjects[event.object.const.id] = true;
-					Object.keys(event.object).forEach(function(key) {
-						let value = object[key];
-						if (isObject(value)) {
-							value.const.incomingReferencesCount++;
-						}
-					});
-				}
-			});
-			newEvents.forEach(function(event) {
-				if (typeof(createdObjects[event.object.const.id]) === 'undefined') {
-					if (event.type === 'set') {
-						if (isObject(event.value)) {
-							event.value.const.incomingReferencesCount++;
-						}
-						if (isObject(event.oldValue)) {
-							event.oldValue.const.incomingReferencesCount--;
-							checkIfNoMoreReferences(event.oldValue);
-						}
-					} else if (event.type === 'delete') {
-						if (isObject(event.oldValue)) {
-							event.oldValue.const.incomingReferencesCount--;
-							checkIfNoMoreReferences(event.oldValue);
-						}						
-					} else if (event.type === 'splice') {
-						if (event.added !== null) {
-							event.added.forEach(function(element) {
-								if(isObject(element)) {
-									element.const.incomingReferencesCount++;
-								}
-							});							
-						}
-						if (event.removed !== null) {
-							event.removed.forEach(function(element) {
-								if(isObject(element)) {
-									element.const.incomingReferencesCount--;
-									checkIfNoMoreReferences(element);
-								}
-							});							
-						}
-					}					
-				}
-			});
-			trace.refCount && logUngroup();
-			// log(events, 3);
-			if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize--;
-		}
-		
 		
 		function increaseIncomingCounter(value) {
-			if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize++;
-			if (isObject(value)) {				
-				if (value.const.incomingReferencesCount < 0) {
-					log(value.const.incomingReferencesCount);
-					throw Error("WTAF");
-				} 
-				if (typeof(value.const.incomingReferencesCount) === 'undefined') {
-					value.const.incomingReferencesCount = 0;
-				}
-				value.const.incomingReferencesCount++;
-			}
-			if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize--;
+			// if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize++;
+			// if (isObject(value)) {
+				// log("increase for:");
+				// log(value.const.id);
+				// if (value.const.incomingReferencesCount < 0) {
+					// log("What is happening here!");
+					// log(value.const.incomingReferencesCount);
+					// throw Error("WTAF");
+				// } 
+				// if (typeof(value.const.incomingReferencesCount) === 'undefined') {
+					// value.const.incomingReferencesCount = 0;
+				// }
+				// value.const.incomingReferencesCount++;
+			// }
+			// if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize--;
 		}
 		
 		function decreaseIncomingCounter(value) {
-			if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize++;
-			if (isObject(value)) {
-				value.const.incomingReferencesCount--;
-				if (value.const.incomingReferencesCount < 0) {
-					console.log(value);
-					throw Error("WTAF");					
-				}
-				if (value.const.incomingReferencesCount === 0) {
-					removedLastIncomingRelation(value);
-				}
-			}
-			if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize--;
+			// if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize++;
+			// if (isObject(value)) {
+				// log("decrease for:");
+				// log(value.const.id);
+
+				// value.const.incomingReferencesCount--;
+				// if (value.const.incomingReferencesCount < 0) {
+					// // log(value);
+					// throw Error("WTAF");					
+				// }
+				// if (value.const.incomingReferencesCount === 0) {
+					// removedLastIncomingRelation(value);
+				// }
+			// }
+			// if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize--;
 		}
 		
 		
@@ -1696,6 +1644,7 @@
 				initial.const.id = nextId++;
 				initial.const.causalityInstance = causalityInstance;
 			}
+			if (configuration.incomingReferenceCounters) initial.const.incomingReferencesCount = 0;
 			
 			emitImmutableCreationEvent(initial);
 			if (--state.inPulse === 0) postPulseCleanup();
@@ -1847,6 +1796,7 @@
 				removeForwarding : genericRemoveForwarding.bind(proxy),
 				mergeAndRemoveForwarding: genericMergeAndRemoveForwarding.bind(proxy)
 			};
+			if (configuration.incomingReferenceCounters) handler.const.incomingReferencesCount = 0;
 			for(property in initialConst) {
 				handler.const[property] = initialConst[property];
 			}
@@ -2212,18 +2162,18 @@
 		}
 
 		function emitImmutableCreationEvent(object) {
-			// if (configuration.incomingReferenceCounters) {
-				// if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize++;
-				// Object.keys(object).forEach(function(key) {
-					// if(key !=== 'const') {
-						// let value = object[key];
-						// if (isObject(value)) {
-							// value.const.incomingReferencesCount++;
-						// }					
-					// }
-				// });
-				// if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize--;
-			// }
+			if (configuration.incomingReferenceCounters) {
+				if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize++;
+				Object.keys(object).forEach(function(key) {
+					if(key !== 'const') {
+						let value = object[key];
+						if (isObject(value)) {
+							value.const.incomingReferencesCount++;
+						}					
+					}
+				});
+				if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize--;
+			}
 			if (configuration.recordPulseEvents) {
 				let event = { type: 'creation', object: object }
 				if (configuration.recordPulseEvents) {
@@ -2233,89 +2183,89 @@
 		} 
 		
 		function emitCreationEvent(handler) {
-			// if (configuration.incomingReferenceCounters) {
-				// if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize++;
-				// Object.keys(handler.target).forEach(function(key) {
-					// let value = object[key];
-					// if (isObject(value)) {
-						// value.const.incomingReferencesCount++;
-					// }
-				// });
-				// if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize--;
-			// }
+			if (configuration.incomingReferenceCounters) {
+				if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize++;
+				Object.keys(handler.target).forEach(function(key) {
+					let value = handler.target[key];
+					if (isObject(value)) {
+						value.const.incomingReferencesCount++;
+					}
+				});
+				if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize--;
+			}
 			if (configuration.recordPulseEvents) {
 				emitEvent(handler, { type: 'creation' });
 			}		
 		} 
 		 
 		function emitSpliceEvent(handler, index, removed, added) {
-			// if (configuration.incomingReferenceCounters) {
-				// if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize++;
-				// if (added !== null) {
-					// added.forEach(function(element) {
-						// if(isObject(element)) {
-							// element.const.incomingReferencesCount++;
-						// }
-					// });							
-				// }
-				// if (removed !== null) {
-					// removed.forEach(function(element) {
-						// if(isObject(element)) {
-							// element.const.incomingReferencesCount--;
-							// checkIfNoMoreReferences(element);
-						// }
-					// });					
-				// }
-				// if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize--;
-			// }
+			if (configuration.incomingReferenceCounters) {
+				if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize++;
+				if (added !== null) {
+					added.forEach(function(element) {
+						if(isObject(element)) {
+							element.const.incomingReferencesCount++;
+						}
+					});							
+				}
+				if (removed !== null) {
+					removed.forEach(function(element) {
+						if(isObject(element)) {
+							element.const.incomingReferencesCount--;
+							checkIfNoMoreReferences(element);
+						}
+					});					
+				}
+				if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize--;
+			}
 			if (configuration.recordPulseEvents || typeof(handler.observers) !== 'undefined') {
 				emitEvent(handler, { type: 'splice', index: index, removed: removed, added: added});
 			}
 		}
 
 		function emitSpliceReplaceEvent(handler, key, value, previousValue) {
-			// if (configuration.incomingReferenceCounters) {
-				// if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize++;
-				// if (isObject(value)) {
-					// value.const.incomingReferencesCount++;
-				// }
-				// if (isObject(previousValue)) {
-					// previousValue.const.incomingReferencesCount--;
-					// checkIfNoMoreReferences(previousValue);
-				// }
-				// if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize--;
-			// }
+			if (configuration.incomingReferenceCounters) {
+				if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize++;
+				if (isObject(value)) {
+					value.const.incomingReferencesCount++;
+				}
+				if (isObject(previousValue)) {
+					previousValue.const.incomingReferencesCount--;
+					checkIfNoMoreReferences(previousValue);
+				}
+				if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize--;
+			}
 			if (configuration.recordPulseEvents || typeof(handler.observers) !== 'undefined') {
 				emitEvent(handler, { type: 'splice', index: key, removed: [previousValue], added: [value] });
 			}
 		}
 
 		function emitSetEvent(handler, key, value, previousValue) {
-			// if (configuration.incomingReferenceCounters) {
-				// if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize++;
-				// if (isObject(value)) {
-					// value.const.incomingReferencesCount++;
-				// }
-				// if (isObject(previousValue)) {
-					// previousValue.const.incomingReferencesCount--;
-					// checkIfNoMoreReferences(previousValue);
-				// }
-				// if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize--;
-			// }
+			if (configuration.incomingReferenceCounters) {
+				if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize++;
+				if (isObject(value)) {
+					value.const.incomingReferencesCount++;
+				}
+				if (isObject(previousValue)) {
+					previousValue.const.incomingReferencesCount--;
+					checkIfNoMoreReferences(previousValue);
+				}
+				if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize--;
+			}
 			if (configuration.recordPulseEvents || typeof(handler.observers) !== 'undefined') {
 				emitEvent(handler, {type: 'set', property: key, value: value, oldValue: previousValue});
 			}
 		}
 
 		function emitDeleteEvent(handler, key, previousValue) {
-			// if (configuration.incomingReferenceCounters) {
-				// if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize++;
-				// if (isObject(previousValue)) {
-					// previousValue.const.incomingReferencesCount--;
-					// checkIfNoMoreReferences(previousValue);
-				// }
-				// if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize--;
-			// }
+			if (configuration.incomingReferenceCounters) {
+				if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize++;
+				if (isObject(previousValue)) {
+					previousValue.const.incomingReferencesCount--;
+					checkIfNoMoreReferences(previousValue);
+				}
+				if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize--;
+			}
 			if (configuration.recordPulseEvents || typeof(handler.observers) !== 'undefined') {
 				emitEvent(handler, {type: 'delete', property: key, oldValue: previousValue});
 			}

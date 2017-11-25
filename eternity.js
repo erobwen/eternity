@@ -1249,7 +1249,7 @@
                     // Kill if unloaded
 					let isPersistentlyStored = typeof(object.const.dbImage) !== 'undefined';
 					let isUnloaded = typeof(object.const.initializer) === 'function'
-					let hasNoIncoming = object.const.incomingReferencesCount  === 0;
+					let hasNoIncoming = object.const.incomingReferencesCount === 0;
 					trace.killing && log("is unloaded: " + isUnloaded);
 					trace.killing && log("has no incoming: " + hasNoIncoming + " (count=" + object.const.incomingReferencesCount + ")");
 					trace.killing && log("is persistently stored: " + isPersistentlyStored);
