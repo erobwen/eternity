@@ -866,13 +866,13 @@
 					state.incomingStructuresDisabled--;
 				}
 				
-				if (typeof(this.const._arrayObservers) !== 'undefined') {
-					notifyChangeObservers(this.const._arrayObservers);
-				}
 				if (state.incomingStructuresDisabled === 0 && !configuration.incomingStructuresAsCausalityObjects) {
 					emitSpliceEvent(this, index, [removed], null);					
 				} else {
 					emitSpliceEvent(this, index, [removedOrIncomingStructure], null);					
+				}
+				if (typeof(this.const._arrayObservers) !== 'undefined') {
+					notifyChangeObservers(this.const._arrayObservers);
 				}
 				if (--state.observerNotificationPostponed === 0) proceedWithPostponedNotifications();
 				if (--state.inPulse === 0) postPulseCleanup();
@@ -901,13 +901,13 @@
 				}
 				
 				// Notify and emit event
-				if (typeof(this.const._arrayObservers) !== 'undefined') {
-					notifyChangeObservers(this.const._arrayObservers);
-				}
 				if (state.incomingStructuresDisabled === 0 && configuration.incomingStructuresAsCausalityObjects) {
 					emitSpliceEvent(this, index, null, addedOrIncomingStructures);
 				} else {
 					emitSpliceEvent(this, index, null, added);
+				}
+				if (typeof(this.const._arrayObservers) !== 'undefined') {
+					notifyChangeObservers(this.const._arrayObservers);
 				}
 				
 				if (--state.observerNotificationPostponed === 0) proceedWithPostponedNotifications();
@@ -931,13 +931,13 @@
 				}
 				
 				// Notify and emit event
-				if (typeof(this.const._arrayObservers) !== 'undefined') {
-					notifyChangeObservers(this.const._arrayObservers);
-				}
 				if (state.incomingStructuresDisabled === 0 && !configuration.incomingStructuresAsCausalityObjects) {
 					emitSpliceEvent(this, 0, [removed], null);
 				} else {
 					emitSpliceEvent(this, 0, [removedOrIncomingStructure], null);
+				}
+				if (typeof(this.const._arrayObservers) !== 'undefined') {
+					notifyChangeObservers(this.const._arrayObservers);
 				}
 				
 				if (--state.observerNotificationPostponed === 0) proceedWithPostponedNotifications();
@@ -963,14 +963,14 @@
 				}
 				
 				// Notify and emit event
-				if (typeof(this.const._arrayObservers) !== 'undefined') {
-					notifyChangeObservers(this.const._arrayObservers);
-				}				
 				if (state.incomingStructuresDisabled === 0 && configuration.incomingStructuresAsCausalityObjects) {
 					emitSpliceEvent(this, 0, null, addedOrIncomingStructures);
 				} else {
 					emitSpliceEvent(this, 0, null, added);
 				}
+				if (typeof(this.const._arrayObservers) !== 'undefined') {
+					notifyChangeObservers(this.const._arrayObservers);
+				}				
 				
 				if (--state.observerNotificationPostponed === 0) proceedWithPostponedNotifications();
 				if (--state.inPulse === 0) postPulseCleanup();
@@ -1006,9 +1006,6 @@
 					removedOrIncomingStructures = this.target.splice.apply(this.target, argumentsArray);
 				}
 
-				if (typeof(this.const._arrayObservers) !== 'undefined') {
-					notifyChangeObservers(this.const._arrayObservers);
-				}
 				if (state.incomingStructuresDisabled === 0) {
 					if (configuration.incomingStructuresAsCausalityObjects) {
 						emitSpliceEvent(this, 0, removedOrIncomingStructures, addedOrIncomingStructures);
@@ -1018,6 +1015,9 @@
 				} else {
 					// emitSpliceEvent(this, 0, null, added);
 					emitSpliceEvent(this, index, removedOrIncomingStructures, added);
+				}
+				if (typeof(this.const._arrayObservers) !== 'undefined') {
+					notifyChangeObservers(this.const._arrayObservers);
 				}
 				
 				if (--state.observerNotificationPostponed === 0) proceedWithPostponedNotifications();
@@ -1469,7 +1469,7 @@
 			} else {
 				emitSetEvent(this, key, value, previousValue);
 			}
-			
+	
 			// If assignment was successful, notify change
 			if (keyDefined) {
 				if (typeof(this.const._propertyObservers) !== 'undefined' && typeof(this.const._propertyObservers[key]) !== 'undefined') {
