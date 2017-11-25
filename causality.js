@@ -1515,6 +1515,13 @@
 				}
 			}
 			
+			// Emit event 
+			if (state.incomingStructuresDisabled === 0 && configuration.incomingStructuresAsCausalityObjects) {
+				emitSetEvent(this, key, valueOrIncomingStructure, previousValueOrIncomingStructure);
+			} else {
+				emitSetEvent(this, key, value, previousValue);
+			}
+			
 			// If assignment was successful, notify change
 			if (keyDefined) {
 				if (typeof(this.const._propertyObservers) !== 'undefined' && typeof(this.const._propertyObservers[key]) !== 'undefined') {
@@ -1526,13 +1533,6 @@
 				}
 			}
 
-			// Emit event 
-			if (state.incomingStructuresDisabled === 0 && configuration.incomingStructuresAsCausalityObjects) {
-				emitSetEvent(this, key, valueOrIncomingStructure, previousValueOrIncomingStructure);
-			} else {
-				emitSetEvent(this, key, value, previousValue);
-			}
-			
 			// End pulse 
 			if (--state.observerNotificationPostponed === 0) proceedWithPostponedNotifications();
 			if (--state.inPulse === 0) postPulseCleanup();
