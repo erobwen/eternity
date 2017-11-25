@@ -2185,11 +2185,18 @@
 
 
 		/**********************************
-		 *  Observe
+		 *  Events and incoming
 		 *
 		 *
 		 **********************************/
-		
+		 
+		function checkIfNoMoreReferences(object) {
+			if (object.const.incomingReferencesCount === 0 && removedLastIncomingRelationCallback) {
+				trace.refCount && log("removed last reference... ");
+				removedLastIncomingRelationCallback(object);
+			}
+		} 
+		 
 		function withoutEmittingEvents(action) {
 			state.inPulse++;
 			state.emitEventPaused++;
@@ -2205,37 +2212,95 @@
 		}
 
 		function emitImmutableCreationEvent(object) {
+			// if (configuration.incomingReferenceCounters) {
+				// if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize++;
+				// Object.keys(object).forEach(function(key) {
+					// if(key !=== 'const') {
+						// let value = object[key];
+						// if (isObject(value)) {
+							// value.const.incomingReferencesCount++;
+						// }					
+					// }
+				// });
+				// if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize--;
+			// }
 			if (configuration.recordPulseEvents) {
 				let event = { type: 'creation', object: object }
 				if (configuration.recordPulseEvents) {
 					state.pulseEvents.push(event);
 				}
-			}		
+			}
 		} 
 		
 		function emitCreationEvent(handler) {
+			// if (configuration.incomingReferenceCounters) {
+				// if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize++;
+				// Object.keys(handler.target).forEach(function(key) {
+					// let value = object[key];
+					// if (isObject(value)) {
+						// value.const.incomingReferencesCount++;
+					// }
+				// });
+				// if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize--;
+			// }
 			if (configuration.recordPulseEvents) {
 				emitEvent(handler, { type: 'creation' });
 			}		
 		} 
 		 
 		function emitSpliceEvent(handler, index, removed, added) {
+			// if (configuration.incomingReferenceCounters) {
+				// if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize++;
+				// if (added !== null) {
+					// added.forEach(function(element) {
+						// if(isObject(element)) {
+							// element.const.incomingReferencesCount++;
+						// }
+					// });							
+				// }
+				// if (removed !== null) {
+					// removed.forEach(function(element) {
+						// if(isObject(element)) {
+							// element.const.incomingReferencesCount--;
+							// checkIfNoMoreReferences(element);
+						// }
+					// });					
+				// }
+				// if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize--;
+			// }
 			if (configuration.recordPulseEvents || typeof(handler.observers) !== 'undefined') {
 				emitEvent(handler, { type: 'splice', index: index, removed: removed, added: added});
 			}
 		}
 
 		function emitSpliceReplaceEvent(handler, key, value, previousValue) {
+			// if (configuration.incomingReferenceCounters) {
+				// if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize++;
+				// if (isObject(value)) {
+					// value.const.incomingReferencesCount++;
+				// }
+				// if (isObject(previousValue)) {
+					// previousValue.const.incomingReferencesCount--;
+					// checkIfNoMoreReferences(previousValue);
+				// }
+				// if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize--;
+			// }
 			if (configuration.recordPulseEvents || typeof(handler.observers) !== 'undefined') {
 				emitEvent(handler, { type: 'splice', index: key, removed: [previousValue], added: [value] });
 			}
 		}
 
 		function emitSetEvent(handler, key, value, previousValue) {
-			// if (trace.basic) {
-				// log("emitSetEvent");
-				// log(configuration);
-				
+			// if (configuration.incomingReferenceCounters) {
+				// if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize++;
+				// if (isObject(value)) {
+					// value.const.incomingReferencesCount++;
+				// }
+				// if (isObject(previousValue)) {
+					// previousValue.const.incomingReferencesCount--;
+					// checkIfNoMoreReferences(previousValue);
+				// }
+				// if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize--;
 			// }
 			if (configuration.recordPulseEvents || typeof(handler.observers) !== 'undefined') {
 				emitEvent(handler, {type: 'set', property: key, value: value, oldValue: previousValue});
@@ -2243,6 +2308,14 @@
 		}
 
 		function emitDeleteEvent(handler, key, previousValue) {
+			// if (configuration.incomingReferenceCounters) {
+				// if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize++;
+				// if (isObject(previousValue)) {
+					// previousValue.const.incomingReferencesCount--;
+					// checkIfNoMoreReferences(previousValue);
+				// }
+				// if (configuration.blockInitializeForIncomingReferenceCounters) state.blockingInitialize--;
+			// }
 			if (configuration.recordPulseEvents || typeof(handler.observers) !== 'undefined') {
 				emitEvent(handler, {type: 'delete', property: key, oldValue: previousValue});
 			}
