@@ -1,21 +1,16 @@
-TODO: Specifiers needs a reference to its causality object... 
-
-
 TODO:
 Eternity work in progress:
 * Create a B-tree for the index. IMPORTANT BUT CAN WAIT
-* Incoming structures enhandement:
-	* Should we really use getSpecifier to create incoming structure???... 
-	* Make sure incoming structures are removed+deallocated when not needed. IMPORTANT
-	* Refactor and create the incoming observation interface. IMPORTANT
-	* Make sure loaded incoming references is updated upon adding and removal of persistent objects.  IMPORTANT BUT CAN WAIT
+* Incoming structures enhancement:
+	* Should we really use getSpecifier() to create incoming structure???
+	* Obsere incoming persistent interface. IMPORTANT BUT CAN WAIT
 * Make it possible to run incoming references without incoming structures as causality objects IMPORTANT (done?)... 
 
 Next Major Step:
 * Convert old Liquid In progress.... 
 
-
 Future (persistent reactive structures.):
+* Refactor getSpecifier, so that it takes object/specifier and moves past const itself. For eternity, it should be possible to have specifiers in the object root. 
 * Store reactive primitives persistently
 	* Modify causality to use methods rather than functions. POSTPONE TO LATER
 	* Store observers persistently.  POSTPONE TO LATER
@@ -25,6 +20,7 @@ Future (persistent reactive structures.):
 
 
 Thoughts:
+TODO: Make sure loaded incoming references is updated upon adding and removal of persistent objects.  IMPORTANT BUT CAN WAIT ???
 TODO: Hide incoming in const as an option... for objectCausality, but not for imageCausality... 
 TODO: For imageCausality: Block initialize for all incoming manipulation.  For objectCausality, initialize before incoming manipulation is needed for zombies. 
 TODO: What if two two phase commits interleave... should be have a list of comits, and have a push/shift algorithm... 
