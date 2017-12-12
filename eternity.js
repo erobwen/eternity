@@ -15,9 +15,6 @@
 	
 	// Neat logging
 	let objectlog = require('./objectlog.js');
-	let log = objectlog.log;
-	let logGroup = objectlog.enter;
-	let logUngroup = objectlog.exit;
 
 	function createEternityInstance(configuration) {
 		// console.log(">>> CREATE ETERNITY INSTANCE <<<");
@@ -26,6 +23,75 @@
 		// logGroup();
 		// log(configuration,5);
 		// logUngroup();
+		/*-----------------------------------------------
+		 *          Debugging
+		 *-----------------------------------------------*/
+		 
+		 // Debugging
+		function log(entity, pattern) {
+			objectCausality.state.recordingPaused++;	
+			imageCausality.state.recordingPaused++;	
+			objectCausality.state.blockingInitialize++;	
+			imageCausality.state.blockingInitialize++;	
+			objectCausality.state.freezeActivityList++;	
+			objectCausality.updateInActiveRecording();
+			imageCausality.updateInActiveRecording();
+
+			objectlog.log(entity, pattern);
+
+			objectCausality.state.recordingPaused--;	
+			imageCausality.state.recordingPaused--;	
+			objectCausality.state.blockingInitialize--;	
+			imageCausality.state.blockingInitialize--;	
+			objectCausality.state.freezeActivityList--;	
+			objectCausality.updateInActiveRecording();
+			imageCausality.updateInActiveRecording();
+		}
+		
+		function logGroup(entity, pattern) {
+			objectCausality.state.recordingPaused++;	
+			imageCausality.state.recordingPaused++;	
+			objectCausality.state.blockingInitialize++;	
+			imageCausality.state.blockingInitialize++;	
+			objectCausality.state.freezeActivityList++;	
+			objectCausality.updateInActiveRecording();
+			imageCausality.updateInActiveRecording();
+
+			objectlog.group(entity, pattern);
+			
+			objectCausality.state.recordingPaused--;	
+			imageCausality.state.recordingPaused--;	
+			objectCausality.state.blockingInitialize--;	
+			imageCausality.state.blockingInitialize--;	
+			objectCausality.state.freezeActivityList--;	
+			objectCausality.updateInActiveRecording();
+			imageCausality.updateInActiveRecording();
+		} 
+		
+		function logUngroup() {
+			objectlog.groupEnd(); 
+		} 
+	
+		function logToString(entity, pattern) {
+			objectCausality.state.withoutRecording++;	
+			imageCausality.state.withoutRecording++;	
+			objectCausality.state.blockingInitialize++;	
+			imageCausality.state.blockingInitialize++;	
+			objectCausality.state.freezeActivityList++;	
+			objectCausality.updateInActiveRecording();
+			imageCausality.updateInActiveRecording();
+
+			let result = objectlog.logToString(entity, pattern);
+
+			objectCausality.state.withoutRecording--;	
+			imageCausality.state.withoutRecording--;	
+			objectCausality.state.blockingInitialize--;	
+			imageCausality.state.blockingInitialize--;	
+			objectCausality.state.freezeActivityList--;	
+			objectCausality.updateInActiveRecording();
+			imageCausality.updateInActiveRecording();
+			return result;
+		}
 
 		/*-----------------------------------------------
 		 *          Object post pulse events
@@ -39,7 +105,7 @@
 		let unstableImages = [];
 
 		function postObjectPulseAction(events) {
-			if (postPulseCallbackBeforeStorage) postPulseCallbackBeforeStorage();
+			if (postPulseCallbackBeforeStorage) postPulseCallbackBeforeStorage(events);
 			
 			// log("postObjectPulseAction: " + events.length + " events");
 			// logGroup();

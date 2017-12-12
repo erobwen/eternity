@@ -14,8 +14,8 @@
 		// let log = objectlog.log;
 		// let log = objectlog.log;
 		function log() {}
-		let logGroup = objectlog.enter;
-		let logUngroup = objectlog.exit;
+		let logGroup = objectlog.group;
+		let logUngroup = objectlog.groupEnd;
 
 		/*-----------------------------------------------
 		 *       Emulated mongo-DB:ish database

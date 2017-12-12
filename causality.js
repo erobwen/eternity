@@ -8,11 +8,7 @@
 		root.causality = factory(); // Support browser global
 	}
 }(this, function () {	
-	// Debugging
 	let objectlog = require('./objectlog.js');
-	let log = objectlog.log;
-	let logGroup = objectlog.enter;
-	let logUngroup = objectlog.exit; 
 	
 	function createCausalityInstance(configuration) {
 		// Tracing per instance 
@@ -82,6 +78,43 @@
 		}
 
 
+		/***************************************************************
+		 *
+		 *  Debugging
+		 *
+		 ***************************************************************/
+		 
+		 // Debugging
+		function log(entity, pattern) {
+			state.recordingPaused++;
+			updateInActiveRecording();
+			objectlog.log(entity, pattern);
+			state.recordingPaused--;	
+			updateInActiveRecording();
+		}
+		
+		function logGroup(entity, pattern) {
+			state.recordingPaused++;
+			updateInActiveRecording();
+			objectlog.group(entity, pattern);
+			state.recordingPaused--;
+			updateInActiveRecording();
+		} 
+		
+		function logUngroup() {
+			objectlog.groupEnd(); 
+		} 
+	
+		function logToString(entity, pattern) {
+			state.recordingPaused++;
+			updateInActiveRecording();
+			let result = objectlog.logToString(entity, pattern);
+			state.recordingPaused--;
+			updateInActiveRecording();
+			return result;
+		}
+		
+		
 		/***************************************************************
 		 *
 		 *  Id format
@@ -166,10 +199,11 @@
 		 // TODO: Specifiers needs a reference to its causality object... 
 		function getSpecifier(javascriptObject, specifierName) {
 			if (typeof(javascriptObject[specifierName]) === 'undefined' || javascriptObject[specifierName] === null) {
+				let referredObject = typeof(javascriptObject.referredObject) !== 'undefined' ? javascriptObject.referredObject : javascriptObject;
 				let specifier = {
 					// Incoming structure
 					isIncomingStructure : true,
-					referredObject : javascriptObject, // should be object instead.... 
+					referredObject : referredObject, // should be object instead.... 
 					referredObjectProperty : specifierName,
 					parent : null,
 
@@ -204,6 +238,12 @@
 			}
 			
 			return gottenReferingObject;
+		}
+
+		let indexUsedNames = {
+			'name' : true,
+			'indexParent' : true, 
+			'indexParentRelation' : true
 		}
 		
 		function setIndex(object, property, index) {
@@ -435,7 +475,7 @@
 			// Note: sometimes value and previous value are just strings. Optimize for this case... 
 			let referringRelation = key;
 			if (trace.incoming) {
-				log("createAndRemoveIncomingRelations");
+				logGroup("createAndRemoveIncomingRelations");
 				log(referringRelation);
 				log(objectProxy);
 			}
@@ -445,12 +485,14 @@
 				referringRelation = objectProxy.indexParentRelation;
 				objectProxy = objectProxy.indexParent;				
 				if (trace.incoming) {
-					log("Moving up one step:");
+					log("Get refering object... one step:");
 					log(referringRelation);
 					log(objectProxy);
+					log("...");
 				}
 			}
 			referringRelation = "property:" + referringRelation;
+			trace.incoming && log("referringRelation : " + referringRelation);
 			
 			// Tear down structure to old value
 			if (isReferencesChunk(previousStructure)) {
@@ -477,6 +519,7 @@
 				value = referencedValue;
 			}
 
+			trace.incoming && logUngroup();
 			return value;
 		}
 		
@@ -502,6 +545,13 @@
 		}
 		
 		function createAndRemoveArrayIncomingRelations(arrayProxy, index, removedOrIncomingStructures, added) {
+			if (trace.incoming) {
+				logGroup("createAndRemoveArrayIncomingRelations");
+				log(index);
+				log(removedOrIncomingStructures, 2);
+				log(added, 2);
+			} 
+
 			// Get refering object 
 			// log("createAndRemoveArrayIncomingRelations");
 			// logGroup();
@@ -540,7 +590,7 @@
 					}					
 				});					
 			}
-			// logUngroup();
+			trace.incoming && logUngroup();
 			return addedAdjusted;
 		} 
 		
@@ -683,14 +733,15 @@
 		*/				
 		function removeReverseReference(refererId, referencesChunk) {
 			if (trace.incoming) {
-				log("removeReverseReference");
-				log(refererId);
-				log(referencesChunk, 3);
+				logGroup("removeReverseReference");
+				// log(refererId);
+				// log(referencesChunk, 3);
 			}
 			let referencesChunkContents = referencesChunk['contents'];
 			delete referencesChunkContents[idExpression(refererId)];
 			referencesChunk.contentsCounter--;
 			tryRemoveIncomingStructure(referencesChunk);
+			trace.incoming && logUngroup();
 		}
 		
 		
@@ -892,11 +943,13 @@
 				
 				// TODO: configuration.incomingReferenceCounters || .... 
 				if (state.incomingStructuresDisabled === 0) {
+					trace.incoming && log("...consider incoming...");
 					state.incomingStructuresDisabled++;
 					addedOrIncomingStructures = createAndRemoveArrayIncomingRelations(this.const.object, index, null, added); // TODO: implement for other array manipulators as well. 
 					state.incomingStructuresDisabled--;
 					this.target.push.apply(this.target, addedOrIncomingStructures);
 				} else {
+					trace.incoming && log("...no incoming...");
 					this.target.push.apply(this.target, added);
 				}
 				
@@ -1096,6 +1149,18 @@
 				emitSpliceEvent(this, target, added, removed);
 				if (--state.inPulse === 0) postPulseCleanup();
 				return result;
+			},
+			
+			forEach : function(callback) {
+				if (state.inActiveRecording) {
+					registerChangeObserver(getSpecifier(this.const, "_arrayObservers"));//object
+				}
+				this.const.target.forEach(function(element) {
+					if (state.incomingStructuresDisabled === 0) {
+						element = getReferredObject(target[key]);
+					}
+					callback(element);
+				});
 			}
 		};
 
@@ -1144,7 +1209,11 @@
 				if (state.inActiveRecording) {
 					registerChangeObserver(getSpecifier(this.const, "_arrayObservers"));//object
 				}
-				return target[key];
+				if (state.incomingStructuresDisabled === 0) {
+					return getReferredObject(target[key]);
+				} else {
+					return target[key];					
+				}
 			}
 		}
 
@@ -1351,8 +1420,10 @@
 					let keyInTarget = key in target;
 					if (state.inActiveRecording) {
 						if (keyInTarget) {
+							// trace.register && log("registerChangeObserver: " + this.const.id + "." + key);
 							registerChangeObserver(getSpecifier(getSpecifier(this.const, "_propertyObservers"), key));
 						} else {
+							// trace.register && log("registerChangeObserver: " + this.const.id + "." + key);
 							registerChangeObserver(getSpecifier(this.const, "_enumerateObservers"));
 						}
 					}
@@ -2103,7 +2174,7 @@
 		}
 
 		function postPulseCleanup() {
-			trace.pulse && logGroup("postPulseCleanup");
+			trace.pulse && logGroup("postPulseCleanup (" + state.pulseEvents.length + " events)");
 			state.inPulse++; // block new pulses!			
 			state.inPostPulseProcess++;
 			
@@ -2117,7 +2188,11 @@
 			});
 			state.contextsScheduledForPossibleDestruction = [];
 			
-
+			// // Compress events
+			// if (configuration.compressEvents) {
+				// compressEvents(state.pulseEvents);
+			// }
+			
 			// Custom post pulse hooks... insert your framework here...
 			trace.pulse && logGroup("postPulseHooks");
 			postPulseHooks.forEach(function(callback) {
@@ -2272,6 +2347,7 @@
 		}
 
 		function emitEvent(handler, event) {
+			// if (event.type === "set" && typeof(event.value) === 'undefined') throw new Error("WTF WTF");
 			if (trace.event) {
 				logGroup("emitEvent: ");// + event.type + " " + event.property);
 				log(event);
@@ -2280,7 +2356,7 @@
 			if (state.emitEventPaused === 0) {
 				// log("EMIT EVENT " + configuration.name + " " + event.type + " " + event.property + "=...");
 				event.object = handler.const.object; 
-				// event.isConsequence = state.refreshingRepeater;
+				// event.isConsequence = state.refreshingRepeater;  //MERGE: coment out this on eternity... 
 				if (configuration.recordPulseEvents) {
 					trace.event && log("store in pulse....");
 					state.pulseEvents.push(event);
@@ -2316,6 +2392,19 @@
 			}
 			handler.observers.push(observerFunction);
 		}
+		
+		// function compressEvents(events) {
+			// let objectPropertyEvents = {};
+			// events.forEach(function(event) {
+				// if (event.type === 'set') {
+					// if (typeof(objectPropertyEvents[event.property]) === 'undefined') {
+						// objectPropertyEvents[event.property] = {};
+					// }
+					// objectPropertyEvents[event.property] = event;
+				// }
+			// });
+			// let newEvents = [];
+		// }
 
 
 		/**********************************
@@ -3491,6 +3580,7 @@
 			withoutSideEffects : withoutSideEffects,
 			assertNotRecording : assertNotRecording,
 			withoutRecording : withoutRecording,
+			updateInActiveRecording : updateInActiveRecording, 
 			withoutNotifyChange : nullifyObserverNotification,
 			withoutEmittingEvents : withoutEmittingEvents,
 			disableIncomingRelations : disableIncomingRelations,
@@ -3507,11 +3597,16 @@
 			getSingleIncomingReference : getSingleIncomingReference, 
 			createArrayIndex : createArrayIndex,
 			setIndex : setIndex,
+			indexUsedNames : indexUsedNames, 
 			isIncomingStructure : isIncomingStructure
 		}
 		
 		// Debugging and testing
 		let debuggingAndTesting = {
+			log : log, 
+			logGroup : logGroup, 
+			logUngroup : logUngroup,
+			logToString : logToString,
 			observeAll : observeAll,
 			cachedCallCount : cachedCallCount,
 			clearRepeaterLists : clearRepeaterLists,
