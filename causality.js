@@ -205,7 +205,7 @@
 					isIncomingStructure : true,
 					referredObject : referredObject, // should be object instead.... 
 					referredObjectProperty : specifierName,
-					parent : null,
+					parent : javascriptObject,
 
 					// Specifier
 					isSpecifier : true,
@@ -328,7 +328,7 @@
 		 */
 		function getReferredObject(referredItem) {
 			if (typeof(referredItem) === 'object' && referredItem !== null) {
-				if (typeof(referredItem.referredObject) !== 'undefined' && typeof(referredItem.isSpecifier) === 'undefined') {
+				if (typeof(referredItem.referredObject) !== 'undefined') { // && typeof(referredItem.isSpecifier) === 'undefined'
 					return referredItem.referredObject;
 				} else {
 					return referredItem;
