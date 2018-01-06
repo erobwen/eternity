@@ -1,22 +1,19 @@
 TODO:
 Eternity work in progress:
+* Connect to an actual database. IMPORTANT
+
 * Create a B-tree for the index. IMPORTANT BUT CAN WAIT
 * Incoming structures enhancement:
-	* Should we really use getSpecifier() to create incoming structure???
+	* Should we really use getSpecifier() to create incoming structure??? Refactor this.
+	* Refactor getSpecifier, so that it takes object/specifier and moves past const itself. For eternity, it should be possible to have specifiers in the object root. 
 	* Obsere incoming persistent interface. IMPORTANT BUT CAN WAIT
-* Make it possible to run incoming references without incoming structures as causality objects IMPORTANT (done?)... 
-
-Next Major Step:
-* Convert old Liquid In progress.... 
 
 Future (persistent reactive structures.):
-* Refactor getSpecifier, so that it takes object/specifier and moves past const itself. For eternity, it should be possible to have specifiers in the object root. 
 * Store reactive primitives persistently
 	* Modify causality to use methods rather than functions. POSTPONE TO LATER
 	* Store observers persistently.  POSTPONE TO LATER
-* Move more things to the state object POSTPONE TO LATER
 * Optimization of GC, use depth count to try early reattatch.  POSTPONE TO LATER
-* Connect to an actual database. POSTPONE TO LATER
+
 
 
 Thoughts:

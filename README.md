@@ -1,5 +1,39 @@
 # Eternity
-Reactive database technology.
+Reactive object-database technology.
+
+
+## Reactive database
+
+Eternity is offering a new way to access data in your database. Traditionally, this is done by queries and updates, but in a reactive database the writing and reading from the database is (almost) completley transparent to the application. 
+
+### Writing
+This means that an object that resides on the database, will be automatically updated when its counterpart in memory is changed. 
+
+### Reading
+In addition, objects will be loaded/unloaded transparently as they are accessed by the application. Eternity keeps a list of the least recently accessed objects, and in order to free up memory, objects at the top of the list will be automatically unloaded.
+
+### Persistent Garbage Collection
+In addition, the set of objects saved in the database will be determined by the objects transitivley refered to by a very specific "persistent node". This also means that eternity has a built in garbage-collector that will automatically remove objects from the database if they no longer can be reached by the persistent node.    
+
+## Example
+
+Any eternity object that is created can be stored, by simply refering to them, directly or indirectly, from the eternity.persistent object.  
+
+    let create = eternity.create;
+	
+	// Store a and b in the database
+	let a = create({});
+	let b = create({});
+	a.toB = b;
+    eternity.persistent.toA = a;
+
+Typically, eternity.persistent will refer to a couple of index tree structures that will refer to your objects needed for your application.  
+
+
+## Eternity objects are proxies
+
+The objects of eternity appear as normal javascript objects. The only difference is that you create them using the eternity.create function that sets up the proxies. 
+
 
 ## Reference anatomy
 This is an image of the reference anatomy in eternity. The system is based on the following premises: 
