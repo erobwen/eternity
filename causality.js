@@ -327,13 +327,17 @@
 		 * Traverse the incoming relation structure foobar
 		 */
 		function getReferredObject(referredItem) {
+			trace.get && logGroup("getReferredObject");
 			if (typeof(referredItem) === 'object' && referredItem !== null) {
-				if (typeof(referredItem.referredObject) !== 'undefined') { // && typeof(referredItem.isSpecifier) === 'undefined'
+				if (typeof(referredItem.referredObject) !== 'undefined') { //  && typeof(referredItem.isSpecifier) === 'undefined'
+					trace.get && logUngroup();
 					return referredItem.referredObject;
 				} else {
+					trace.get && logUngroup();
 					return referredItem;
 				}
 			}
+			trace.get && logUngroup();
 			return referredItem;
 		}
 		
@@ -581,11 +585,18 @@
 			// Remove incoming relations for removed
 			if (removedOrIncomingStructures !== null) {
 				removedOrIncomingStructures.forEach(function(removedOrIncomingStructure) {
-					if (isIncomingStructure(previousStructure)) {
-						if ((previousValue.const.incomingReferences -= 1) === 0)  removedLastIncomingRelation(removedElement); // TODO: Move elsewhere... 
-						removeReverseReference(proxy.const.id, removedOrIncomingStructure);
-						if (typeof(removedOrIncomingStructure.const.incoming[referringRelation].observers) !== 'undefined') {
-							notifyChangeObservers(removedOrIncomingStructure.const.incoming[referringRelation].observers);
+					let isIncomingStructureResult = isIncomingStructure(removedOrIncomingStructure);
+					let isObjectResult = isObject(removedOrIncomingStructure);
+					if (isIncomingStructureResult || isObjectResult) {
+						let removedObject = isObjectResult ? removedOrIncomingStructure : getReferredObject(removedOrIncomingStructure);
+						if ((removedObject.const.incomingReferences -= 1) === 0)  removedLastIncomingRelation(removedObject);
+						if (isIncomingStructureResult) {
+							removeReverseReference(arrayProxy.const.id, removedOrIncomingStructure);
+							if (typeof(removedObject.const.incoming) !== 'undefined' 
+								&& typeof(removedObject.const.incoming[referringRelation]) !== 'undefined' 
+								&& typeof(removedObject.const.incoming[referringRelation].observers) !== 'undefined') {
+								notifyChangeObservers(removedObject.const.incoming[referringRelation].observers);
+							}
 						}
 					}					
 				});					
@@ -608,7 +619,6 @@
 			}
 		} 
 		
-		
 		function getIncomingPropertyStructure(referencedObject, propertyKey) {
 			trace.incoming && log("getIncomingPropertyStructure");
 			
@@ -624,7 +634,7 @@
 					
 					isList : true,
 					last: null, 
-					first: null };
+					first: null };				
 				if (configuration.incomingStructuresAsCausalityObjects) {
 					incomingPropertiesStructure = create(incomingPropertiesStructure);
 				}
@@ -634,13 +644,15 @@
 			}
 			
 			// Create incoming for this particular property
-			if (trace.incoming) {
-				log(incomingPropertiesStructure);
-				log(propertyKey);
-				log(incomingPropertiesStructure[propertyKey]);
-			}
+			// if (trace.incoming) {
+				// trace.incoming && log(incomingPropertiesStructure);
+				// trace.incoming && log(propertyKey);
+				// trace.incoming && log(incomingPropertiesStructure[propertyKey]);
+			// }
 			if (typeof(incomingPropertiesStructure[propertyKey]) === 'undefined') {
-				let incomingStructure = { 
+				let incomingStructure = {
+					// configurationName : configuration.name,
+					// stamp : stamp++,
 					isIncomingStructure : true, 
 					referredObject: referencedObject,
 					isIncomingPropertyStructure : true,
@@ -652,6 +664,12 @@
 					next: null, 
 					previous: incomingPropertiesStructure.last 
 				};
+				if (configuration.incomingStructuresAsCausalityObjects) {
+					incomingStructure = create(incomingStructure);
+					if (incomingStructure.propertyKey === "property:indexParent") {
+						throw new Error("What is this, should not have incoming structure for indexParent....");
+					}
+				}
 				if (incomingPropertiesStructure.first === null) {
 					incomingPropertiesStructure.first = incomingStructure;
 					incomingPropertiesStructure.last = incomingStructure;
@@ -659,16 +677,7 @@
 					incomingPropertiesStructure.last.next = incomingStructure;
 					incomingPropertiesStructure.last = incomingStructure;
 				}
-				
-				if (configuration.incomingStructuresAsCausalityObjects) {
-					// Disable incoming relations here? otherwise we might end up with incoming structures between 
-					incomingStructure = create(incomingStructure);
-					if (incomingStructure.propertyKey === "property:indexParent") {
-						throw new Error("What is this, should not have incoming structure for indexParent....");
-					}
-					// log("CREATED INCOMING STRUCTURE THAT IS AN OBJECT");
-					// log(incomingStructure);
-				}
+								
 				incomingPropertiesStructure[propertyKey] = incomingStructure;
 			}
 			
@@ -1045,7 +1054,7 @@
 				let removed; 
 
 				if (state.incomingStructuresDisabled === 0) {
-					removedOrIncomingStructures = this.target.slice(index, removedCount);
+					removedOrIncomingStructures = this.target.slice(index, index + removedCount);
 					state.incomingStructuresDisabled++;
 					addedOrIncomingStructures = createAndRemoveArrayIncomingRelations(this.const.object, index, removedOrIncomingStructures, added);
 					state.incomingStructuresDisabled--;
@@ -1061,9 +1070,9 @@
 
 				if (state.incomingStructuresDisabled === 0) {
 					if (configuration.incomingStructuresAsCausalityObjects) {
-						emitSpliceEvent(this, 0, removedOrIncomingStructures, addedOrIncomingStructures);
+						emitSpliceEvent(this, index, removedOrIncomingStructures, addedOrIncomingStructures);
 					} else {
-						emitSpliceEvent(this, 0, removed, added);
+						emitSpliceEvent(this, index, removed, added);
 					}
 				} else {
 					// emitSpliceEvent(this, 0, null, added);
@@ -1157,10 +1166,10 @@
 				}
 				this.const.target.forEach(function(element) {
 					if (state.incomingStructuresDisabled === 0) {
-						element = getReferredObject(target[key]);
+						element = getReferredObject(element);
 					}
 					callback(element);
-				});
+				}.bind(this));
 			}
 		};
 
@@ -1269,8 +1278,7 @@
 				}
 			}
 
-			state.observerNotificationPostponed--;
-			proceedWithPostponedNotifications();
+			if (--state.observerNotificationPostponed === 0) proceedWithPostponedNotifications();
 			if (--state.inPulse === 0) postPulseCleanup();
 
 			if( target[key] !== value && !(Number.isNaN(target[key]) && Number.isNaN(value)) ) return false; // Write protected?
@@ -1379,8 +1387,7 @@
 		
 		function getHandlerObject(target, key) {
 			if (trace.get > 0) {
-				log("getHandlerObject: "  + this.const.name + "." + key);
-				logGroup();
+				logGroup("getHandlerObject: "  + this.const.name + "." + key);
 			}
 			key = key.toString();
 			// log("getHandlerObject: " + key);
@@ -1412,7 +1419,7 @@
 						let descriptor = Object.getOwnPropertyDescriptor(scan, key);
 						if (typeof(descriptor) !== 'undefined' && typeof(descriptor.get) !== 'undefined') {
 							if (trace.get > 0) logUngroup();
-							// if (trace.get) log("returning bound thing...");
+							if (trace.get) log("returning bound thing...");
 							return descriptor.get.bind(this.const.object)();
 						}
 						scan = Object.getPrototypeOf( scan );
@@ -1428,7 +1435,7 @@
 						}
 					}
 					if (state.incomingStructuresDisabled === 0) {
-						// console.log("find referred object");
+						trace.get && log("find referred object");
 						// console.log(key);
 						if (trace.get > 0) logUngroup();
 						return getReferredObject(target[key]);
@@ -1440,6 +1447,29 @@
 			}
 		}
 				
+		function valueToString(value) {
+			if (isObject(value)) {
+				return "object:" + value.const.id;
+			} else if (typeof(value) !== 'object'){
+				return value;
+			} else {
+				return value;
+			}
+		}
+		
+		function objectDigest(object) {
+			liquid.state.recordingPaused++;
+			liquid.updateInActiveRecording();
+			let result = "[" + getClassName(object) + "." + object.const.id + "]"; // TODO: add name if any... 
+			liquid.state.recordingPaused--;
+			liquid.updateInActiveRecording();
+			return result;
+		} 
+
+		function getClassName(object) {
+			return Object.getPrototypeOf(object).constructor.name
+		}
+
 		
 		function setHandlerObject(target, key, value) {
 			// log("setHandlerObject" + key);
@@ -1447,9 +1477,9 @@
 			
 			// Ensure initialized
 			if (trace.set > 0) {
-				log("setHandlerObject: " + this.const.name + "." + key + "= ");
+				logGroup("setHandlerObject: " + objectDigest(this.const.object) + "." + key + " = " + valueToString(value));
+				console.log(value);
 				// throw new Error("What the actual fuck, I mean jesuz..!!!");
-				logGroup();
 			}
 			ensureInitialized(this, target);
 			
@@ -1465,6 +1495,7 @@
 			
 			// Write protection
 			if (!canWrite(this.const.object)) {
+				console.log("Unautharized attempt to write property " + key + " of object " + target._);
 				if (trace.set > 0) logUngroup();
 				return;
 			}
@@ -1485,12 +1516,16 @@
 			// Note if key was undefined and get previous value
 			let keyDefined = key in target;
 			let previousValueOrIncomingStructure = target[key];
+			trace.set && log("previous Value 1: ");
+			trace.set && log(previousValueOrIncomingStructure);
 			let previousValue;
 			if (keyDefined && typeof(previousValueOrIncomingStructure) === 'object' && state.incomingStructuresDisabled === 0) {
 				previousValue = getReferredObject(previousValueOrIncomingStructure);
 			} else {
 				previousValue = previousValueOrIncomingStructure;
 			}
+			trace.set && log("previous Value: ");
+			trace.set && log(previousValue);
 			
 			// If same value as already set, do nothing.
 			if (keyDefined) {
@@ -2153,7 +2188,9 @@
 		 **********************************/
 		
 		function pulse(action) {
-			trace.pulse && logGroup("pulse");
+			// if (state.noPulse) throw new Error("There should not be any pulse!");
+			trace.pulse && logGroup("pulse (" + configuration.name + ")");
+			// trace.pulse && log(action);
 			
 			state.inPulse++;
 			let result = action();
@@ -2168,13 +2205,13 @@
 			state.inPulse++;
 			state.observerNotificationPostponed++;
 			action();
-			state.observerNotificationPostponed--;
-			proceedWithPostponedNotifications();
+			if (--state.observerNotificationPostponed === 0) proceedWithPostponedNotifications();
 			if (--state.inPulse === 0) postPulseCleanup();
 		}
 
 		function postPulseCleanup() {
-			trace.pulse && logGroup("postPulseCleanup (" + state.pulseEvents.length + " events)");
+			trace.pulse && logGroup("postPulseCleanup (" + state.pulseEvents.length + " events, " + configuration.name + ")");
+			trace.pulse && log(state.pulseEvents, 2);
 			state.inPulse++; // block new pulses!			
 			state.inPostPulseProcess++;
 			
@@ -2596,16 +2633,21 @@
 		let lastObserverToNotifyChange = null;
 		
 		function proceedWithPostponedNotifications() {
-			if (state.observerNotificationPostponed == 0) {
+			trace.set && logGroup("proceedWithPostponedNotifications");
+			trace.set && log("state.observerNotificationPostponed: " + state.observerNotificationPostponed);
+			if (state.observerNotificationPostponed === 0) {
+				trace.set && log(nextObserverToNotifyChange);
 				while (nextObserverToNotifyChange !== null) {
+					trace.set && log("found an observer to notify...")
 					let recorder = nextObserverToNotifyChange;
 					nextObserverToNotifyChange = nextObserverToNotifyChange.nextToNotify;
+					if (nextObserverToNotifyChange === null) lastObserverToNotifyChange = null;
 					// blockSideEffects(function() {
 					performAction(recorder.uponChangeAction);
 					// });
 				}
-				lastObserverToNotifyChange = null;
 			}
+			trace.set && logUngroup();
 		}
 
 		function nullifyObserverNotification(callback) {
@@ -2618,6 +2660,8 @@
 		// Recorders is a map from id => recorder
 		// A bit like "for all incoming"...
 		function notifyChangeObservers(observers) {
+			trace.set && log("notifyChangeObservers...");
+			trace.set && log("state.observerNotificationNullified: " + state.observerNotificationNullified);
 			if (typeof(observers.isChunkListHead) !== 'undefined') {
 				if (state.observerNotificationNullified > 0) {
 					return;
@@ -2625,6 +2669,7 @@
 
 				let contents = observers.contents;
 				for (id in contents) {
+					// trace.set && log("notifying a change observer!!!");
 					notifyChangeObserver(contents[id]);
 				}
 
@@ -2642,14 +2687,21 @@
 		}
 
 		function notifyChangeObserver(observer) {
+			trace.set && logGroup("notifyChangeObserver");
+			trace.set && log(observer);
 			if (observer != state.microContext) {
+				trace.set && log("not writing to itself...");
 				if (typeof(observer.remove) === 'function') {
+					trace.set && log("removing observer	...");
 					observer.remove(); // Cannot be any more dirty than it already is!					
 				}
+				trace.set && log("state.observerNotificationPostponed: " + state.observerNotificationPostponed);
 				if (state.observerNotificationPostponed > 0) {
 					if (lastObserverToNotifyChange !== null) {
+						trace.set && log("Add last...");
 						lastObserverToNotifyChange.nextToNotify = observer;
 					} else {
+						trace.set && log("Add first and last...");
 						nextObserverToNotifyChange = observer;
 					}
 					lastObserverToNotifyChange = observer;
@@ -2658,7 +2710,10 @@
 					performAction(observer.uponChangeAction);
 					// });
 				}
+			} else {
+				trace.set && log("observer same as microcontext, do not notify self!!!");
 			}
+			trace.set && logUngroup();
 		}
 
 
@@ -2693,6 +2748,7 @@
 		}
 
 		function repeatOnChange() { // description(optional), action
+			state.inPulse++;
 			// Arguments
 			let repeaterAction;
 			let description = '';
@@ -2708,6 +2764,7 @@
 				description: description,
 				action: repeaterAction,
 				remove : function() {
+					// throw new Error("Should nt happen");
 					// console.log("removeRepeater: " + repeater.const.id + "." + repeater.description);
 					removeChildContexts(this);
 					detatchRepeater(this);
@@ -2717,10 +2774,14 @@
 				previousDirty : null
 			}
 			if (configuration.reactiveStructuresAsCausalityObjects) repeater = createImmutable(repeater)
-			return refreshRepeater(repeater);
+			let result = refreshRepeater(repeater);
+			if (--state.inPulse === 0) postPulseCleanup();
+			return result;
 		}
 
 		function refreshRepeater(repeater) {
+			// console.log("=====================Refresh =====");
+			// state.inPulse++;
 			state.refreshingRepeater = true;
 			enterContext('repeater_refreshing', repeater);
 			// console.log("parent context type: " + repeater.parent.type);
@@ -2736,6 +2797,8 @@
 			);
 			leaveContext();
 			state.refreshingRepeater = false;
+			// if (--state.inPulse === 0) postPulseCleanup();
+			// console.log("=================================");
 			return repeater;
 		}
 
@@ -3492,7 +3555,7 @@
 						log("<<< registerActivity: "  + handler.const.name + " >>>");
 						// log(activityListFilter(handler.const.object));
 					}
-					logGroup();
+					// logGroup();
 					// log(handler.target);
 					// Init if not initialized
 					if (typeof(handler.activityListNext) === 'undefined') {
@@ -3514,7 +3577,7 @@
 					activityListFirst = handler;				
 					
 					if (trace.basic) logActivityList();
-					logUngroup();
+					// logUngroup();
 				}
 				
 				state.blockingInitialize--;
@@ -3632,6 +3695,7 @@
 		
 		let causalityInstance = {
 			state : state,
+			configuration : configuration, 
 			
 			// Install causality to global scope. 
 			install : install,
