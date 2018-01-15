@@ -485,10 +485,6 @@
 				
 				// Push changes to database
 				twoPhaseComit();
-				
-				// Cleanup
-				pendingUpdate = null;
-			
 			} else {
 				// log("no events...");
 				// throw new Error("a pulse with no events?");
@@ -778,9 +774,9 @@
 		let tmpDbIdToDbId;
 
 		function flushToDatabase() {
-			// while (pendingUpdates.length > 0) {
-				// twoPhaseComit();					
-			// }
+			while (pendingUpdates.length > 0) {
+				twoPhaseComit();					
+			}
 		} 
 		 
 		function startWriteDaemon() {
