@@ -471,15 +471,7 @@
 					// }
 				});
 			});
-		}				
-
-
-
-		let nextTmpDbId;
-		let tmpDbIdToDbImage;
-		let tmpDbIdToDbId;
-		let tmpDbIdPrefix = "_tmp_id_";
-		
+		}
 
 		function postImagePulseAction(events) {
 			// log("postImagePulseAction: " + events.length + " events");
@@ -495,9 +487,6 @@
 				twoPhaseComit();
 				
 				// Cleanup
-				tmpDbId = 0;
-				tmpDbIdToDbImage = null;
-				tmpDbIdToDbId = null;
 				pendingUpdate = null;
 			
 			} else {
@@ -527,6 +516,11 @@
 		 *        First stage: Compile update 
 		 *-----------------------------------------------*/
 		
+		let tmpDbIdPrefix = "_tmp_id_";
+
+		let nextTmpDbId;
+		let pendingUpdate;
+		
 		function getTmpDbId(dbImage) {
 			if (typeof(dbImage.const.tmpDbId) === 'undefined') {
 				createTemporaryDbId(dbImage);
@@ -537,7 +531,7 @@
 		function createTemporaryDbId(dbImage) {
 			let tmpDbId = tmpDbIdPrefix + nextTmpDbId++;
 			dbImage.const.tmpDbId = tmpDbId;
-			tmpDbIdToDbImage[tmpDbId] = dbImage;
+			pendingUpdate.tmpDbIdToDbImage[tmpDbId] = dbImage;
 			return tmpDbId;
 		}
 				
@@ -561,23 +555,26 @@
 				// log(events, 2);				
 			}
 			
-			let pendingUpdate = {
-				imageCreations : {},
-				imageDeallocations : {},
-				imageUpdates : {}
+			nextTmpDbId = 0;
+			
+			pendingUpdate = {
+				tmpDbIdToDbImage : {},
+				changes : {
+					imageCreations : {},
+					imageDeallocations : {},
+					imageUpdates : {}					
+				}
 			}
 			imageCausality.disableIncomingRelations(function () { // All incoming structures fully visible!
 				
 				// Temporary ids for two phase comit to database.
-				nextTmpDbId = 0;
-				tmpDbIdToDbImage = {};
-				tmpDbIdToDbId = {};
+				
 				
 				
 				// Find all deallocations.
 				events.forEach(function(event) {
 					if (event.type === 'set' && event.property === eternityTag + "_to_deallocate") {
-						pendingUpdate.imageDeallocations[event.value] = true;
+						pendingUpdate.changes.imageDeallocations[event.value] = true;
 					}
 				});
 
@@ -598,7 +595,7 @@
 							
 							// Serialized image creation, with temporary db ids. 
 							let tmpDbId = getTmpDbId(dbImage);
-							pendingUpdate.imageCreations[tmpDbId] = serializeDbImage(dbImage);
+							pendingUpdate.changes.imageCreations[tmpDbId] = serializeDbImage(dbImage);
 							
 							// if (typeof(pendingUpdate.imageUpdates[imageId]) !== 'undefined') {
 								// // We will do a full write of this image, no need to update after.				
@@ -614,10 +611,10 @@
 							
 							// Only update if we will not do a full write on this image. 
 							let dbId = dbImage.const.dbId;
-							if (typeof(pendingUpdate.imageUpdates[dbId]) === 'undefined') {
-								pendingUpdate.imageUpdates[dbId] = {};
+							if (typeof(pendingUpdate.changes.imageUpdates[dbId]) === 'undefined') {
+								pendingUpdate.changes.imageUpdates[dbId] = {};
 							}
-							let imageUpdates = pendingUpdate.imageUpdates[dbId];
+							let imageUpdates = pendingUpdate.changes.imageUpdates[dbId];
 							
 							// Serialized value with temporary db ids. 
 							// recursiveCounter = 0;
@@ -636,13 +633,13 @@
 							
 							// Only update if we will not do a full write on this image. 
 							let dbId = dbImage.const.dbId;
-							if (typeof(pendingUpdate.imageUpdates[dbId]) === 'undefined') {
-								pendingUpdate.imageUpdates[dbId] = {};
+							if (typeof(pendingUpdate.changes.imageUpdates[dbId]) === 'undefined') {
+								pendingUpdate.changes.imageUpdates[dbId] = {};
 							}
-							if (typeof(pendingUpdate.imageUpdates[dbId]["_eternityDeletedKeys"]) === 'undefined') {
-								pendingUpdate.imageUpdates[dbId]["_eternityDeletedKeys"] = {};
+							if (typeof(pendingUpdate.changes.imageUpdates[dbId]["_eternityDeletedKeys"]) === 'undefined') {
+								pendingUpdate.changes.imageUpdates[dbId]["_eternityDeletedKeys"] = {};
 							}
-							let imageUpdates = pendingUpdate.imageUpdates[dbId];
+							let imageUpdates = pendingUpdate.changes.imageUpdates[dbId];
 							let deletedKeys = imageUpdates["_eternityDeletedKeys"];
 							
 							// Serialized value with temporary db ids. 
@@ -654,9 +651,12 @@
 					}		
 				});								
 			});
-			if(trace.eternity) log(pendingUpdate, 4);
 			pendingUpdates.push(pendingUpdate);
-			trace.eternity && logUngroup();
+			if(trace.eternity) log(pendingUpdate, 4);
+
+			pendingUpdate = null;
+			nextTmpDbId = 0;
+			trace.eternity && logUngroup();			
 		}
 		
 	
@@ -775,10 +775,12 @@
 		 *        Second stage: Write in two phases
 		 *-----------------------------------------------*/
 
+		let tmpDbIdToDbId;
+
 		function flushToDatabase() {
-			while (pendingUpdates.length > 0) {
-				twoPhaseComit();					
-			}
+			// while (pendingUpdates.length > 0) {
+				// twoPhaseComit();					
+			// }
 		} 
 		 
 		function startWriteDaemon() {
@@ -791,31 +793,32 @@
 		}
 		 
 		function twoPhaseComit() {
+			tmpDbIdToDbId = {};
 			// log("twoPhaseComit:");
-			let pendingUpdate = pendingUpdates.shift();
+			pendingUpdate = pendingUpdates.shift();
 			// logGroup();
 
 			// First Phase, store transaction in database for transaction completion after failure (cannot rollback since previous values are not stored, could be future feature?). This write is atomic to MongoDb.
-			if (configuration.twoPhaseComit) mockMongoDB.updateRecord(updateDbId, pendingUpdate);
+			if (configuration.twoPhaseComit) mockMongoDB.updateRecord(updateDbId, pendingUpdate.changes);
 			
 			// Create 
-			let imageCreations = pendingUpdate.imageCreations;
+			let imageCreations = pendingUpdate.changes.imageCreations;
 			for (let tmpDbId in imageCreations) {
 				writePlaceholderToDatabase(tmpDbId); // sets up tmpDbIdToDbId
 			}
 			for (let tmpDbId in imageCreations) {
 				writeSerializedImageToDatabase(tmpDbIdToDbId[tmpDbId], replaceTmpDbIdsWithDbIds(imageCreations[tmpDbId]));
 			}
-			for (let tmpDbId in pendingUpdate.imageDeallocations) {
+			for (let tmpDbId in pendingUpdate.changes.imageDeallocations) {
 				mockMongoDB.deallocate(tmpDbId);
 			}			
 			
 			
 			// TODO: Update entire record if the number of updates are more than half of fields.
-			if(trace.eternity) log("pendingUpdate.imageUpdates:" + Object.keys(pendingUpdate.imageUpdates).length);
-			for (let id in pendingUpdate.imageUpdates) {
+			if(trace.eternity) log("pendingUpdate.changes.imageUpdates:" + Object.keys(pendingUpdate.changes.imageUpdates).length);
+			for (let id in pendingUpdate.changes.imageUpdates) {
 				// log("update dbImage id:" + id + " keys: " + Object.keys(pendingImageUpdates[id]));
-				let updates = pendingUpdate.imageUpdates[id];
+				let updates = pendingUpdate.changes.imageUpdates[id];
 				let updatesWithoutTmpDbIds = replaceTmpDbIdsWithDbIds(updates);
 				if(trace.eternity) log(updatesWithoutTmpDbIds);
 				for (let property in updatesWithoutTmpDbIds) {
@@ -836,9 +839,9 @@
 
 			// Write dbIds back to the images. TODO: consider, how do they get back to the object? maybe not, so we need to move it there in the unload code. 
 			// Note: this stage can be ignored in recovery mode, as then there no previously loaded objects.
-			for (let tmpDbId in tmpDbIdToDbImage) {
+			for (let tmpDbId in pendingUpdate.tmpDbIdToDbImage) {
 				// log("WRITING:");
-				let dbImage = tmpDbIdToDbImage[tmpDbId];
+				let dbImage = pendingUpdate.tmpDbIdToDbImage[tmpDbId];
 				// log(dbImage.const.name);
 				let dbId = tmpDbIdToDbId[tmpDbId];				
 				dbImage.const.dbId = dbId;
@@ -850,6 +853,7 @@
 			if (configuration.twoPhaseComit) mockMongoDB.updateRecord(updateDbId, { name: "updatePlaceholder" });
 			
 			// logUngroup();
+			tmpDbIdToDbId = null;
 		}
 
 		function removeTmpDbIdsFromProperty(property) {
@@ -1049,6 +1053,7 @@
 		
 		let peekedAtDbRecords = {};
 		function peekAtRecord(dbId) {
+			flushToDatabase();
 			if (typeof(peekedAtDbRecords[dbId]) === 'undefined') {
 				peekedAtDbRecords[dbId] = mockMongoDB.getRecord(dbId);
 			}
@@ -1056,6 +1061,7 @@
 		}
 		
 		function getDbRecord(dbId) {
+			flushToDatabase();
 			if (typeof(peekedAtDbRecords[dbId]) === 'undefined') {
 				// No previous peeking, just get it
 				return mockMongoDB.getRecord(dbId);
@@ -2041,6 +2047,7 @@
 		
 		// Note: causality.persistent is replace after an unload... 
 		function unloadAllAndClearMemory() {
+			flushToDatabase();
 			objectCausality.resetObjectIds();
 			imageCausality.resetObjectIds();
 			delete instance.persistent;
@@ -2049,6 +2056,7 @@
 		}
 		
 		function clearDatabaseAndClearMemory() {
+			flushToDatabase();
 			mockMongoDB.clearDatabase();
 			unloadAllAndClearMemory();
 		}
@@ -2408,6 +2416,7 @@
 			forAllPersistentIncomingNow : forAllPersistentIncomingNow,
 			createAction : createAction,
 			collectAll : collectAll,
+			flushToDatabase : flushToDatabase,
 			oneStepCollection : oneStepCollection
 		});
 
