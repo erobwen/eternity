@@ -1755,7 +1755,9 @@
                             imageCausality.state.incomingStructuresDisabled++;
                             let value = current[property];
                             imageCausality.state.incomingStructuresDisabled--;
-                            if (imageCausality.isObject(value) && isUnstable(value) && objectCausality.persistent.const.dbImage !== value) { // Has to exists!
+							// console.log(instance.persistent);
+							// console.log(instance.persistent);
+                            if (imageCausality.isObject(value) && isUnstable(value) && instance.persistent.const.dbImage !== value) { // Has to exists!
                                 let referedImage = value;
                                 if(trace.gc) log("reconnecting " + referedImage.const.name + "!");
                                 referedImage._eternityParent = current;
@@ -1987,7 +1989,7 @@
 				// Clear peek at cache
 				peekedAtDbRecords = {};
 				
-				// if (typeof(objectCausality.persistent) === 'undefined') {
+				// if (typeof(instance.persistent) === 'undefined') {
 				if (mockMongoDB.getRecordsCount() === 0) {
 					// log("setup from an empty database...");
 					
@@ -2095,11 +2097,11 @@
 			
 							// Ensure iteration structure in db
 							let iterations;
-							if (typeof(objectCausality.persistent.iterations) === 'undefined') {
+							if (typeof(instance.persistent.iterations) === 'undefined') {
 								iterations = objectCausality.create([]);
-								objectCausality.persistent.iterations = iterations;
+								instance.persistent.iterations = iterations;
 							} else {
-								iterations = objectCausality.persistent.iterations;
+								iterations = instance.persistent.iterations;
 							}
 
 							// Setup the rest for iteration
@@ -2133,7 +2135,7 @@
 		function incomingChunkRemovedForImage(incomingChunk) {
 			// log("incomingChunkRemovedForImage");
 			let newIterations = []; 
-			let iterations = objectCausality.persistent.iterations;
+			let iterations = instance.persistent.iterations;
 			iterations.forEach(function(iteration) {
 				if (iteration.currentChunk === incomingChunk) {
 					if (incomingChunk.next !== null) {
@@ -2154,11 +2156,11 @@
 		function processPersistentOneStep() {
 			// log("processPersistentOneStep");
 			imageCausality.disableIncomingRelations(function() {
-				if (typeof(objectCausality.persistent.iterations) !== 'undefined' && objectCausality.persistent.iterations.length > 0) {
-					let iterations = objectCausality.persistent.iterations;
+				if (typeof(instance.persistent.iterations) !== 'undefined' && instance.persistent.iterations.length > 0) {
+					let iterations = instance.persistent.iterations;
 					let newIterations = [];
 				
-					objectCausality.persistent.iterations.forEach(function(iteration) {
+					instance.persistent.iterations.forEach(function(iteration) {
 						let currentChunk = iteration.currentChunk;
 						// log("Here!!!")
 						// log(currentChunk);
@@ -2191,8 +2193,8 @@
 					});
 				}
 			});
-			// log(objectCausality.persistent.iterations, 2);
-			return typeof(objectCausality.persistent.iterations) === 'undefined' || objectCausality.persistent.iterations.length === 0;
+			// log(instance.persistent.iterations, 2);
+			return typeof(instance.persistent.iterations) === 'undefined' || instance.persistent.iterations.length === 0;
 		}		
 		
 		let volatileIterations = [];
