@@ -17,12 +17,11 @@
 	let objectlog = require('./objectlog.js');
 
 	function createEternityInstance(configuration) {
-		// console.log(">>> CREATE ETERNITY INSTANCE <<<");
-
-		// log("createEternityInstance: " + configuration.name);
-		// logGroup();
-		// log(configuration,5);
-		// logUngroup();
+		// objectlog.log("createEternityInstance: " + configuration.name);
+		// objectlog.group();
+		// objectlog.log(configuration,5);
+		// objectlog.groupEnd();
+		
 		/*-----------------------------------------------
 		 *          Debugging
 		 *-----------------------------------------------*/
@@ -2279,7 +2278,7 @@
 		// Image causality
 		// let imageCausality = requireUncached("causalityjs_advanced");
 		let imageCausality = require("./causality.js")({ 
-			name : 'imageCausality',
+			name : 'imageCausality' + (typeof(configuration.name) !== 'undefined') ? configuration.name : "",
 			recordPulseEvents : true, 
 			incomingStructureChunkSize : configuration.persistentIncomingChunkSize,
 			incomingChunkRemovedCallback : incomingChunkRemovedForImage,
@@ -2331,7 +2330,7 @@
 		// log("Assigning causality");
 		Object.assign(objectCausalityConfiguration, configuration.causalityConfiguration);
 		Object.assign(objectCausalityConfiguration, {
-			name: 'objectCausality',
+			name: 'objectCausality' + (typeof(configuration.name) !== 'undefined') ? configuration.name : "",
 			recordPulseEvents : true,
 			objectActivityList : true,
 			incomingReferenceCounters : true, 

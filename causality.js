@@ -11,6 +11,11 @@
 	let objectlog = require('./objectlog.js');
 	
 	function createCausalityInstance(configuration) {
+		// objectlog.log("createCausalityInstance: " + configuration.name);
+		// objectlog.group();
+		// objectlog.log(configuration,5);
+		// objectlog.groupEnd();
+		
 		// Tracing per instance 
 		let trace = { 
 			basic : 0, 
