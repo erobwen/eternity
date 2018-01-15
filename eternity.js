@@ -452,7 +452,7 @@
 		 
 		let imageIdToImageMap = {};
 		
-		let pendingUpdate;
+		let pendingUpdates = [];
 
 		function valueToString(value) {
 			if (objectCausality.isObject(value) || imageCausality.isObject(value)) {
@@ -560,17 +560,19 @@
 				log("events:");
 				// log(events, 2);				
 			}
+			
+			let pendingUpdate = {
+				imageCreations : {},
+				imageDeallocations : {},
+				imageUpdates : {}
+			}
 			imageCausality.disableIncomingRelations(function () { // All incoming structures fully visible!
 				
 				// Temporary ids for two phase comit to database.
 				nextTmpDbId = 0;
 				tmpDbIdToDbImage = {};
 				tmpDbIdToDbId = {};
-				pendingUpdate = {
-					imageCreations : {},
-					imageDeallocations : {},
-					imageUpdates : {}
-				}
+				
 				
 				// Find all deallocations.
 				events.forEach(function(event) {
@@ -653,6 +655,7 @@
 				});								
 			});
 			if(trace.eternity) log(pendingUpdate, 4);
+			pendingUpdates.push(pendingUpdate);
 			trace.eternity && logUngroup();
 		}
 		
@@ -772,8 +775,24 @@
 		 *        Second stage: Write in two phases
 		 *-----------------------------------------------*/
 
+		function flushToDatabase() {
+			while (pendingUpdates.length > 0) {
+				twoPhaseComit();					
+			}
+		} 
+		 
+		function startWriteDaemon() {
+			setTimeout(42, () => {
+				if (pendingUpdates.length > 0) {
+					twoPhaseComit();					
+				}
+				startWriteDaemon();
+			});
+		}
+		 
 		function twoPhaseComit() {
 			// log("twoPhaseComit:");
+			let pendingUpdate = pendingUpdates.shift();
 			// logGroup();
 
 			// First Phase, store transaction in database for transaction completion after failure (cannot rollback since previous values are not stored, could be future feature?). This write is atomic to MongoDb.
