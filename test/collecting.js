@@ -6,7 +6,10 @@ let objectlog = require('../objectlog.js');
 let log = objectlog.log;
 let logGroup = objectlog.enter;
 let logUngroup = objectlog.exit;
-let eternity = require('../eternity')({name: "collecting.js", maxNumberOfLoadedObjects : 200});  // Includes persistent root.
+let eternity = require('../eternity')({
+	name: "collecting.js", 
+	maxNumberOfLoadedObjects : 200
+});  // Includes persistent root.
 
 // Tests based on mobx test/array.js
 describe("garbage-collection", function () {

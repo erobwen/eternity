@@ -8,7 +8,12 @@ MyClass.prototype.getFoobar = function() {
 let classRegistry = {MyClass : MyClass};
 
 const assert = require('assert');
-let eternity = require('../eternity')({name: "classes.js", classRegistry : classRegistry}); // Note: name is necessary, since class registry will be invisible to configuration comparer....
+let eternity = require('../eternity')({
+	name: "classes.js", // Note: name is necessary, since class registry will be invisible to configuration comparer....
+	causalityConfiguration : {
+		classRegistry : classRegistry
+	}
+}); 
 let create = eternity.create;
 let persistent = eternity.persistent;
 // const log = console.log.bind(console);

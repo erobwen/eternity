@@ -2,7 +2,13 @@
 const assert = require('assert');
 
 let classRegistry = {};
-let eternity = require('../eternity')({name: "incoming.js", persistentIncomingChunkSize: 1, classRegistry : classRegistry});
+let eternity = require('../eternity')({
+	name: "incoming.js", 
+	persistentIncomingChunkSize: 1, 
+	causalityConfiguration : {
+		classRegistry : classRegistry
+	}
+});
 
 // Setup classes
 function CollectorClass() {

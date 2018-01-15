@@ -269,6 +269,7 @@
 				contents = {};
 			}
 			let dbImage = imageCausality.create(contents); // Only Object image here... 
+			if (!imageCausality.isObject(dbImage)) throw new Error("WTF!");
 			
 			imageIdToImageMap[dbImage.const.id] = dbImage;
 			connectObjectWithDbImage(object, dbImage);
@@ -555,11 +556,10 @@
 		
 		function compileUpdate(events) {
 			if (trace.eternity) log("compileUpdate:");			
-			logGroup();
 			if (trace.eternity) {
-				// if (trace.eternity) log(events);
+				logGroup();
 				log("events:");
-				log(events, 2);				
+				// log(events, 2);				
 			}
 			imageCausality.disableIncomingRelations(function () { // All incoming structures fully visible!
 				
@@ -654,7 +654,7 @@
 				});								
 			});
 			if(trace.eternity) log(pendingUpdate, 4);
-			logUngroup();
+			trace.eternity && logUngroup();
 		}
 		
 	
@@ -721,12 +721,26 @@
 							rightCausalityInstance = entity.const.causalityInstance === imageCausality;
 						}
 					}
-					
-					console.log(typeCorrect);
-					console.log(notNull);
-					console.log(hasConst);
-					console.log(rightCausalityInstance);
-					log(entity, 1);
+					log("A non object encountered. Examining it! ");
+					log("typeCorrect: " + typeCorrect);
+					log("notNull: " + notNull);
+					log("hasConst:" + hasConst);
+					log("rightCausalityInstance: " + rightCausalityInstance);
+					log(entity, 2);
+					log(typeof(entity));
+					log(typeof(entity.const));
+					log(entity.const);
+					log(entity.const.causalityInstance.configuration.name);
+					// log("");
+					// log("imageCausality.state:");
+					// log(imageCausality.state);
+					// log("");
+					// log("imageCausality.configuration:");
+					// log(imageCausality.configuration, 10);
+					// log("");
+					// log("objectCausality.configuration:");
+					// log(objectCausality.configuration, 10);
+					// log("");
 					throw new Error("Plain object references not allowed!"); 
 				}
 				// log("===========");
@@ -970,10 +984,11 @@
 				} else if (className === 'Object') {
 					return {}; // Just in case of similar situations to above for some Javascript interpretors... 
 				} else {
-					if (typeof(configuration.classRegistry[className]) === 'function') {
-						return Object.create(configuration.classRegistry[className].prototype);
-					} else if (typeof(configuration.classRegistry[className]) === 'object') {
-						return Object.create(configuration.classRegistry[className]);
+					let classRegistry = configuration.causalityConfiguration.classRegistry;
+					if (typeof(classRegistry[className]) === 'function') {
+						return Object.create(classRegistry[className].prototype);
+					} else if (typeof(classRegistry[className]) === 'object') {
+						return Object.create(classRegistry[className]);
 					} else {
 						throw new Error("Cannot find class named " + className + ". Make sure to enter it in the eternity classRegistry configuration." );
 					}
@@ -1697,7 +1712,10 @@
 				if (!id.startsWith("_eternity")) {
 					let referer = contents[id];
 					// log("Try reconnect with: " + referer.const.name);
-					if ((typeof(referer._eternityParent) !== 'undefined' && !inList(unstableZone, referer) && !inList(destructionZone, referer)) || referer === objectCausality.persistent.const.dbImage) { // && !inList(destructionZone, referer) && !inList(unstableZone, referer)
+					if ((typeof(referer._eternityParent) !== 'undefined' 
+						&& !inList(unstableZone, referer) 
+						&& !inList(destructionZone, referer)) 
+						|| referer === instance.persistent.const.dbImage) { // && !inList(destructionZone, referer) && !inList(unstableZone, referer)
 						// log("Connecting!!!!");
 						gcState.scanningIncomingFor._eternityParent = referer; // TODO: disable incoming relations, should be fine... 
 						gcState.scanningIncomingFor._eternityParentProperty = gcState.currentIncomingStructureRoot.property;
@@ -1963,7 +1981,7 @@
 		
 		function setupDatabase() {
 			// log("setupDatabase");
-			logGroup();
+			trace.eternity && logGroup();
 			imageCausality.pulse(function() {					
 
 				// Clear peek at cache
@@ -1995,9 +2013,9 @@
 					
 					// gcState = createImagePlaceholderFromDbId(collectionDbId);
 				}
-				objectCausality.persistent = createObjectPlaceholderFromDbId(persistentDbId);
+				instance.persistent = createObjectPlaceholderFromDbId(persistentDbId);
 			});
-			logUngroup();
+			trace.eternity && logUngroup();
 		}
 		
 		
@@ -2005,7 +2023,7 @@
 		function unloadAllAndClearMemory() {
 			objectCausality.resetObjectIds();
 			imageCausality.resetObjectIds();
-			delete objectCausality.persistent;
+			delete instance.persistent;
 			dbIdToDbImageMap = {};
 			setupDatabase();
 		}
@@ -2260,7 +2278,6 @@
 		// let imageCausality = requireUncached("causalityjs_advanced");
 		let imageCausality = require("./causality.js")({ 
 			name : 'imageCausality',
-			id : 'imageCausality:' + JSON.stringify(configuration),
 			recordPulseEvents : true, 
 			incomingStructureChunkSize : configuration.persistentIncomingChunkSize,
 			incomingChunkRemovedCallback : incomingChunkRemovedForImage,
@@ -2312,8 +2329,7 @@
 		// log("Assigning causality");
 		Object.assign(objectCausalityConfiguration, configuration.causalityConfiguration);
 		Object.assign(objectCausalityConfiguration, {
-			name: 'objectCausality', 
-			id: 'objectCausality:' + JSON.stringify(configuration), 
+			name: 'objectCausality',
 			recordPulseEvents : true,
 			objectActivityList : true,
 			incomingReferenceCounters : true, 
@@ -2324,29 +2340,14 @@
 			// incomingStructuresAsCausalityObjects : true
 		});
 		let objectCausality = require("./causality.js")(objectCausalityConfiguration);
-		
-		// Additions 
-		Object.assign(objectCausality, {
-			setPostPulseActionBeforeStorage : setPostPulseActionBeforeStorage
-		});
 		objectCausality.addPostPulseAction(postObjectPulseAction);
-		objectCausality.mockMongoDB = mockMongoDB;
-		objectCausality.unloadAllAndClearMemory = unloadAllAndClearMemory;
-		objectCausality.clearDatabaseAndClearMemory = clearDatabaseAndClearMemory;
-		objectCausality.forAllPersistentIncomingNow = forAllPersistentIncomingNow;
-		objectCausality.createAction = createAction;
-		objectCausality.imageCausality = imageCausality;
-		objectCausality.instance = objectCausality;
-		objectCausality.collectAll = collectAll;
-		objectCausality.oneStepCollection = oneStepCollection;
-		// TODO: install this... 
 		objectCausality.addRemovedLastIncomingRelationCallback(function(dbImage) {
 			// log("incoming relations reaced zero...");
             tryKillObject(dbImage);
         });
+		
+		// TODO: install this... 
 		objectCausality.setActivityListFilter(function(object) {
-			
-			
 			// throw new Error("Here!"); 
 			let isZombie = false;
             // objectCausality.blockInitialize(function() {
@@ -2368,17 +2369,38 @@
 			return true;
 			// TODO: Add and remove to activity list as we persist/unpersist this object....
 		});
-		let trace = objectCausality.trace;
-		trace.killing = 0;
-		trace.loading = 0;
-		trace.zombies = 0;
-		trace.eternity = false;
+		
+		
+		
+		/*-----------------------------------------------
+		 *           Setup instance
+		 *-----------------------------------------------*/
+		// Additions
+		let instance = {};
+		Object.assign(instance, objectCausality);
+		Object.assign(instance, {
+			objectCausality : objectCausality, 
+			imageCausality : imageCausality,
+			setPostPulseActionBeforeStorage : setPostPulseActionBeforeStorage,
+			mockMongoDB : mockMongoDB,
+			unloadAllAndClearMemory : unloadAllAndClearMemory,
+			clearDatabaseAndClearMemory : clearDatabaseAndClearMemory,
+			forAllPersistentIncomingNow : forAllPersistentIncomingNow,
+			createAction : createAction,
+			collectAll : collectAll,
+			oneStepCollection : oneStepCollection
+		});
+
+		let trace = instance.trace;
+		// trace.killing = 0;
+		// trace.loading = 0;
+		// trace.zombies = 0;
+		// trace.eternity = false;
 		
 		// Setup database
 		setupDatabase();
 		
-		
-		return objectCausality;
+		return instance;
 	}
 
 	

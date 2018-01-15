@@ -10,12 +10,14 @@
 }(this, function () {
 	function createDatabase() {
 		// Neat logging
-		let objectlog = require('./objectlog.js');
+		// let objectlog = require('./objectlog.js');
 		// let log = objectlog.log;
-		// let log = objectlog.log;
+		// let logGroup = objectlog.group;
+		// let logUngroup = objectlog.groupEnd;
+		
 		function log() {}
-		let logGroup = objectlog.group;
-		let logUngroup = objectlog.groupEnd;
+		function logGroup() {}
+		function logUngroup() {}
 
 		/*-----------------------------------------------
 		 *       Emulated mongo-DB:ish database
@@ -110,7 +112,7 @@
 		}
 		
 		function getRecord(id) {
-			// console.log(dataRecords[id])
+			log(dataRecords[id])
 			return JSON.parse(dataRecords[id]);
 		}		
 		
