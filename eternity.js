@@ -244,11 +244,12 @@
 			let dbImage = createDbImageConnectedWithObject(object);
 			dbImage.const.name = object.const.name + "(dbImage)";
 			imageCausality.state.incomingStructuresDisabled--;
-			dbImage["_eternityParent"] = potentialParentImage;
-			dbImage["_eternityObjectClass"] = Object.getPrototypeOf(object).constructor.name;
-			dbImage["_eternityImageClass"] = (object instanceof Array) ? "Array" : "Object";
-			dbImage["_eternityParentProperty"] = potentialParentProperty;
-			dbImage["_eternityIsObjectImage"] = true;
+			dbImage[eternityTag + "Persistent"] = true;
+			dbImage[eternityTag + "Parent"] = potentialParentImage;
+			dbImage[eternityTag + "ObjectClass"] = Object.getPrototypeOf(object).constructor.name;
+			dbImage[eternityTag + "ImageClass"] = (object instanceof Array) ? "Array" : "Object";
+			dbImage[eternityTag + "ParentProperty"] = potentialParentProperty;
+			dbImage[eternityTag + "IsObjectImage"] = true;
 			imageCausality.state.incomingStructuresDisabled++;
 			
 			// TODO: have causality work with this... currently incoming references count is not updatec correctly
@@ -572,6 +573,9 @@
 					if (event.type === 'set' && event.property === eternityTag + "_to_deallocate") {
 						pendingUpdate.changes.imageDeallocations[event.value] = true;
 					}
+					// if (event.type === 'set' && event.property === eternityTag + "Persistent" && event.value) {
+						// pendingUpdate.changes.imageDeallocations[event.object.dbId] = true;
+					// }
 				});
 
 				// Extract updates and creations to be done.
@@ -601,6 +605,7 @@
 						}
 					} else if (event.type === 'set') {
 						if (typeof(dbImage.const.dbId) !== 'undefined' && dbImage.const.dbId !== null && typeof(dbImage[eternityTag + "_to_deallocate"]) === 'undefined') { // 
+						// if (typeof(dbImage.const.dbId) !== 'undefined' && dbImage.const.dbId !== null && dbImage[eternityTag + "Persistent"]) { // 
 							// Maintain image structure
 							increaseLoadedIncomingMacroReferenceCounters(dbImage, event.property);
 							// decreaseLoadedIncomingMacroReferenceCounters(dbImage, event.); // TODO: Decrease counters here? Get the previousIncomingStructure... 
@@ -624,6 +629,7 @@
 						}
 					} else if (event.type === 'delete') {
 						if (typeof(dbImage.const.dbId) !== 'undefined' && dbImage.const.dbId !== null && typeof(dbImage[eternityTag + "_to_deallocate"]) === 'undefined') { // 
+						// if (typeof(dbImage.const.dbId) !== 'undefined' && dbImage.const.dbId !== null && dbImage[eternityTag + "Persistent"]) { // 
 							// Maintain image structure
 							// decreaseLoadedIncomingMacroReferenceCounters(dbImage, event.); // TODO: Decrease counters here?
 							
@@ -1162,7 +1168,7 @@
 			// log(object);
 			object.const.name = dbImage.const.name; // TODO remove debugg
 			for (let property in dbImage) {
-				if (property !== 'incoming' && !property.startsWith("_eternity")) {
+				if (property !== 'incoming' && !property.startsWith(eternityTag)) {
 					// log("load property: " + property);
 					// log("-------");
 					let value = dbImage[property];
@@ -1620,6 +1626,8 @@
 		
 		function deallocateInDatabase(dbImage) {
 			dbImage[eternityTag + "_to_deallocate"] = dbImage.const.dbId;
+			dbImage[eternityTag + "Persistent"] = false;
+			// dbImage[eternityTag + "_to_deallocate"] = dbImage.const.dbId;
 			// dbImage._eternityDeallocate = true;
 			// mockMongoDB.deallocate(dbImage.const.dbId);
 			delete dbImage.const.correspondingObject.const.dbImage;
@@ -2014,7 +2022,7 @@
 					// log("setup from an empty database...");
 					
 					// Persistent root object
-					persistentDbId = mockMongoDB.saveNewRecord({ name : "persistent" });
+					persistentDbId = mockMongoDB.saveNewRecord({ name : "Persistent" });
 
 					// Update placeholder
 					updateDbId = mockMongoDB.saveNewRecord({ name: "updatePlaceholder" });   //Allways have it here, even if not in use for compatiblity reasons. 
@@ -2136,10 +2144,12 @@
 							// log(currentChunk);
 							if (typeof(currentChunk) !== 'undefined' && currentChunk !== null) {
 								// log("pushing chunk!!!");
-								iterations.push(imageCausality.create({
+								let contents = {
 									currentChunk : currentChunk,
 									objectAction : objectAction
-								}));
+								}
+								contents[eternityTag + "Persistent"] = true;
+								iterations.push(imageCausality.create(contents));
 								// log(iterations,3);
 							}
 						}
