@@ -481,11 +481,10 @@
 				// Set the class of objects created... TODO: Do this in-pulse somehow instead?
 				addImageClassNames(events);
 				
-				// Serialize changes in memory
-				compileUpdate(events);
+				// Push to pending updates
+				pendingUpdates.push(events);
 				
-				// Push changes to database
-				twoPhaseComit();
+				flushToDatabase();
 			} else {
 				// log("no events...");
 				// throw new Error("a pulse with no events?");
@@ -514,9 +513,9 @@
 		 *-----------------------------------------------*/
 		
 		let tmpDbIdPrefix = "_tmp_id_";
-
-		let nextTmpDbId;
 		let pendingUpdate;
+		
+		let nextTmpDbId;
 		
 		function getTmpDbId(dbImage) {
 			if (typeof(dbImage.const.tmpDbId) === 'undefined') {
@@ -653,12 +652,12 @@
 					}		
 				});								
 			});
-			pendingUpdates.push(pendingUpdate);
 			if(trace.eternity) log(pendingUpdate, 4);
-
-			pendingUpdate = null;
 			nextTmpDbId = 0;
-			trace.eternity && logUngroup();			
+			let result = pendingUpdate;
+			pendingUpdate = null;
+			trace.eternity && logUngroup();
+			return result;
 		}
 		
 	
@@ -777,18 +776,23 @@
 		 *        Second stage: Write in two phases
 		 *-----------------------------------------------*/
 
+		let ongoingUpdate;
 		let tmpDbIdToDbId;
 
 		function flushToDatabase() {
 			while (pendingUpdates.length > 0) {
-				twoPhaseComit();					
+				// Serialize changes in memory
+				ongoingUpdate = compileUpdate(pendingUpdates.shift());
+				
+				// Push changes to database
+				twoPhaseComit();				
 			}
 		} 
 		 
 		function startWriteDaemon() {
 			setTimeout(42, () => {
 				if (pendingUpdates.length > 0) {
-					twoPhaseComit();					
+					flushToDatabase();					
 				}
 				startWriteDaemon();
 			});
@@ -797,30 +801,29 @@
 		function twoPhaseComit() {
 			tmpDbIdToDbId = {};
 			// log("twoPhaseComit:");
-			pendingUpdate = pendingUpdates.shift();
 			// logGroup();
 
 			// First Phase, store transaction in database for transaction completion after failure (cannot rollback since previous values are not stored, could be future feature?). This write is atomic to MongoDb.
-			if (configuration.twoPhaseComit) mockMongoDB.updateRecord(updateDbId, pendingUpdate.changes);
+			if (configuration.twoPhaseComit) mockMongoDB.updateRecord(updateDbId, ongoingUpdate.changes);
 			
 			// Create 
-			let imageCreations = pendingUpdate.changes.imageCreations;
+			let imageCreations = ongoingUpdate.changes.imageCreations;
 			for (let tmpDbId in imageCreations) {
 				writePlaceholderToDatabase(tmpDbId); // sets up tmpDbIdToDbId
 			}
 			for (let tmpDbId in imageCreations) {
 				writeSerializedImageToDatabase(tmpDbIdToDbId[tmpDbId], replaceTmpDbIdsWithDbIds(imageCreations[tmpDbId]));
 			}
-			for (let tmpDbId in pendingUpdate.changes.imageDeallocations) {
+			for (let tmpDbId in ongoingUpdate.changes.imageDeallocations) {
 				mockMongoDB.deallocate(tmpDbId);
 			}			
 			
 			
 			// TODO: Update entire record if the number of updates are more than half of fields.
-			if(trace.eternity) log("pendingUpdate.changes.imageUpdates:" + Object.keys(pendingUpdate.changes.imageUpdates).length);
-			for (let id in pendingUpdate.changes.imageUpdates) {
+			if(trace.eternity) log("ongoingUpdate.changes.imageUpdates:" + Object.keys(ongoingUpdate.changes.imageUpdates).length);
+			for (let id in ongoingUpdate.changes.imageUpdates) {
 				// log("update dbImage id:" + id + " keys: " + Object.keys(pendingImageUpdates[id]));
-				let updates = pendingUpdate.changes.imageUpdates[id];
+				let updates = ongoingUpdate.changes.imageUpdates[id];
 				let updatesWithoutTmpDbIds = replaceTmpDbIdsWithDbIds(updates);
 				if(trace.eternity) log(updatesWithoutTmpDbIds);
 				for (let property in updatesWithoutTmpDbIds) {
@@ -841,9 +844,9 @@
 
 			// Write dbIds back to the images. TODO: consider, how do they get back to the object? maybe not, so we need to move it there in the unload code. 
 			// Note: this stage can be ignored in recovery mode, as then there no previously loaded objects.
-			for (let tmpDbId in pendingUpdate.tmpDbIdToDbImage) {
+			for (let tmpDbId in ongoingUpdate.tmpDbIdToDbImage) {
 				// log("WRITING:");
-				let dbImage = pendingUpdate.tmpDbIdToDbImage[tmpDbId];
+				let dbImage = ongoingUpdate.tmpDbIdToDbImage[tmpDbId];
 				// log(dbImage.const.name);
 				let dbId = tmpDbIdToDbId[tmpDbId];				
 				dbImage.const.dbId = dbId;

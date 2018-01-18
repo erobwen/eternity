@@ -34,15 +34,15 @@
 		}
 		
 		let deallocatedIds = [];
-		
+		deallocatedTag = "[deallocated]"
 		function deallocate(id) {
 			// throw new Error("should not deallocate: " + id);
-			dataRecords[id] = "[deallocated]";
+			dataRecords[id] = deallocatedTag;
 			deallocatedIds.push(id);
 		}
 		
 		function isDeallocated(id) {
-			return dataRecords[id] === "[deallocated]";
+			return dataRecords[id] === deallocatedTag;
 		}
 		
 		function saveNewRecord(dataRecord) {
@@ -112,7 +112,9 @@
 		}
 		
 		function getRecord(id) {
-			log(dataRecords[id])
+			if (isDeallocated(id)) {
+				throw new Error("Cannot request a deleted record! id:" + id);
+			}
 			return JSON.parse(dataRecords[id]);
 		}		
 		
