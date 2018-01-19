@@ -1628,16 +1628,28 @@
 		 *-----------------------------------------------*/
 		
 		function deallocateInDatabase(dbImage) {
-			dbImage[eternityTag + "_to_deallocate"] = dbImage.const.dbId;
-			dbImage[eternityTag + "Persistent"] = false;
-			// dbImage[eternityTag + "_to_deallocate"] = dbImage.const.dbId;
-			// dbImage._eternityDeallocate = true;
-			// mockMongoDB.deallocate(dbImage.const.dbId);
-			delete dbImage.const.correspondingObject.const.dbImage;
-			delete dbImage.const.correspondingObject.const.dbId;
-			delete dbImage.const.correspondingObject;
-			delete dbImage.const.dbId;
-			delete dbImage.const.tmpDbId;
+			// trace.deallocate && 
+			// log("deallocateInDatabase: " + dbImage.const.id + ", " + dbImage.const.dbId);
+			// log(dbImage, 2);
+			if (typeof(dbImage[eternityTag + "_to_deallocate"]) === 'undefined') {			
+				// if (typeof(dbImage.const.dbId) === 'undefined') {
+					// log("Beeep!");
+					// throw new Error("Deallocating an image that has no dbId");				
+				// }
+				// dbImage.const.dbIdToDeallocate = dbImage.const.dbId;
+				// dbImage[eternityTag + "_to_deallocate"] = "true";
+				// dbImage[eternityTag + "dbIdTodeallocate"] = dbImage.const.dbId;
+				dbImage[eternityTag + "_to_deallocate"] = dbImage.const.dbId
+				dbImage[eternityTag + "Persistent"] = false;
+				// dbImage[eternityTag + "_to_deallocate"] = dbImage.const.dbId;
+				// dbImage._eternityDeallocate = true;
+				// mockMongoDB.deallocate(dbImage.const.dbId);
+				delete dbImage.const.correspondingObject.const.dbImage;
+				delete dbImage.const.correspondingObject.const.dbId;
+				delete dbImage.const.correspondingObject;
+				// delete dbImage.const.dbId;
+				// delete dbImage.const.tmpDbId;
+			}
 		}
 		
 		// Main state-holder image

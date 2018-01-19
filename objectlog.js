@@ -227,6 +227,31 @@
 			}
 		},
 		
+		logVar : function(name, entity, pattern) {
+			if (objectlog.findLogs) throw new Error("No logs allowed!");
+			if (configuration.useConsoleDefault) {
+				console.log(name + ":");
+				console.group();
+				console.log(entity);
+				console.groupEnd();
+			} else {
+				context = createStdoutContext();
+				if (typeof(pattern) === 'undefined') pattern = 1;
+				context.log(name + ": ");
+				
+				let spaceLeft = configuration.bufferWidth - (context.indentLevel * configuration.indentToken.length) - (name + ": ").length; 
+				context.horizontal = configuration.bufferWidth === -1 ? true : horizontalLogFitsWithinWidthLimit(entity, pattern, spaceLeft); 
+				
+				if (context.horizontal) {					
+					logPattern(entity, pattern, context);
+				} else {
+					context.indentLevel++;					
+					logPattern(entity, pattern, context);
+					context.indentLevel--;
+				}
+			}
+		},
+		
 		group : function(entity, pattern) {
 			if (objectlog.findLogs) throw new Error("No logs allowed!");
 			if (configuration.useConsoleDefault) {

@@ -30,6 +30,7 @@ describe("garbage-collection", function () {
 		let a = create({name: "a"});
 		persistent.a = a;
 		assert.equal(typeof(a.const.dbImage) !== 'undefined', true);
+		let aDbId = a.const.dbImage.const.dbId;
 
 		persistent.a = null;
 
@@ -46,7 +47,8 @@ describe("garbage-collection", function () {
 		// log("----------------------------------------")
 	
 		assert.equal(typeof(a.const.dbImage) === 'undefined', true);
-		
+		assert.ok(eternity.mockMongoDB.isDeallocated(aDbId));
+				
 		eternity.trace.eternity = true;
 		delete eternity.trace.eternity;
 	});
