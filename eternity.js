@@ -570,7 +570,7 @@
 				// Find all deallocations.
 				events.forEach(function(event) {
 					if (event.type === 'set' && event.property === eternityTag + "_to_deallocate") {
-						pendingUpdate.changes.imageDeallocations[event.value] = true;
+						pendingUpdate.changes.imageDeallocations[event.object.const.dbId] = true;
 					}
 					// if (event.type === 'set' && event.property === eternityTag + "Persistent" && event.value) {
 						// pendingUpdate.changes.imageDeallocations[event.object.dbId] = true;
@@ -1639,7 +1639,7 @@
 				// dbImage.const.dbIdToDeallocate = dbImage.const.dbId;
 				// dbImage[eternityTag + "_to_deallocate"] = "true";
 				// dbImage[eternityTag + "dbIdTodeallocate"] = dbImage.const.dbId;
-				dbImage[eternityTag + "_to_deallocate"] = dbImage.const.dbId
+				dbImage[eternityTag + "_to_deallocate"] = true;
 				dbImage[eternityTag + "Persistent"] = false;
 				// dbImage[eternityTag + "_to_deallocate"] = dbImage.const.dbId;
 				// dbImage._eternityDeallocate = true;
