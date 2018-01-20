@@ -484,7 +484,7 @@
 				// Push to pending updates
 				pendingUpdates.push(events);
 				
-				flushToDatabase();
+				// flushToDatabase();
 			} else {
 				// log("no events...");
 				// throw new Error("a pulse with no events?");
@@ -2428,6 +2428,7 @@
 		let instance = {};
 		Object.assign(instance, objectCausality);
 		Object.assign(instance, {
+			pendingUpdates : pendingUpdates,
 			objectCausality : objectCausality, 
 			imageCausality : imageCausality,
 			setPostPulseActionBeforeStorage : setPostPulseActionBeforeStorage,

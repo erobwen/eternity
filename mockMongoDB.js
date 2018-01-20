@@ -28,13 +28,17 @@
 		function getAllRecordsParsed() {
 			let parsedRecords = [];
 			dataRecords.forEach(function(record) {
-				parsedRecords.push(JSON.parse(record));
+				if (record === deallocatedTag) {
+					parsedRecords.push(deallocatedTag);
+				} else {
+					parsedRecords.push(JSON.parse(record));					
+				}
 			});
 			return parsedRecords;
 		}
 		
 		let deallocatedIds = [];
-		deallocatedTag = "[deallocated]"
+		let deallocatedTag = "[deallocated]"
 		function deallocate(id) {
 			// throw new Error("should not deallocate: " + id);
 			dataRecords[id] = deallocatedTag;
