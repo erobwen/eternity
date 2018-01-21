@@ -953,6 +953,7 @@
 			// log("NOT HERESSSSS!");
 			// log("createImagePlaceholderFromDbId: " + dbId);
 			let placeholder;
+			imageCausality.state.emitEventPaused++;
 			imageCausality.pulse(function() { // Pulse here to make sure that dbId is set before post image pulse comence.
 				let record = peekAtRecord(dbId);
 				// console.log(typeof(record._eternityImageClass) !== 'undefined' ? record._eternityImageClass : 'Object');
@@ -964,6 +965,7 @@
 				imageIdToImageMap[placeholder.const.id] = placeholder;
 				placeholder.const.initializer = imageFromDbIdInitializer;
 			});
+			imageCausality.state.emitEventPaused--;
 			return placeholder;
 		}
 		
