@@ -665,7 +665,7 @@
 							let tmpDbId = getTmpDbId(dbImage);
 							compiledUpdate.imageCreations[tmpDbId] = serializeDbImage(dbImage);
 							
-						} else {
+						} else if (typeof(compiledUpdate.imageCreations[tmpDbId]) === 'undefined') {
 							// if (event.type === 'creation') {
 								// log("Wrong turn!");
 								// log(event, 2);
@@ -856,9 +856,9 @@
 		}
 		 
 		function twoPhaseComit() {
-			log("twoPhaseComit:");
-			logGroup();
-			log(pendingUpdate, 10);
+			// log("twoPhaseComit:");
+			// logGroup();
+			// log(pendingUpdate, 10);
 
 			// First Phase, store transaction in database for transaction completion after failure (cannot rollback since previous values are not stored, could be future feature?). This write is atomic to MongoDb.
 			if (configuration.twoPhaseComit) mockMongoDB.updateRecord(updateDbId, pendingUpdate);
@@ -875,8 +875,8 @@
 				mockMongoDB.deallocate(dbId);
 			}			
 			
-			log("tmpDbIdToDbId:");
-			log(tmpDbIdToDbId, 2);
+			// log("tmpDbIdToDbId:");
+			// log(tmpDbIdToDbId, 2);
 			
 			// TODO: Update entire record if the number of updates are more than half of fields.
 			if(trace.eternity) log("pendingUpdate.imageUpdates:" + Object.keys(pendingUpdate.imageUpdates).length);
@@ -924,7 +924,7 @@
 			if (configuration.twoPhaseComit) mockMongoDB.updateRecord(updateDbId, { name: "updatePlaceholder" });
 			
 			// Remove pending update
-			logUngroup();
+			// logUngroup();
 			pendingUpdate = null;
 		}
 
