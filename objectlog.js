@@ -270,6 +270,7 @@
 				console.groupEnd();
 			} else {
 				globalIndentLevel--;
+				if (globalIndentLevel < 0) globalIndentLevel = 0;
 				if (typeof(entity) !== 'undefined') {
 					logPattern(entity, pattern);
 				}

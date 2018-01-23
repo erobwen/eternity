@@ -494,7 +494,7 @@
 					// log("pendingUpdate after merge");
 					// log(pendingUpdate, 10);
 				}
-				flushToDatabase();
+				// flushToDatabase();
 			} else {
 				// log("no events...");
 				// throw new Error("a pulse with no events?");
@@ -586,15 +586,6 @@
 			// Merge creations
 			Object.assign(destination.imageCreations, source.imageCreations);
 			
-			// Merge deallocations
-			for (let dbOrTmpId in source.imageDeallocations) {
-				if (isTmpDbId(dbOrTmpId)) {
-					delete destination.imageCreations[dbOrTmpId];
-				} else {
-					destination.imageDeallocations[dbOrTmpId] = true;
-				}
-			} 
-			
 			// Merge record updates
 			for (let dbOrTmpId in source.imageUpdates) {
 				let recordUpdate = source.imageUpdates[dbOrTmpId];
@@ -612,14 +603,25 @@
 							}
 						}					
 					} else {
-						let destinationRecordUpdate = destination.imageCreations[dbOrTmpId];
-						mergeRecordUpdate(destinationRecordUpdate, recordUpdate);
+						let destinationRecordUpdate = destination.imageUpdates[dbOrTmpId];
+						mergeRecordUpdate(destinationRecordUpdate, recordUpdate);							
 					}
 				} else {
 					destination.imageUpdates[dbOrTmpId] = recordUpdate;
 				}
 			}
-			
+
+			// Merge deallocations
+			for (let dbOrTmpId in source.imageDeallocations) {
+				if (typeof(destination.imageCreations[dbOrTmpId]) !== 'undefined') {
+					delete destination.imageCreations[dbOrTmpId];
+				}
+				if (typeof(destination.imageUpdates[dbOrTmpId]) !== 'undefined') {
+					delete destination.imageUpdates[dbOrTmpId];
+				}
+				destination.imageDeallocations[dbOrTmpId] = true;
+			} 
+						
 			// Make sure that the merge destination is up for firt phase coomit
 			destination.needsSaving = true;
 		}
@@ -634,22 +636,6 @@
 			}
 			imageCausality.disableIncomingRelations(function () { // All incoming structures fully visible!
 				
-				// Find all deallocations.
-				events.forEach(function(event) {
-					if (event.type === 'set' && event.property === eternityTag + "_to_deallocate") {
-						if (typeof(event.object.const.dbId) !== 'undefined') {
-							compiledUpdate.imageDeallocations[event.object.const.dbId] = true;							
-						} else if (typeof(event.object.const.tmpDbId) !== 'undefined') {
-							let tmpDbId = event.object.const.tmpDbId;
-							if (typeof(compiledUpdate.imageCreations[tmpDbId])) {
-								delete compiledUpdate.imageCreations[tmpDbId];
-							} else {
-								compiledUpdate.imageDeallocations[tmpDbId] = true;
-							}
-						}
-					}
-				});
-
 				// Extract updates and creations to be done.
 				events.forEach(function(event) {
 					let dbImage = event.object;
@@ -726,6 +712,34 @@
 						// }
 					}
 				});								
+
+				// Find all deallocations.
+				events.forEach(function(event) {
+					if (event.type === 'set' && event.property === eternityTag + "_to_deallocate") {
+						if (typeof(event.object.const.dbId) !== 'undefined') {
+							let dbId = event.object.const.dbId;
+							
+							compiledUpdate.imageDeallocations[dbId] = true;
+
+							if (typeof(compiledUpdate.imageUpdates[dbId])) {
+								delete compiledUpdate.imageUpdates[dbId];
+							}						
+						} else if (typeof(event.object.const.tmpDbId) !== 'undefined') {
+							let tmpDbId = event.object.const.tmpDbId;
+							
+							if (typeof(compiledUpdate.imageCreations[tmpDbId])) {
+								delete compiledUpdate.imageCreations[tmpDbId];
+							} else {
+								compiledUpdate.imageDeallocations[tmpDbId] = true;
+							}
+							
+							if (typeof(compiledUpdate.imageUpdates[tmpDbId])) {
+								delete compiledUpdate.imageUpdates[tmpDbId];
+							}
+						}
+						
+					}
+				});
 			});
 			trace.eternity && logUngroup();
 			return compiledUpdate;
@@ -897,7 +911,7 @@
 			for (let id in pendingUpdate.imageUpdates) {
 				let updates = pendingUpdate.imageUpdates[id];
 				if (isTmpDbId(id)) {
-					log("id: " + id);
+					// log("id: " + id);
 					if (typeof(tmpDbIdToDbId[id]) === 'undefined0') throw new Error("No db id found for tmpDbId: " + id);
 					id = tmpDbIdToDbId[id];
 				}
@@ -1862,9 +1876,9 @@
 		
 		
 		function oneStepCollection() {
-			// log("oneStepCollection:");
-			logGroup();
-			if (trace.eternity) {
+			trace.gc && log("oneStepCollection:");
+			trace.gc && logGroup();
+			if (trace.gc) {
 				log(gcState, 1);
 			}
 			imageCausality.state.incomingStructuresDisabled--;
@@ -1873,7 +1887,7 @@
 				// Reattatch 
 				if (!isEmptyList(gcState, pendingForChildReattatchment)) {
 					// log("<<<<           >>>>>");
-					// log("<<<< reattatch >>>>>");
+					trace.gc && log("<<<< reattatch >>>>>");
 					// log("<<<<           >>>>>");
 					let current = removeFirstFromList(gcState, pendingForChildReattatchment);
 					
@@ -1913,7 +1927,7 @@
 				// Expand unstable zone
 				if (!isEmptyList(gcState, unexpandedUnstableZone)) {
 					// log("<<<<                        >>>>>");
-					// log("<<<< expand unstable zone   >>>>>");
+					trace.gc && log("<<<< expand unstable zone   >>>>>");
 					logGroup();
 					// log("<<<<                        >>>>>");
 					let dbImage = removeFirstFromList(gcState, unexpandedUnstableZone);
@@ -1954,7 +1968,7 @@
 				// Iterate incoming, try to stabilize...
 				if(gcState.scanningIncomingFor === null && !isEmptyList(gcState, unstableZone)) {
 					// log("<<<<                        >>>>>");
-					// log("<<<< Iterate incoming       >>>>>");
+					trace.gc && log("<<<< Iterate incoming       >>>>>");
 					// log("<<<<                        >>>>>");
 					let currentImage = removeFirstFromList(gcState, unstableZone);
 					// log(currentImage.const.name);
@@ -1994,7 +2008,7 @@
 				// Scan incoming in progress, continue with it
 				if (gcState.scanningIncomingFor !== null) {
 					// log("<<<<                        >>>>>");
-					// log("<<<< Scan in progress...... >>>>>");
+					trace.gc && log("<<<< Scan in progress...... >>>>>");
 					// log("<<<<                        >>>>>");
 					// log(gcState.currentIncomingStructureChunk);
 					
@@ -2026,7 +2040,7 @@
 				// Destroy those left in the destruction list. 
 				if (!isEmptyList(gcState, destructionZone)) {
 					// log("<<<<                 >>>>>");
-					// log("<<<< Destroy ......  >>>>>");
+					trace.gc && log("<<<< Destroy ......  >>>>>");
 					// log("<<<<                 >>>>>");
 					
 					let toDestroy = removeFirstFromList(gcState, destructionZone);
@@ -2068,7 +2082,7 @@
 				// Start a new zone.
 				if (!isEmptyList(gcState, pendingUnstableOrigins)) {
 					// log("<<<<                        >>>>>");
-					// log("<<<< Start new zone ......  >>>>>");
+					trace.gc && log("<<<< Start new zone ......  >>>>>");
 					// log("<<<<                        >>>>>");
 
 					// Start new unstable cycle.
