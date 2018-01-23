@@ -80,9 +80,14 @@ describe("basics", function () {
 	
 	
 	it('should save refered objects recursivley, in steps', function () {
-		persistent.A = create({name : 'A'});
-		// log(persistent.A, 2);
+		// eternity.pulse(function() {
+			
+			persistent.A = create({name : 'A'});
+			// log("------------------------------------------------------------");
+			// log(persistent.A, 2);
+		// });
 		persistent.A.B = create({name : 'B'});
+		// log("------------------------------------------------------------");
 		assert.equal("B", persistent.A.B.name);
 		
 		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	

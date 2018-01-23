@@ -485,12 +485,15 @@
 				
 				// Push to pending updates
 				let compiledUpdate = compileUpdate(events);
+				// log("compiledUpdate");
+				// log(compiledUpdate, 10);
 				if (pendingUpdate === null) {
 					pendingUpdate = compiledUpdate;
 				} else {
 					mergeUpdate(pendingUpdate, compiledUpdate);					
+					// log("pendingUpdate after merge");
+					// log(pendingUpdate, 10);
 				}
-				
 				flushToDatabase();
 			} else {
 				// log("no events...");
@@ -656,6 +659,7 @@
 						
 						// if (dbId === null && tmpDbId === null) {
 						if (event.type === 'creation') {
+							// log("PINGPINGPINGPINGPINGPINGPINGPING")
 							// Maintain image structure
 							for (let property in dbImage) {
 								increaseLoadedIncomingMacroReferenceCounters(dbImage, property);
@@ -710,7 +714,16 @@
 								// No update if delete
 								delete imageUpdates[property];
 							}		
-						}
+						} 
+						// else {
+							// if (event.property === 'B') {
+								// log("reject event");
+								// log(event.object.const.tmpDbId);
+								// log(event.object.const.dbId);
+								// log(Object.keys(compiledUpdate.imageCreations));
+								// log(event, 2);
+							// }
+						// }
 					}
 				});								
 			});
@@ -837,6 +850,7 @@
 		let tmpDbIdToDbId = {};
 
 		function flushToDatabase() {
+			// log("FLUSH FLUSH FLUSH FLUSH FLUSH FLUSH FLUSH FLUSH FLUSH FLUSH FLUSH FLUSH FLUSH FLUSH ")
 			while(pendingUpdate !== null) {
 				twoPhaseComit();				
 			}
@@ -914,6 +928,7 @@
 				let dbId = tmpDbIdToDbId[tmpDbId];				
 				let dbImage = tmpDbIdToDbImage[tmpDbId];
 				delete tmpDbIdToDbImage[tmpDbId];
+				delete dbImage.const.tmpDbId;
 				// log(dbImage.const.name);
 				dbImage.const.dbId = dbId;
 				dbImage.const.serializedMongoDbId = imageCausality.idExpression(dbId);
