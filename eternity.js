@@ -453,7 +453,7 @@
 		 
 		let imageIdToImageMap = {};
 		
-		let pendingUpdates = [];
+		let pendingUpdate = null;
 
 		function valueToString(value) {
 			if (objectCausality.isObject(value) || imageCausality.isObject(value)) {
@@ -481,16 +481,24 @@
 				// Set the class of objects created... TODO: Do this in-pulse somehow instead?
 				addImageClassNames(events);
 				
-				// Push to pending updates
-				pendingUpdates.push(events);
+				// pendingUpdates.push(events);
 				
-				// flushToDatabase();
+				// Push to pending updates
+				let compiledUpdate = compileUpdate(events);
+				if (pendingUpdate === null) {
+					pendingUpdate = compiledUpdate;
+				} else {
+					mergeUpdate(pendingUpdate, compiledUpdate);					
+				}
+				
+				flushToDatabase();
 			} else {
 				// log("no events...");
 				// throw new Error("a pulse with no events?");
 			}
 			// logUngroup();
 		} 
+		
 
 		function addImageClassNames(events) {
 			imageCausality.assertNotRecording();
@@ -515,9 +523,8 @@
 		let tmpDbIdPrefix = "_tmp_id_";
 		
 		
-		let nextTmpDbId;
+		let nextTmpDbId = 0;
 		let tmpDbIdToDbImage = {};		
-		
 		
 		function getTmpDbId(dbImage) {
 			if (typeof(dbImage.const.tmpDbId) === 'undefined') {
@@ -545,47 +552,110 @@
 			return "";
 		}
 		
-		function compileUpdate(events) {
-			if (trace.eternity) log("compileUpdate:");			
-			if (trace.eternity) {
-				logGroup();
-				log("events:");
-				// log(events, 2);				
+		function mergeRecordUpdate(destination, source) {
+			let destinationDeletedKeys = typeof(destination._eternityDeletedKeys) !== 'undefined'  ? destination._eternityDeletedKeys : null
+			for (let property in source) {
+				if (property === "_eternityDeletedKeys") {
+					let deletedKeys = source[property];
+					if (destinationDeletedKeys !== null) {
+						Object.assign(destinationDeletedKeys, deletedKeys);
+					} else {
+						destinationDeletedKeys = deletedKeys;
+						destination._eternityDeletedKeys = destinationDeletedKeys;
+					}
+					
+					// Make sure not set something that will be deleted
+					for (let property in destinationDeletedKeys) {
+						delete destination[destinationDeletedKeys];
+					}
+				} else {
+					destination[property] = source[property];
+					
+					// Make sure not to delete somehting that will be set
+					if (destinationDeletedKeys !== null && typeof(destinationDeletedKeys[property]) !== 'undefined') {
+						delete destinationDeletedKeys[property];
+					}
+				}
+			}							
+		}
+				
+		function mergeUpdate(destination, source) {
+			// Merge creations
+			Object.assign(destination.imageCreations, source.imageCreations);
+			
+			// Merge deallocations
+			for (let dbOrTmpId in source.imageDeallocations) {
+				if (isTmpDbId(dbOrTmpId)) {
+					delete destination.imageCreations[dbOrTmpId];
+				} else {
+					destination.imageDeallocations[dbOrTmpId] = true;
+				}
+			} 
+			
+			// Merge record updates
+			for (let dbOrTmpId in source.imageUpdates) {
+				let recordUpdate = source.imageUpdates[dbOrTmpId];
+				if (typeof(destination.imageUpdates[dbOrTmpId]) !== 'undefined') {
+					if (isTmpDbId(dbOrTmpId) && typeof(destination.imageCreations[dbOrTmpId]) !== 'undefined') {
+						let pendingCreation = destination.imageCreations[dbOrTmpId];
+						for (let property in recordUpdate) {
+							if (property === "_eternityDeletedKeys") {
+								let deletedKeys = recordUpdate[property];
+								for (let property in deletedKeys) {
+									delete pendingCreation[property];
+								}
+							} else {
+								pendingCreation[property] = recordUpdate[property];
+							}
+						}					
+					} else {
+						let destinationRecordUpdate = destination.imageCreations[dbOrTmpId];
+						mergeRecordUpdate(destinationRecordUpdate, recordUpdate);
+					}
+				} else {
+					destination.imageUpdates[dbOrTmpId] = recordUpdate;
+				}
 			}
 			
-			nextTmpDbId = 0;
-			
-			let pendingUpdate = {
+			// Make sure that the merge destination is up for firt phase coomit
+			destination.needsSaving = true;
+		}
+
+		
+		function compileUpdate(events) {
+			let compiledUpdate = {
 				imageCreations : {},
 				imageDeallocations : {},
-				imageUpdates : {}					
+				imageUpdates : {},
+				needsSaving : true
 			}
 			imageCausality.disableIncomingRelations(function () { // All incoming structures fully visible!
-				
-				// Temporary ids for two phase comit to database.
-				
-				
 				
 				// Find all deallocations.
 				events.forEach(function(event) {
 					if (event.type === 'set' && event.property === eternityTag + "_to_deallocate") {
-						pendingUpdate.imageDeallocations[event.object.const.dbId] = true;
+						if (typeof(event.object.const.dbId) !== 'undefined') {
+							compiledUpdate.imageDeallocations[event.object.const.dbId] = true;							
+						} else if (typeof(event.object.const.tmpDbId) !== 'undefined') {
+							let tmpDbId = event.object.const.tmpDbId;
+							if (typeof(compiledUpdate.imageCreations[tmpDbId])) {
+								delete compiledUpdate.imageCreations[tmpDbId];
+							} else {
+								compiledUpdate.imageDeallocations[tmpDbId] = true;
+							}
+						}
 					}
-					// if (event.type === 'set' && event.property === eternityTag + "Persistent" && event.value) {
-						// pendingUpdate.imageDeallocations[event.object.dbId] = true;
-					// }
 				});
 
 				// Extract updates and creations to be done.
 				events.forEach(function(event) {
-					if (trace.eternity) {
-						// log("events.forEach(function(event)) { ..."); 
-					}
 					let dbImage = event.object;
-					let imageId = dbImage.const.id;
+					if (typeof(dbImage[eternityTag + "_to_deallocate"]) === 'undefined') {
+						let dbId = typeof(dbImage.const.dbId) !== 'undefined' ? dbImage.const.dbId : null;
+						let tmpDbId = typeof(dbImage.const.tmpDbId) !== 'undefined' ? dbImage.const.tmpDbId : null;
 						
-					if (event.type === 'creation') {
-						if (typeof(dbImage.const.dbId) === 'undefined') {
+						// if (dbId === null && tmpDbId === null) {
+						if (event.type === 'creation') {
 							// Maintain image structure
 							for (let property in dbImage) {
 								increaseLoadedIncomingMacroReferenceCounters(dbImage, property);
@@ -593,70 +663,59 @@
 							
 							// Serialized image creation, with temporary db ids. 
 							let tmpDbId = getTmpDbId(dbImage);
-							pendingUpdate.imageCreations[tmpDbId] = serializeDbImage(dbImage);
+							compiledUpdate.imageCreations[tmpDbId] = serializeDbImage(dbImage);
 							
-							// if (typeof(pendingUpdate.imageUpdates[imageId]) !== 'undefined') {
-								// // We will do a full write of this image, no need to update after.				
-								// delete pendingUpdate.imageUpdates[dbId];   // will never happen anymore?
+						} else {
+							// if (event.type === 'creation') {
+								// log("Wrong turn!");
+								// log(event, 2);
+								// throw new Error("hmpf...");
 							// }
-						
-						}
-					} else if (event.type === 'set') {
-						if (typeof(dbImage.const.dbId) !== 'undefined' && dbImage.const.dbId !== null && typeof(dbImage[eternityTag + "_to_deallocate"]) === 'undefined') { // 
-						// if (typeof(dbImage.const.dbId) !== 'undefined' && dbImage.const.dbId !== null && dbImage[eternityTag + "Persistent"]) { // 
-							// Maintain image structure
-							increaseLoadedIncomingMacroReferenceCounters(dbImage, event.property);
-							// decreaseLoadedIncomingMacroReferenceCounters(dbImage, event.); // TODO: Decrease counters here? Get the previousIncomingStructure... 
-							
-							// Only update if we will not do a full write on this image. 
-							let dbId = dbImage.const.dbId;
-							if (typeof(pendingUpdate.imageUpdates[dbId]) === 'undefined') {
-								pendingUpdate.imageUpdates[dbId] = {};
+							let key = dbId !== null ? dbId : tmpDbId;
+							if (typeof(compiledUpdate.imageUpdates[key]) === 'undefined') {
+								compiledUpdate.imageUpdates[key] = {};
 							}
-							let imageUpdates = pendingUpdate.imageUpdates[dbId];
-							
-							// Serialized value with temporary db ids. 
-							// recursiveCounter = 0;
-							let value = convertReferencesToDbIdsOrTemporaryIds(event.value);
-							let property = event.property;
-							property = imageCausality.transformPossibleIdExpression(property, imageIdToDbIdOrTmpDbId);
-							imageUpdates[event.property] = value;
-							if (typeof(imageUpdates["_eternityDeletedKeys"]) !== 'undefined') {
-								delete imageUpdates["_eternityDeletedKeys"][event.property];
-							} 
+							let imageUpdates = compiledUpdate.imageUpdates[key];								
+								
+							if (event.type === 'set') {
+								// Maintain image structure
+								increaseLoadedIncomingMacroReferenceCounters(dbImage, event.property);
+								// decreaseLoadedIncomingMacroReferenceCounters(dbImage, event.); // TODO: Decrease counters here? Get the previousIncomingStructure... 
+								
+								// Serialized value with temporary db ids. 
+								let value = convertReferencesToDbIdsOrTemporaryIds(event.value);
+								let property = event.property;
+								property = imageCausality.transformPossibleIdExpression(property, imageIdToDbIdOrTmpDbId);
+								imageUpdates[event.property] = value;
+								
+								// No delete if update
+								if (typeof(imageUpdates["_eternityDeletedKeys"]) !== 'undefined') {
+									delete imageUpdates["_eternityDeletedKeys"][event.property];
+								} 
+							} else if (event.type === 'delete') {
+								// Maintain image structure
+								// decreaseLoadedIncomingMacroReferenceCounters(dbImage, event.); // TODO: Decrease counters here?
+								
+								// Get deleted keys 
+								if (typeof(imageUpdates["_eternityDeletedKeys"]) === 'undefined') {
+									imageUpdates["_eternityDeletedKeys"] = {};
+								}
+								let deletedKeys = imageUpdates["_eternityDeletedKeys"];
+								
+								// Serialized value with temporary db ids. 
+								let property = event.property;
+								property = imageCausality.transformPossibleIdExpression(property, imageIdToDbIdOrTmpDbId);
+								deletedKeys[property] = true;
+								
+								// No update if delete
+								delete imageUpdates[property];
+							}		
 						}
-					} else if (event.type === 'delete') {
-						if (typeof(dbImage.const.dbId) !== 'undefined' && dbImage.const.dbId !== null && typeof(dbImage[eternityTag + "_to_deallocate"]) === 'undefined') { // 
-						// if (typeof(dbImage.const.dbId) !== 'undefined' && dbImage.const.dbId !== null && dbImage[eternityTag + "Persistent"]) { // 
-							// Maintain image structure
-							// decreaseLoadedIncomingMacroReferenceCounters(dbImage, event.); // TODO: Decrease counters here?
-							
-							// Only update if we will not do a full write on this image. 
-							let dbId = dbImage.const.dbId;
-							if (typeof(pendingUpdate.imageUpdates[dbId]) === 'undefined') {
-								pendingUpdate.imageUpdates[dbId] = {};
-							}
-							if (typeof(pendingUpdate.imageUpdates[dbId]["_eternityDeletedKeys"]) === 'undefined') {
-								pendingUpdate.imageUpdates[dbId]["_eternityDeletedKeys"] = {};
-							}
-							let imageUpdates = pendingUpdate.imageUpdates[dbId];
-							let deletedKeys = imageUpdates["_eternityDeletedKeys"];
-							
-							// Serialized value with temporary db ids. 
-							let property = event.property;
-							property = imageCausality.transformPossibleIdExpression(property, imageIdToDbIdOrTmpDbId);
-							deletedKeys[property] = true;
-							delete imageUpdates[event.property];
-						}
-					}		
+					}
 				});								
 			});
-			if(trace.eternity) log(pendingUpdate, 4);
-			nextTmpDbId = 0;
-			let result = pendingUpdate;
-			pendingUpdate = null;
 			trace.eternity && logUngroup();
-			return result;
+			return compiledUpdate;
 		}
 		
 	
@@ -775,17 +834,16 @@
 		 *        Second stage: Write in two phases
 		 *-----------------------------------------------*/
 
-		let ongoingUpdate;
-		let tmpDbIdToDbId;
+		let tmpDbIdToDbId = {};
 
 		function flushToDatabase() {
-			while (pendingUpdates.length > 0) {
-				// Serialize changes in memory
-				ongoingUpdate = compileUpdate(pendingUpdates.shift());
-				
-				// Push changes to database
+			while(pendingUpdate !== null) {
 				twoPhaseComit();				
 			}
+			
+			tmpDbIdToDbId = {};	
+			nextTmpDbId = 0;
+			tmpDbIdToDbImage = {};
 		} 
 		 
 		function startWriteDaemon() {
@@ -798,31 +856,38 @@
 		}
 		 
 		function twoPhaseComit() {
-			tmpDbIdToDbId = {};
-			// log("twoPhaseComit:");
-			// logGroup();
+			log("twoPhaseComit:");
+			logGroup();
+			log(pendingUpdate, 10);
 
 			// First Phase, store transaction in database for transaction completion after failure (cannot rollback since previous values are not stored, could be future feature?). This write is atomic to MongoDb.
-			if (configuration.twoPhaseComit) mockMongoDB.updateRecord(updateDbId, ongoingUpdate);
+			if (configuration.twoPhaseComit) mockMongoDB.updateRecord(updateDbId, pendingUpdate);
 			
 			// Create 
-			let imageCreations = ongoingUpdate.imageCreations;
+			let imageCreations = pendingUpdate.imageCreations;
 			for (let tmpDbId in imageCreations) {
 				writePlaceholderToDatabase(tmpDbId); // sets up tmpDbIdToDbId
 			}
 			for (let tmpDbId in imageCreations) {
 				writeSerializedImageToDatabase(tmpDbIdToDbId[tmpDbId], replaceTmpDbIdsWithDbIds(imageCreations[tmpDbId]));
 			}
-			for (let tmpDbId in ongoingUpdate.imageDeallocations) {
-				mockMongoDB.deallocate(tmpDbId);
+			for (let dbId in pendingUpdate.imageDeallocations) {
+				mockMongoDB.deallocate(dbId);
 			}			
 			
+			log("tmpDbIdToDbId:");
+			log(tmpDbIdToDbId, 2);
 			
 			// TODO: Update entire record if the number of updates are more than half of fields.
-			if(trace.eternity) log("ongoingUpdate.imageUpdates:" + Object.keys(ongoingUpdate.imageUpdates).length);
-			for (let id in ongoingUpdate.imageUpdates) {
+			if(trace.eternity) log("pendingUpdate.imageUpdates:" + Object.keys(pendingUpdate.imageUpdates).length);
+			for (let id in pendingUpdate.imageUpdates) {
+				let updates = pendingUpdate.imageUpdates[id];
+				if (isTmpDbId(id)) {
+					log("id: " + id);
+					if (typeof(tmpDbIdToDbId[id]) === 'undefined0') throw new Error("No db id found for tmpDbId: " + id);
+					id = tmpDbIdToDbId[id];
+				}
 				// log("update dbImage id:" + id + " keys: " + Object.keys(pendingImageUpdates[id]));
-				let updates = ongoingUpdate.imageUpdates[id];
 				let updatesWithoutTmpDbIds = replaceTmpDbIdsWithDbIds(updates);
 				if(trace.eternity) log(updatesWithoutTmpDbIds);
 				for (let property in updatesWithoutTmpDbIds) {
@@ -840,6 +905,7 @@
 					}
 				}
 			}
+			
 
 			// Write dbIds back to the images. TODO: consider, how do they get back to the object? maybe not, so we need to move it there in the unload code. 
 			// Note: this stage can be ignored in recovery mode, as then there no previously loaded objects.
@@ -857,8 +923,9 @@
 			// Finish, clean up transaction
 			if (configuration.twoPhaseComit) mockMongoDB.updateRecord(updateDbId, { name: "updatePlaceholder" });
 			
-			// logUngroup();
-			tmpDbIdToDbId = null;
+			// Remove pending update
+			logUngroup();
+			pendingUpdate = null;
 		}
 
 		function removeTmpDbIdsFromProperty(property) {
@@ -2430,7 +2497,6 @@
 		let instance = {};
 		Object.assign(instance, objectCausality);
 		Object.assign(instance, {
-			pendingUpdates : pendingUpdates,
 			objectCausality : objectCausality, 
 			imageCausality : imageCausality,
 			setPostPulseActionBeforeStorage : setPostPulseActionBeforeStorage,

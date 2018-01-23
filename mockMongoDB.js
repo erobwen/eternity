@@ -118,8 +118,11 @@
 		function getRecord(id) {
 			if (isDeallocated(id)) {
 				throw new Error("Cannot request a deleted record! id:" + id);
+			} else if (typeof(dataRecords[id]) === 'undefined') {
+				throw new Error("Cannot find any record for id '" + id + "'");
+			} else {				
+				return JSON.parse(dataRecords[id]);
 			}
-			return JSON.parse(dataRecords[id]);
 		}		
 		
 		function deleteRecord(id) {

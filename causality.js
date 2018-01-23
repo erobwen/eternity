@@ -1797,7 +1797,9 @@
 					// console.log(classOrPrototype);
 					createdTarget = new classRegistry[createdTarget]();
 				}
-			}
+			} 
+			// else if (typeof(createdTarget) === 'object') {
+			// }
 			let cacheId = null;
 			let initialData = null;
 			if (typeof(cacheIdOrInitData) !== 'undefined') {
@@ -3757,6 +3759,7 @@
 			activateSpecialFeatures : false, 
 						
 			// Special features
+			useFreshTargetInCreate : false,
 			useIncomingStructures : false,
 			incomingStructureChunkSize: 500,
 			incomingChunkRemovedCallback : null,
