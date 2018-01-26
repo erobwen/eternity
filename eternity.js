@@ -13,6 +13,18 @@
 		return Array.prototype.slice.call(arguments);
 	};
 	
+	function firstKey(object) {
+		let result = null;
+		if (typeof(object) !== 'undefined') {
+			for(let key in object) {
+				result = key;
+				break;
+			}			
+		}
+		return result;
+	}
+	
+	
 	// Neat logging
 	let objectlog = require('./objectlog.js');
 
@@ -630,6 +642,8 @@
 		function compileUpdate(events) {
 			let compiledUpdate = {
 				imageCreations : {},
+				pendingImageCreations : 0, 
+				imageWritings : {},
 				imageDeallocations : {},
 				imageUpdates : {},
 				needsSaving : true
@@ -883,7 +897,110 @@
 			});
 		}
 		 
+		
+		function oneStepTwoPhaseCommit() {
+			// log("oneStepTwoPhaseCommit: ");
+			// log(pendingUpdate, 10);
+			let stepDone = false;
+			let allDone = true;
+			if (configuration.twoPhaseComit && pendingUpdate.needsSaving) allDone = false;
+			// log(allDone);
+			if (!stepDone && configuration.twoPhaseComit && pendingUpdate.needsSaving) {
+				pendingUpdate.needsSaving = false;
+				mockMongoDB.updateRecord(updateDbId, pendingUpdate);
+				stepDone = true;
+			}
+			
+			let imageCreationTmpDbId = firstKey(pendingUpdate.imageCreations);
+			if (imageCreationTmpDbId !== null) allDone = false;
+			// log(allDone);
+			if (!stepDone && imageCreationTmpDbId !== null) {
+				let tmpDbId = imageCreationTmpDbId;
+				let content = pendingUpdate.imageCreations[tmpDbId];
+				delete pendingUpdate.imageCreations[tmpDbId];
+				pendingUpdate.pendingImageCreations++;
+				let dbId = writePlaceholderToDatabase(tmpDbId); // sets up tmpDbIdToDbId
+				pendingUpdate.pendingImageCreations--;
+				pendingUpdate.imageWritings[tmpDbId] = content;
+				
+				// Clean out map
+				// log(tmpDbIdToDbImage);
+				// log(tmpDbId);
+				let dbImage = tmpDbIdToDbImage[tmpDbId];
+				delete tmpDbIdToDbImage[tmpDbId];
+				
+				// Update image
+				delete dbImage.const.tmpDbId;
+				dbImage.const.dbId = dbId;
+				dbImage.const.serializedMongoDbId = imageCausality.idExpression(dbId);
+
+				stepDone = true;
+			}
+			
+			if (pendingUpdate.pendingImageCreations !== 0) allDone = false;
+			if (pendingUpdate.pendingImageCreations === 0) {			
+				let imageWritingsTmpDbId = firstKey(pendingUpdate.imageWritings);
+				if (imageWritingsTmpDbId !== null) allDone = false;
+				if (!stepDone && imageWritingsTmpDbId !== null) {
+					let tmpDbId = imageWritingsTmpDbId;
+					let contents = pendingUpdate.imageWritings[tmpDbId];
+					delete pendingUpdate.imageWritings[tmpDbId];
+					mockMongoDB.updateRecord(tmpDbIdToDbId[tmpDbId], replaceTmpDbIdsWithDbIds(contents));
+					stepDone = true;
+				}
+				
+				let imageUpdatesKey = firstKey(pendingUpdate.imageUpdates);
+				if (imageUpdatesKey !== null) allDone = false;
+				// log(allDone);
+				if (!stepDone && imageUpdatesKey !== null) {
+					let imagePropertyUpdates = pendingUpdate.imageUpdates[imageUpdatesKey];
+					let savedTmpDbId = null;
+					if (isTmpDbId(imageUpdatesKey))  {
+						// throw new Error("Update with tmpDbId!!!: " + imageUpdatesKey);
+						savedTmpDbId = imageUpdatesKey;
+						imageUpdatesKey = tmpDbIdToDbId[imageUpdatesKey];
+					}
+					
+					let property = firstKey(imagePropertyUpdates);
+					if (property === null) {
+						delete pendingUpdate.imageUpdates[savedTmpDbId === null ? imageUpdatesKey : savedTmpDbId];
+					} else if (property === "_eternityDeletedKeys") {
+						let keyToDelete = firstKey(imagePropertyUpdates._eternityDeletedKeys);
+						if(keyToDelete !== null) {
+							delete imagePropertyUpdates._eternityDeletedKeys[keyToDelete];
+							mockMongoDB.deleteRecordPath(imageUpdatesKey, [keyToDelete]);												
+						} else {
+							delete imagePropertyUpdates._eternityDeletedKeys;
+						}
+					} else {
+						let newValue = replaceTmpDbIdsWithDbIds(imagePropertyUpdates[property]);
+						delete imagePropertyUpdates[property];
+						mockMongoDB.updateRecordPath(imageUpdatesKey, [property], newValue);					
+					}
+					
+					stepDone = true;
+				}				
+			}
+			
+			let imageDeallocationsKey = firstKey(pendingUpdate.imageDeallocations);
+			if (imageDeallocationsKey !== null) allDone = false;
+			// log(allDone);
+			if (!stepDone && imageDeallocationsKey !== null) {
+				delete pendingUpdate.imageDeallocations[imageDeallocationsKey];
+				mockMongoDB.deallocate(imageDeallocationsKey);
+				
+				stepDone = true;
+			}
+			
+			// log("allDone:" + allDone);
+			return allDone; 
+		} 
+		
+		 
 		function twoPhaseComit() {
+			while(!oneStepTwoPhaseCommit()) {}
+			pendingUpdate = null;
+			return;
 			// log("twoPhaseComit:");
 			// logGroup();
 			// log(pendingUpdate, 10);
@@ -1026,6 +1143,7 @@
 		function writePlaceholderToDatabase(tmpDbId) {
 			let dbId = mockMongoDB.saveNewRecord({_eternitySerializedTmpDbId : tmpDbId}); // A temporary id so we can trace it down in case of failure.
 			tmpDbIdToDbId[tmpDbId] = dbId; //imageCausality.idExpression(dbId); ? 
+			return dbId;
 		}
 		
 		
