@@ -2576,7 +2576,7 @@
 					this.sources.forEach(function(observerSet) {
 						removeReverseReference(id, observerSet);
 					});
-					this.sources.lenght = 0;  // From repeater itself.
+					this.sources.length = 0;  // From repeater itself.
 				}
 			};
 			if (configuration.reactiveStructuresAsCausalityObjects) context = createImmutable(context);

@@ -643,6 +643,7 @@
 			let compiledUpdate = {
 				imageCreations : {},
 				pendingImageCreations : 0, 
+				pendingOtherDbOperations : 0,
 				imageWritings : {},
 				imageDeallocations : {},
 				imageUpdates : {},
@@ -918,9 +919,11 @@
 				let tmpDbId = imageCreationTmpDbId;
 				let content = pendingUpdate.imageCreations[tmpDbId];
 				delete pendingUpdate.imageCreations[tmpDbId];
+				
 				pendingUpdate.pendingImageCreations++;
-				let dbId = writePlaceholderToDatabase(tmpDbId); // sets up tmpDbIdToDbId
+				let dbId = writePlaceholderToMongoDb(tmpDbId); // sets up tmpDbIdToDbId
 				pendingUpdate.pendingImageCreations--;
+				
 				pendingUpdate.imageWritings[tmpDbId] = content;
 				
 				// Clean out map
@@ -945,7 +948,11 @@
 					let tmpDbId = imageWritingsTmpDbId;
 					let contents = pendingUpdate.imageWritings[tmpDbId];
 					delete pendingUpdate.imageWritings[tmpDbId];
+					
+					pendingUpdate.pendingOtherDbOperations++;
 					mockMongoDB.updateRecord(tmpDbIdToDbId[tmpDbId], replaceTmpDbIdsWithDbIds(contents));
+					pendingUpdate.pendingOtherDbOperations--;
+					
 					stepDone = true;
 				}
 				
@@ -968,14 +975,18 @@
 						let keyToDelete = firstKey(imagePropertyUpdates._eternityDeletedKeys);
 						if(keyToDelete !== null) {
 							delete imagePropertyUpdates._eternityDeletedKeys[keyToDelete];
+							pendingUpdate.pendingOtherDbOperations++;
 							mockMongoDB.deleteRecordPath(imageUpdatesKey, [keyToDelete]);												
+							pendingUpdate.pendingOtherDbOperations--;
 						} else {
 							delete imagePropertyUpdates._eternityDeletedKeys;
 						}
 					} else {
 						let newValue = replaceTmpDbIdsWithDbIds(imagePropertyUpdates[property]);
 						delete imagePropertyUpdates[property];
+						pendingUpdate.pendingOtherDbOperations++;
 						mockMongoDB.updateRecordPath(imageUpdatesKey, [property], newValue);					
+						pendingUpdate.pendingOtherDbOperations--;
 					}
 					
 					stepDone = true;
@@ -987,9 +998,15 @@
 			// log(allDone);
 			if (!stepDone && imageDeallocationsKey !== null) {
 				delete pendingUpdate.imageDeallocations[imageDeallocationsKey];
+				pendingUpdate.pendingOtherDbOperations++;
 				mockMongoDB.deallocate(imageDeallocationsKey);
+				pendingUpdate.pendingOtherDbOperations--;
 				
 				stepDone = true;
+			}
+			
+			if (pendingUpdate.pendingOtherDbOperations > 0) {
+				allDone = false;
 			}
 			
 			// log("allDone:" + allDone);
@@ -1011,7 +1028,7 @@
 			// Create 
 			let imageCreations = pendingUpdate.imageCreations;
 			for (let tmpDbId in imageCreations) {
-				writePlaceholderToDatabase(tmpDbId); // sets up tmpDbIdToDbId
+				writePlaceholderToMongoDb(tmpDbId); // sets up tmpDbIdToDbId
 			}
 			for (let tmpDbId in imageCreations) {
 				writeSerializedImageToDatabase(tmpDbIdToDbId[tmpDbId], replaceTmpDbIdsWithDbIds(imageCreations[tmpDbId]));
@@ -1140,7 +1157,7 @@
 		}
 		
 		
-		function writePlaceholderToDatabase(tmpDbId) {
+		function writePlaceholderToMongoDb(tmpDbId) {
 			let dbId = mockMongoDB.saveNewRecord({_eternitySerializedTmpDbId : tmpDbId}); // A temporary id so we can trace it down in case of failure.
 			tmpDbIdToDbId[tmpDbId] = dbId; //imageCausality.idExpression(dbId); ? 
 			return dbId;
@@ -1481,7 +1498,40 @@
 		let maxNumberOfLoadedObjects = configuration.maxNumberOfLoadedObjects; //10000;
 		// let unloadedObjects = 0;
 		let loadedObjects = 0;
+		let pinnedObjects = 0;
 		
+		function isPinned(object) {
+			return typeof(object.const.pinned) !== 'undefined' && object.const.pinned > 0;
+		}
+		
+		function pin(object) {
+			if (typeof(object.const.pinned) === 'undefined') {
+				object.const.pinned = 1;
+				pinnedObjects++;
+			} else {
+				object.const.pinned++;				
+			}
+		}
+		
+		function unpin(object) {
+			if (typeof(object.const.pinned) === 'undefined') {
+				throw new Error("Cannot unpin an object that is not pinned!");
+			} else {
+				object.const.pinned--;
+				if (object.const.pinned === 0) {
+					delete object.const.pinned;
+					pinnedObjects--;
+				}
+			}
+		}
+		
+		function getLeastActiveNonPinnedObject() {
+			let leastActiveObject = objectCausality.getActivityListLast();
+			while(leastActiveObject !== null && isPinned(leastActiveObject)) {
+				leastActiveObject = objectCausality.getActivityListPrevious(leastActiveObject)
+			}
+			return leastActiveObject;
+		}
 		
 		function unloadAndKillObjects() {
 			// log("unloadAndKillObjects");
