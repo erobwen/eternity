@@ -40,8 +40,9 @@
 			writeRestriction : null,
 			sideEffectBlockStack : [],
 			context : null,
-			microContext : null,
-			nextIsMicroContext : false,
+			independentContext : null,
+			inCachedCall : null,
+			inReCache : null,			
 			contextsScheduledForPossibleDestruction : [],
 			
 			blockingInitialize : 0,
@@ -92,18 +93,18 @@
 		 // Debugging
 		function log(entity, pattern) {
 			state.recordingPaused++;
-			updateInActiveRecording();
+			updateContextState();
 			objectlog.log(entity, pattern);
 			state.recordingPaused--;	
-			updateInActiveRecording();
+			updateContextState();
 		}
 		
 		function logGroup(entity, pattern) {
 			state.recordingPaused++;
-			updateInActiveRecording();
+			updateContextState();
 			objectlog.group(entity, pattern);
 			state.recordingPaused--;
-			updateInActiveRecording();
+			updateContextState();
 		} 
 		
 		function logUngroup() {
@@ -112,10 +113,10 @@
 	
 		function logToString(entity, pattern) {
 			state.recordingPaused++;
-			updateInActiveRecording();
+			updateContextState();
 			let result = objectlog.logToString(entity, pattern);
 			state.recordingPaused--;
-			updateInActiveRecording();
+			updateContextState();
 			return result;
 		}
 		
@@ -764,8 +765,6 @@
 			// console.log("intitializeAsReverseReferencesChunkListThenAddIfNeeded:");
 			// console.log(referingObject);
 
-			
-			// console.log(activeRecorder);
 			if (typeof(incomingStructure.isChunkListHead) === 'undefined') {
 				incomingStructure.isChunkListHead = true;
 				// incomingStructure.contents = { name: "contents" };
@@ -1464,10 +1463,10 @@
 		
 		function objectDigest(object) {
 			liquid.state.recordingPaused++;
-			liquid.updateInActiveRecording();
+			liquid.updateContextState();
 			let result = "[" + getClassName(object) + "." + object.const.id + "]"; // TODO: add name if any... 
 			liquid.state.recordingPaused--;
-			liquid.updateInActiveRecording();
+			liquid.updateContextState();
 			return result;
 		} 
 
@@ -1932,7 +1931,7 @@
 			// });
 			// However, will witout emitting events work for eternity? What does it want really?
 
-			if (inReCache()) {
+			if (state.inReCache) {
 				if (cacheId !== null &&  typeof(state.context.cacheIdObjectMap[cacheId]) !== 'undefined') {
 					// Overlay previously created
 					let infusionTarget = state.context.cacheIdObjectMap[cacheId]; // TODO: this map should be compressed in regards to multi level zombies.
@@ -2058,136 +2057,133 @@
 		 **********************************/
 
 
-		function inCachedCall() {
-			if (state.context === null) {
-				return false;
-			} else {
-				return state.context.type === "cached_call";
+		function updateContextState() {
+			state.inActiveRecording = (state.context !== null) ? ((state.context.type === "recording") && state.recordingPaused === 0) : false;
+			state.activeRecording = (state.inActiveRecording) ? state.context : null;
+			
+			state.inCachedCall = null;
+			state.inReCache = null;
+			if (state.independentContext !== null) {
+				state.inCachedCall = (state.independentContext.type === "cached_call") ? state.independentContext : null; 
+				state.inReCache = (state.independentContext.type === "reCache") ? state.independentContext : null;
 			}
 		}
-
-		function inReCache() {
-			if (state.context === null) {
-				return false;
-			} else {
-				return state.context.type === "reCache";
-			}
-		}
-
-		function noContext() {
-			return state.context === null;
-		}
-
-		function updateInActiveRecording() {
-			state.inActiveRecording = (state.microContext === null) ? false : ((state.microContext.type === "recording") && state.recordingPaused === 0);
-			state.activeRecording = state.inActiveRecording ? state.microContext : null;
-		}
-
-		function getActiveRecording() {
-			return state.activeRecording;
-			// if ((state.microContext === null) ? false : ((state.microContext.type === "recording") && state.recordingPaused === 0)) {
-				// return state.microContext;
-			// } else {
-				// return null;
-			// }
-		}
-
-		function inActiveRepetition() {
-			return (state.microContext === null) ? false : ((state.microContext.type === "repeater") && state.recordingPaused === 0);
-		}
-
-		function getActiveRepeater() {
-			if ((state.microContext === null) ? false : ((state.microContext.type === "repeater") && state.recordingPaused === 0)) {
-				return state.microContext;
-			} else {
-				return null;
-			}
-		}
-
-
-		function enterContextAndExpectMicroContext(type, enteredContext) {
-			state.nextIsMicroContext = true;
-			enterContext(type, enteredContext);
-		}
-
-
+		
 		function removeChildContexts(context) {
-			if (typeof(context.children) !== 'undefined' && context.children.length > 0) {
-				context.children.forEach(function (child) {
-					child.remove();
-				});
-				context.children = [];
+			trace.context && logGroup("removeChildContexts:" + context.type);
+			if (context.child !== null && !context.child.independent) {
+				context.child.removeContextsRecursivley();
 			}
+			context.child = null; // always remove
+			if (context.children !== null) {				
+				context.children.forEach(function (child) {
+					if (!child.independent) {
+						child.removeContextsRecursivley();
+					}
+				});
+			}
+			context.children = []; // always clear
+			trace.context && logUngroup();
+		}
+		
+		
+		function removeContextsRecursivley() {
+			trace.context && logGroup("removeContextsRecursivley");
+			this.remove();
+			this.isRemoved = true;
+			removeChildContexts(this);
+			trace.context && logUngroup();
 		}
 
+		// Optimization, do not create array if not needed.
+		function addChild(context, child) {
+			if (context.child === null && context.children === null) {
+				context.child = child;
+			} else if (context.children === null) {
+				context.children = [context.child, child];
+				context.child = null;
+			} else {
+				context.children.push(child);
+			}
+		}
+		
 		// occuring types: recording, repeater_refreshing, cached_call, reCache, block_side_effects
 		function enterContext(type, enteredContext) {
+			// logGroup("enterContext: " + type);
 			if (typeof(enteredContext.initialized) === 'undefined') {
-				// Enter new context
+				// Initialize context
+				enteredContext.removeContextsRecursivley = removeContextsRecursivley;
+				enteredContext.parent = null;
+				enteredContext.independentParent = state.independentContext;
 				enteredContext.type = type;
-				enteredContext.macro = null;
-
+				enteredContext.child = null;
+				enteredContext.children = null;
 				enteredContext.directlyInvokedByApplication = (state.context === null);
-				if (state.nextIsMicroContext) {
-					// Build a micro context
-					enteredContext.macro = state.microContext;
-					state.microContext.micro = enteredContext;
-					state.nextIsMicroContext = false;
-				} else {
-					// Build a new macro context
-					enteredContext.children = [];
 
-					if (state.context !== null && typeof(enteredContext.independent) === 'undefined') {
-						state.context.children.push(enteredContext);
-					}
-					state.context = enteredContext;
+				// Connect with parent
+				if (state.context !== null) {
+					addChild(state.context, enteredContext)
+					enteredContext.parent = state.context; // Even a shared context like a cached call only has the first callee as its parent. Others will just observe it. 
+				} else {
+					enteredContext.independent = true;
 				}
-				state.microContext = enteredContext;
+
+				if (enteredContext.independent) {
+					state.independentContext = enteredContext;	
+				}
 
 				enteredContext.initialized = true;
 			} else {
-				// Re-enter context
-				let primaryContext = enteredContext;
-				while (primaryContext.macro !== null) {
-					primaryContext = primaryContext.macro
+				if (enteredContext.independent) {
+					state.independentContext = enteredContext;				
+				} else {
+					state.independentContext = enteredContext.independentParent;
 				}
-				state.context = primaryContext;
-
-				state.microContext = enteredContext;
+			}
+			
+			// if (!enteredContext.independent)
+			// if (!enteredContext.independent)
+			if (state.independentContext === null && !enteredContext.independent) {
+				throw new Error("should be!!");
 			}
 
-			// Debug printout of macro hierarchy
-			// let macros = [enteredContext];
-			// let macro =  enteredContext.macro;
-			// while(macro !== null) {
-			//     macros.unshift(macro);
-			//     macro = macro.macro;
-			// }
-			// console.log("====== enterContext ======== " + state.causalityStack.length + " =" + macros.map((context) => { return context.type; }).join("->"));
-			updateInActiveRecording();
-			state.causalityStack.push(enteredContext);
+
+			state.context = enteredContext;
+			updateContextState();
+			// logUngroup();
 			return enteredContext;
 		}
 
 
 		function leaveContext() {
-			let leftContext = state.causalityStack.pop();
-			if (state.causalityStack.length > 0) {
-				state.microContext = state.causalityStack[state.causalityStack.length - 1];
-				let scannedContext = state.microContext;
-				while (scannedContext.macro !== null) {
-					scannedContext = scannedContext.macro;
-				}
-				state.context = scannedContext;
-			} else {
-				state.context = null;
-				state.microContext = null;
+			if (state.context.independent) {
+				state.independentContext = state.context.independentParent;
 			}
-			updateInActiveRecording();
-			// console.log("====== leaveContext ========" + leftContext.type);
+			state.context = state.context.parent;
+			updateContextState();
 		}
 
 
+		function enterIndependentContext() {
+			enterContext("independently", {
+				independent : true,
+				remove : () => {}
+			});
+		}
+		
+		function leaveIndependentContext() {
+			leaveContext();
+		}
+		
+		function independently(action) {
+			enterContext("independently", {
+				independent : true,
+				remove : () => {}
+			}); 
+			action();
+			leaveContext();
+		}
+		
 		/**********************************
 		 *  Pulse & Transactions
 		 *
@@ -2568,6 +2564,7 @@
 			// log("createImmutable...");
 			// Recorder context
 			let context = {
+				independent : false,
 				nextToNotify: null,
 				description: description,
 				uponChangeAction: doAfterChange,
@@ -2599,10 +2596,10 @@
 		
 		function withoutRecording(action) {
 			state.recordingPaused++;
-			updateInActiveRecording();
+			updateContextState();
 			action();
 			state.recordingPaused--;
-			updateInActiveRecording();
+			updateContextState();
 		}
 
 		function emptyObserverSet(observerSet) {
@@ -2696,7 +2693,7 @@
 		function notifyChangeObserver(observer) {
 			trace.set && logGroup("notifyChangeObserver");
 			trace.set && log(observer);
-			if (observer != state.microContext) {
+			if (observer != state.context) {
 				trace.set && log("not writing to itself...");
 				if (typeof(observer.remove) === 'function') {
 					trace.set && log("removing observer	...");
@@ -2768,8 +2765,9 @@
 
 			// Activate!
 			let repeater = {
-				description: description,
-				action: repeaterAction,
+				independent : false,
+				description : description,
+				action : repeaterAction,
 				remove : function() {
 					// throw new Error("Should nt happen");
 					// console.log("removeRepeater: " + repeater.const.id + "." + repeater.description);
@@ -2793,7 +2791,6 @@
 			enterContext('repeater_refreshing', repeater);
 			// console.log("parent context type: " + repeater.parent.type);
 			// console.log("context type: " + repeater.type);
-			state.nextIsMicroContext = true;
 			repeater.returnValue = uponChangeDo(
 				repeater.action,
 				function () {
@@ -3049,7 +3046,6 @@
 					state.contextsScheduledForPossibleDestruction.push(cacheRecord);
 				};
 				enterContext('cached_repeater', cacheRecord);
-				state.nextIsMicroContext = true;
 
 				// cacheRecord.remove = function() {}; // Never removed directly, only when no observers & no direct application call
 				cacheRecord.repeaterHandle = repeatOnChange(repeatedFunction);
@@ -3092,7 +3088,7 @@
 
 		function genericCallAndCacheInCacheFunction() {
 			let argumentsArray = argumentsToArray(arguments);
-			if (inCachedCall() > 0) {
+			if (state.inCachedCall > 0) {
 				return this.const.cached.apply(this, argumentsArray);
 			} else {
 				let functionName = argumentsArray.shift();
@@ -3129,7 +3125,6 @@
 
 				state.cachedCallsCount++;
 				enterContext('cached_call', cacheRecord);
-				state.nextIsMicroContext = true;
 				// Never encountered these arguments before, make a new cache
 				let returnValue = uponChangeDo(
 					function () {
@@ -3357,7 +3352,7 @@
 
 		function genericReCacheInCacheFunction() {
 			let argumentsArray = argumentsToArray(arguments);
-			if (inReCache() > 0) {
+			if (state.inReCache > 0) {
 				return this.const.reCached.apply(this, argumentsArray);
 			} else {
 				let functionName = argumentsArray.shift();
@@ -3385,11 +3380,10 @@
 				};
 
 				// Is this call non-automatic
-				cacheRecord.directlyInvokedByApplication = noContext();
+				cacheRecord.directlyInvokedByApplication = state.context === null;
 
 				// Never encountered these arguments before, make a new cache
 				enterContext('reCache', cacheRecord);
-				state.nextIsMicroContext = true;
 				getSpecifier(cacheRecord, 'contextObservers').removedCallback = function() {
 					state.contextsScheduledForPossibleDestruction.push(cacheRecord);
 				};
@@ -3398,7 +3392,7 @@
 						cacheRecord.newlyCreated = [];
 						let newReturnValue;
 						// console.log("better be true");
-						// console.log(inReCache());
+						// console.log(inReCache);
 						newReturnValue = this[functionName].apply(this, argumentsList);
 						// console.log(cacheRecord.newlyCreated);
 
@@ -3650,7 +3644,7 @@
 			withoutSideEffects : withoutSideEffects,
 			assertNotRecording : assertNotRecording,
 			withoutRecording : withoutRecording,
-			updateInActiveRecording : updateInActiveRecording, 
+			updateInActiveRecording : updateContextState, 
 			withoutNotifyChange : nullifyObserverNotification,
 			withoutEmittingEvents : withoutEmittingEvents,
 			disableIncomingRelations : disableIncomingRelations,
