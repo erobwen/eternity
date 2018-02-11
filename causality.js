@@ -1932,7 +1932,9 @@
 			// However, will witout emitting events work for eternity? What does it want really?
 
 			if (state.inReCache !== null) {
-				if (cacheId !== null &&  typeof(state.inReCache.cacheIdObjectMap[cacheId]) !== 'undefined') {
+				trace.reCreate && log("creating in re create: " + cacheId);
+				if (cacheId !== null && typeof(state.inReCache.cacheIdObjectMap[cacheId]) !== 'undefined') {
+					trace.reCreate && log("...recreating...");
 					// Overlay previously created
 					let infusionTarget = state.inReCache.cacheIdObjectMap[cacheId]; // TODO: this map should be compressed in regards to multi level zombies.
 					infusionTarget.nonForwardConst.storedForwardsTo = infusionTarget.nonForwardConst.forwardsTo;
@@ -3091,7 +3093,7 @@
 
 		function genericCallAndCacheInCacheFunction() {
 			let argumentsArray = argumentsToArray(arguments);
-			if (state.inCachedCall > 0) {
+			if (state.inCachedCall !== null) {
 				return this.const.cached.apply(this, argumentsArray);
 			} else {
 				let functionName = argumentsArray.shift();
@@ -3354,7 +3356,7 @@
 
 		function genericReCacheInCacheFunction() {
 			let argumentsArray = argumentsToArray(arguments);
-			if (state.inReCache > 0) {
+			if (state.inReCache !== null) {
 				return this.const.reCached.apply(this, argumentsArray);
 			} else {
 				let functionName = argumentsArray.shift();
