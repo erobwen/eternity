@@ -2219,10 +2219,14 @@
 			state.inPostPulseProcess++;
 			
 			// Cleanup reactive structures no longer needed
+			// log("postPulseCleanup: " + state.contextsScheduledForPossibleDestruction.length);
 			state.contextsScheduledForPossibleDestruction.forEach(function(context) {
+				// log("destroy context?" + context.type);
 				if (!context.directlyInvokedByApplication) {
+					// log("... indirect...");
 					if (emptyObserverSet(context.contextObservers)) {
-						context.remove();
+						// log("... emptyObserverSet...");
+						context.removeContextsRecursivley();
 					}
 				}
 			});
@@ -2771,9 +2775,8 @@
 				remove : function() {
 					// throw new Error("Should nt happen");
 					// console.log("removeRepeater: " + repeater.const.id + "." + repeater.description);
-					removeChildContexts(this);
+					// removeChildContexts(this);
 					detatchRepeater(this);
-					this.micro.remove(); // Remove recorder!
 				},
 				nextDirty : null,
 				previousDirty : null
@@ -3040,9 +3043,9 @@
 				cacheRecord.independent = true; // Do not delete together with parent
 				cacheRecord.remove = function() {
 					functionCacher.deleteExistingRecord();
-					cacheRecord.micro.remove();
 				};
 				getSpecifier(cacheRecord, "contextObservers").removedCallback = function() {
+					// log("removeCallback: in repeater... ");
 					state.contextsScheduledForPossibleDestruction.push(cacheRecord);
 				};
 				enterContext('cached_repeater', cacheRecord);
@@ -3120,7 +3123,6 @@
 				// Is this call non-automatic
 				cacheRecord.remove = function() {
 					functionCacher.deleteExistingRecord();
-					cacheRecord.micro.remove(); // Remove recorder
 				};
 
 				state.cachedCallsCount++;
@@ -3376,7 +3378,6 @@
 				cacheRecord.cacheIdObjectMap = {};
 				cacheRecord.remove = function() {
 					functionCacher.deleteExistingRecord();
-					cacheRecord.micro.remove(); // Remove recorder
 				};
 
 				// Is this call non-automatic
