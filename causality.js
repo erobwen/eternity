@@ -1931,17 +1931,17 @@
 			// });
 			// However, will witout emitting events work for eternity? What does it want really?
 
-			if (state.inReCache) {
-				if (cacheId !== null &&  typeof(state.context.cacheIdObjectMap[cacheId]) !== 'undefined') {
+			if (state.inReCache !== null) {
+				if (cacheId !== null &&  typeof(state.inReCache.cacheIdObjectMap[cacheId]) !== 'undefined') {
 					// Overlay previously created
-					let infusionTarget = state.context.cacheIdObjectMap[cacheId]; // TODO: this map should be compressed in regards to multi level zombies.
+					let infusionTarget = state.inReCache.cacheIdObjectMap[cacheId]; // TODO: this map should be compressed in regards to multi level zombies.
 					infusionTarget.nonForwardConst.storedForwardsTo = infusionTarget.nonForwardConst.forwardsTo;
 					infusionTarget.nonForwardConst.forwardsTo = proxy;
-					state.context.newlyCreated.push(infusionTarget);
+					state.inReCache.newlyCreated.push(infusionTarget);
 					return infusionTarget;   // Borrow identity of infusion target.
 				} else {
 					// Newly created in this reCache cycle. Including overlaid ones.
-					state.context.newlyCreated.push(proxy);
+					state.inReCache.newlyCreated.push(proxy);
 				}
 			}
 
