@@ -330,7 +330,7 @@
 		} 
 		 
 		/**
-		 * Traverse the incoming relation structure foobar
+		 * Traverse the incoming relation structure
 		 */
 		function getReferredObject(referredItem) {
 			trace.get && logGroup("getReferredObject");
@@ -1394,10 +1394,6 @@
 				logGroup("getHandlerObject: "  + this.const.name + "." + key);
 			}
 			key = key.toString();
-			// log("getHandlerObject: " + key);
-			// if (key instanceof 'Symbol') { incoming
-				// throw "foobar";
-			// }
 			ensureInitialized(this, target);
 			
 			if (this.const.forwardsTo !== null && key !== "nonForwardConst") {
@@ -3365,6 +3361,27 @@
 				return this[functionName].apply(this, argumentsArray);
 			}
 		}
+		
+		function reCreate(reCreationState, creationAction) {
+			state.inReCache.newlyCreated = [];
+			creationAction();
+			
+			withoutRecording(function() { // Do not observe reads from the overlays
+				state.inReCache.newlyCreated.forEach(function(created) {
+					if (created.nonForwardConst.forwardsTo !== null) {
+						// console.log("Has overlay, merge!!!!");
+						mergeOverlayIntoObject(created);
+					} else {
+						// console.log("Infusion id of newly created:");
+						// console.log(created.const.cacheId);
+						if (created.const.cacheId !== null) {
+
+							state.inReCache.cacheIdObjectMap[created.const.cacheId] = created;
+						}
+					}
+				});
+			}.bind(this));
+		}
 
 		function genericReCacheFunction() {
 			// console.log("call reCache");
@@ -3379,7 +3396,8 @@
 				let cacheRecord = functionCacher.createNewRecord();
 				cacheRecord.independent = true; // Do not delete together with parent
 
-				cacheRecord.cacheIdObjectMap = {};
+				cacheRecord.cacheIdObjectMap = {}; // foobar
+				cacheRecord.reCreateState = {};
 				cacheRecord.remove = function() {
 					functionCacher.deleteExistingRecord();
 				};
@@ -3394,29 +3412,11 @@
 				};
 				cacheRecord.repeaterHandler = repeatOnChange(
 					function () {
-						cacheRecord.newlyCreated = [];
 						let newReturnValue;
-						// console.log("better be true");
-						// console.log(inReCache);
-						newReturnValue = this[functionName].apply(this, argumentsList);
-						// console.log(cacheRecord.newlyCreated);
-
-						// console.log("Assimilating:");
-						withoutRecording(function() { // Do not observe reads from the overlays
-							cacheRecord.newlyCreated.forEach(function(created) {
-								if (created.nonForwardConst.forwardsTo !== null) {
-									// console.log("Has overlay, merge!!!!");
-									mergeOverlayIntoObject(created);
-								} else {
-									// console.log("Infusion id of newly created:");
-									// console.log(created.const.cacheId);
-									if (created.const.cacheId !== null) {
-
-										cacheRecord.cacheIdObjectMap[created.const.cacheId] = created;
-									}
-								}
-							});
-						}.bind(this));
+						
+						reCreate(cacheRecord.reCreateState, () => {
+							newReturnValue = this[functionName].apply(this, argumentsList);							
+						});
 
 						// See if we need to trigger event on return value
 						if (newReturnValue !== cacheRecord.returnValue) {
