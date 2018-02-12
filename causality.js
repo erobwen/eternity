@@ -1459,11 +1459,11 @@
 		}
 		
 		function objectDigest(object) {
-			liquid.state.recordingPaused++;
-			liquid.updateContextState();
+			state.recordingPaused++;
+			updateContextState();
 			let result = "[" + getClassName(object) + "." + object.const.id + "]"; // TODO: add name if any... 
-			liquid.state.recordingPaused--;
-			liquid.updateContextState();
+			state.recordingPaused--;
+			updateContextState();
 			return result;
 		} 
 
@@ -2061,7 +2061,7 @@
 
 		function updateContextState() {
 			if (state.context !== null) {
-				state.inActiveRecording = (state.context !== null && state.context.activeRecording !== null);
+				state.inActiveRecording = (state.recordingPaused === 0 && state.context !== null && state.context.activeRecording !== null);
 				state.activeRecording = (state.inActiveRecording) ? state.context.activeRecording : null;
 				state.inCachedCall = state.context.inCachedCall;
 				state.inReCache = state.context.inCachedCall;
@@ -2076,7 +2076,7 @@
 		}
 		
 		function removeChildContexts(context) {
-			delete context.parent;
+			// delete context.parent; // do not remove parent reference!
 			
 			trace.context && logGroup("removeChildContexts:" + context.type);
 			if (context.child !== null && !context.child.independent) {
@@ -2118,12 +2118,12 @@
 		}
 
 		function connectWithParent(parent, child) {			
-			if (parent !== null) {
+			if (parent === null) {
+				child.independent = true; // has to be!
+				child.parent = null;
+			} else {
 				// Connect with parent
 				addChild(parent, child);				
-				child.independent = true; // has to be!
-			} else {
-				child.parent = null;
 			}
 			
 			if (child.independent || parent === null) {
@@ -2145,13 +2145,13 @@
 		
 		// occuring types: recording, repeater_refreshing, cached_call, reCache, block_side_effects
 		function enterContext(type, enteredContext) {
-			// logGroup("enterContext: " + type);
+			trace.context && logGroup("enterContext: " + type);
 			if (typeof(enteredContext.initialized) === 'undefined') {
 				// Initialize context
-				enteredContext.removeContextsRecursivley = removeContextsRecursivley;
-				enteredContext.parent = null;
 				enteredContext.type = type;
+				enteredContext.removeContextsRecursivley = removeContextsRecursivley;
 				
+				enteredContext.parent = null;
 				enteredContext.child = null;
 				enteredContext.children = null;
 				
@@ -2163,16 +2163,18 @@
 			}
 			
 			state.context = enteredContext;
+			if (typeof(state.context) === 'undefined') throw new Error("...");
 			
 			updateContextState();
-			// logUngroup();
 			return enteredContext;
 		}
 
 
 		function leaveContext() {
+			trace.context && logUngroup();
 			if (state.context !== null) {
-				state.context = state.context.parent;				
+				state.context = state.context.parent;
+				if (typeof(state.context) === 'undefined') throw new Error("...");
 			}
 			updateContextState();
 		}
@@ -2712,6 +2714,7 @@
 			trace.set && logGroup("notifyChangeObserver");
 			trace.set && log(observer);
 			if (observer != state.context) {
+			// if (state.context !== null && state.context.activeRecording !== observer) {
 				trace.set && log("not writing to itself...");
 				if (typeof(observer.remove) === 'function') {
 					trace.set && log("removing observer	...");
@@ -3385,7 +3388,7 @@
 				remove : function() {}
 			};
 			enterContext('reCreate', reCreationContext);
-			creationAction();
+			let returnValue = creationAction();
 			withoutRecording(function() { // Do not observe reads from the overlays
 				reCreationContext.newlyCreated.forEach(function(created) {
 					if (created.nonForwardConst.forwardsTo !== null) {
@@ -3402,6 +3405,7 @@
 				});
 			});
 			leaveContext();
+			return returnValue;
 		}
 
 		function genericReCacheFunction() {
@@ -3430,19 +3434,23 @@
 				getSpecifier(cacheRecord, 'contextObservers').removedCallback = function() {
 					state.contextsScheduledForPossibleDestruction.push(cacheRecord);
 				};
-				reCreate(cacheRecord.reCreateState, (function() {
-					cacheRecord.repeaterHandler = repeatOnChange(
-						(function(){
-							let newReturnValue = this[functionName].apply(this, argumentsList);							
+				
+				cacheRecord.repeaterHandler = repeatOnChange(
+					(function(){
+						let newReturnValue;
+						// log("repeating...");
+						
+						reCreate(cacheRecord.reCreateState, (function() {
+							newReturnValue = this[functionName].apply(this, argumentsList);							
+						}.bind(this)));
 
-							// See if we need to trigger event on return value
-							if (newReturnValue !== cacheRecord.returnValue) {
-								cacheRecord.returnValue = newReturnValue;
-								notifyChangeObservers(cacheRecord.contextObservers);
-							}
-						}.bind(this))
-					);
-				}.bind(this)));
+						// See if we need to trigger event on return value
+						if (newReturnValue !== cacheRecord.returnValue) {
+							cacheRecord.returnValue = newReturnValue;
+							notifyChangeObservers(cacheRecord.contextObservers);
+						}
+					}.bind(this))
+				);
 				
 				leaveContext();
 				registerAnyChangeObserver(cacheRecord.contextObservers);
