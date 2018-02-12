@@ -36,13 +36,14 @@
 			inPostPulseProcess : 0,
 			pulseEvents : [],
 			
-			causalityStack : [],
+			// causalityStack : [],
 			writeRestriction : null,
 			sideEffectBlockStack : [],
 			context : null,
 			independentContext : null,
 			inCachedCall : null,
-			inReCache : null,			
+			inReCache : null,
+			inReCreate : null,
 			contextsScheduledForPossibleDestruction : [],
 			
 			blockingInitialize : 0,
@@ -1762,8 +1763,9 @@
 		function resetObjectIds() {
 			nextId = 0;
 		}
-		 
-		function create(createdTarget, cacheIdOrInitData) {
+		
+		
+		function create(createdTarget, cacheIdOrInitData) { // maincreate
 			if (trace.basic > 0) {
 				log("create, target type: " + typeof(createdTarget));
 				logGroup();
@@ -2058,18 +2060,24 @@
 
 
 		function updateContextState() {
-			state.inActiveRecording = (state.context !== null) ? ((state.context.type === "recording") && state.recordingPaused === 0) : false;
-			state.activeRecording = (state.inActiveRecording) ? state.context : null;
-			
-			state.inCachedCall = null;
-			state.inReCache = null;
-			if (state.independentContext !== null) {
-				state.inCachedCall = (state.independentContext.type === "cached_call") ? state.independentContext : null; 
-				state.inReCache = (state.independentContext.type === "reCache") ? state.independentContext : null;
-			}
+			if (state.context !== null) {
+				state.inActiveRecording = (state.context !== null && state.context.activeRecording !== null);
+				state.activeRecording = (state.inActiveRecording) ? state.context.activeRecording : null;
+				state.inCachedCall = state.context.inCachedCall;
+				state.inReCache = state.context.inCachedCall;
+				state.inReCreate = state.context.inCachedCall;				
+			} else {
+				state.inActiveRecording = false;
+				state.activeRecording = null;
+				state.inCachedCall = null;
+				state.inReCache = null;
+				state.inReCreate = null;
+			}			
 		}
 		
 		function removeChildContexts(context) {
+			delete context.parent;
+			
 			trace.context && logGroup("removeChildContexts:" + context.type);
 			if (context.child !== null && !context.child.independent) {
 				context.child.removeContextsRecursivley();
@@ -2097,6 +2105,8 @@
 
 		// Optimization, do not create array if not needed.
 		function addChild(context, child) {
+			child.parent = context; // Note: Even a shared context like a cached call only has the first callee as its parent. Others will just observe it.
+
 			if (context.child === null && context.children === null) {
 				context.child = child;
 			} else if (context.children === null) {
@@ -2104,6 +2114,32 @@
 				context.child = null;
 			} else {
 				context.children.push(child);
+			}
+		}
+
+		function connectWithParent(parent, child) {			
+			if (parent !== null) {
+				// Connect with parent
+				addChild(parent, child);				
+				child.independent = true; // has to be!
+			} else {
+				child.parent = null;
+			}
+			
+			if (child.independent || parent === null) {
+				// Initialize state
+				child.independentContext = child;
+				child.activeRecording = child.type === "recording" ? child : null;
+				child.inReCreate = child.type === "reCreate" ? child : null;
+				child.inReCache = child.type === "reCache" ? child : null;
+				child.inCachedCall = child.type === "cached_call" ? child : null;
+			} else {
+				// Inherit state
+				child.independentContext = parent.independentContext;
+				child.activeRecording = child.type === "recording" ? child : parent.activeRecording;
+				child.inReCreate = child.type === "reCreate" ? child : parent.inReCreate;
+				child.inReCache = child.type === "reCache" ? child : parent.inReCache;
+				child.inCachedCall = child.type === "cached_call" ? child : parent.inCachedCall;
 			}
 		}
 		
@@ -2114,41 +2150,20 @@
 				// Initialize context
 				enteredContext.removeContextsRecursivley = removeContextsRecursivley;
 				enteredContext.parent = null;
-				enteredContext.independentParent = state.independentContext;
 				enteredContext.type = type;
+				
 				enteredContext.child = null;
 				enteredContext.children = null;
+				
 				enteredContext.directlyInvokedByApplication = (state.context === null);
-
-				// Connect with parent
-				if (state.context !== null) {
-					addChild(state.context, enteredContext)
-					enteredContext.parent = state.context; // Even a shared context like a cached call only has the first callee as its parent. Others will just observe it. 
-				} else {
-					enteredContext.independent = true;
-				}
-
-				if (enteredContext.independent) {
-					state.independentContext = enteredContext;	
-				}
-
+				
+				connectWithParent(state.context, enteredContext);
+				
 				enteredContext.initialized = true;
-			} else {
-				if (enteredContext.independent) {
-					state.independentContext = enteredContext;				
-				} else {
-					state.independentContext = enteredContext.independentParent;
-				}
 			}
 			
-			// if (!enteredContext.independent)
-			// if (!enteredContext.independent)
-			if (state.independentContext === null && !enteredContext.independent) {
-				throw new Error("should be!!");
-			}
-
-
 			state.context = enteredContext;
+			
 			updateContextState();
 			// logUngroup();
 			return enteredContext;
@@ -2156,10 +2171,9 @@
 
 
 		function leaveContext() {
-			if (state.context.independent) {
-				state.independentContext = state.context.independentParent;
+			if (state.context !== null) {
+				state.context = state.context.parent;				
 			}
-			state.context = state.context.parent;
 			updateContextState();
 		}
 
@@ -3363,16 +3377,17 @@
 		}
 		
 		function reCreate(reCreationState, creationAction) {
-			state.inReCache.newlyCreated = [];
-			creationAction();
-			enterContext('reCreate', {
+			// state.inReCache.newlyCreated = [];
+			let reCreationContext = {
 				independent : false,
-				// cacheIdObjectMap : reCreationState,
-				// newlyCreated : [],
+				cacheIdObjectMap : reCreationState,
+				newlyCreated : [],
 				remove : function() {}
-			});
+			};
+			enterContext('reCreate', reCreationContext);
+			creationAction();
 			withoutRecording(function() { // Do not observe reads from the overlays
-				state.inReCache.newlyCreated.forEach(function(created) {
+				reCreationContext.newlyCreated.forEach(function(created) {
 					if (created.nonForwardConst.forwardsTo !== null) {
 						// console.log("Has overlay, merge!!!!");
 						mergeOverlayIntoObject(created);
@@ -3381,11 +3396,11 @@
 						// console.log(created.const.cacheId);
 						if (created.const.cacheId !== null) {
 
-							state.inReCache.cacheIdObjectMap[created.const.cacheId] = created;
+							reCreationContext.cacheIdObjectMap[created.const.cacheId] = created;
 						}
 					}
 				});
-			}.bind(this));
+			});
 			leaveContext();
 		}
 
@@ -3402,35 +3417,33 @@
 				let cacheRecord = functionCacher.createNewRecord();
 				cacheRecord.independent = true; // Do not delete together with parent
 
-				cacheRecord.cacheIdObjectMap = {};
 				cacheRecord.reCreateState = {};
 				cacheRecord.remove = function() {
 					functionCacher.deleteExistingRecord();
 				};
 
 				// Is this call non-automatic
-				cacheRecord.directlyInvokedByApplication = state.context === null;
+				cacheRecord.directlyInvokedByApplication = (state.context === null);
 
 				// Never encountered these arguments before, make a new cache
 				enterContext('reCache', cacheRecord);
 				getSpecifier(cacheRecord, 'contextObservers').removedCallback = function() {
 					state.contextsScheduledForPossibleDestruction.push(cacheRecord);
 				};
-				cacheRecord.repeaterHandler = repeatOnChange(
-					function () {
-						let newReturnValue;
-						
-						reCreate(cacheRecord.reCreateState, () => {
-							newReturnValue = this[functionName].apply(this, argumentsList);							
-						});
+				reCreate(cacheRecord.reCreateState, (function() {
+					cacheRecord.repeaterHandler = repeatOnChange(
+						(function(){
+							let newReturnValue = this[functionName].apply(this, argumentsList);							
 
-						// See if we need to trigger event on return value
-						if (newReturnValue !== cacheRecord.returnValue) {
-							cacheRecord.returnValue = newReturnValue;
-							notifyChangeObservers(cacheRecord.contextObservers);
-						}
-					}.bind(this)
-				);
+							// See if we need to trigger event on return value
+							if (newReturnValue !== cacheRecord.returnValue) {
+								cacheRecord.returnValue = newReturnValue;
+								notifyChangeObservers(cacheRecord.contextObservers);
+							}
+						}.bind(this))
+					);
+				}.bind(this)));
+				
 				leaveContext();
 				registerAnyChangeObserver(cacheRecord.contextObservers);
 				return cacheRecord.returnValue;
@@ -3737,7 +3750,7 @@
 			getActivityListPrevious : getActivityListPrevious,
 			pokeObject : pokeObject,
 			removeFromActivityList : removeFromActivityList
-		}
+		};
 		Object.assign(causalityInstance, languageExtensions);
 		Object.assign(causalityInstance, debuggingAndTesting);
 		return causalityInstance;
