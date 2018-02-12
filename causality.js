@@ -3365,7 +3365,12 @@
 		function reCreate(reCreationState, creationAction) {
 			state.inReCache.newlyCreated = [];
 			creationAction();
-			
+			enterContext('reCreate', {
+				independent : false,
+				// cacheIdObjectMap : reCreationState,
+				// newlyCreated : [],
+				remove : function() {}
+			});
 			withoutRecording(function() { // Do not observe reads from the overlays
 				state.inReCache.newlyCreated.forEach(function(created) {
 					if (created.nonForwardConst.forwardsTo !== null) {
@@ -3381,6 +3386,7 @@
 					}
 				});
 			}.bind(this));
+			leaveContext();
 		}
 
 		function genericReCacheFunction() {
@@ -3396,7 +3402,7 @@
 				let cacheRecord = functionCacher.createNewRecord();
 				cacheRecord.independent = true; // Do not delete together with parent
 
-				cacheRecord.cacheIdObjectMap = {}; // foobar
+				cacheRecord.cacheIdObjectMap = {};
 				cacheRecord.reCreateState = {};
 				cacheRecord.remove = function() {
 					functionCacher.deleteExistingRecord();
