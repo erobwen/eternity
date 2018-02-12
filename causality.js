@@ -1430,13 +1430,13 @@
 					}
 					let keyInTarget = key in target;
 					if (state.inActiveRecording) {
-						if (keyInTarget) {
+						// if (keyInTarget) {
 							// trace.register && log("registerChangeObserver: " + this.const.id + "." + key);
 							registerChangeObserver(getSpecifier(getSpecifier(this.const, "_propertyObservers"), key));
-						} else {
-							// trace.register && log("registerChangeObserver: " + this.const.id + "." + key);
-							registerChangeObserver(getSpecifier(this.const, "_enumerateObservers"));
-						}
+						// } else {
+							// // trace.register && log("registerChangeObserver: " + this.const.id + "." + key);
+							// registerChangeObserver(getSpecifier(this.const, "_enumerateObservers"));
+						// }
 					}
 					if (state.incomingStructuresDisabled === 0) {
 						trace.get && log("find referred object");
@@ -1581,12 +1581,14 @@
 			}
 	
 			// If assignment was successful, notify change
-			if (keyDefined) {
-				if (typeof(this.const._propertyObservers) !== 'undefined' && typeof(this.const._propertyObservers[key]) !== 'undefined') {
-					notifyChangeObservers(this.const._propertyObservers[key]);
-				}
-			} else {
+			if (typeof(this.const._propertyObservers) !== 'undefined' && typeof(this.const._propertyObservers[key]) !== 'undefined') {
+				trace.notifyChange && log("notify change in " + key);
+				notifyChangeObservers(this.const._propertyObservers[key]);
+			}
+			if (!keyDefined) {
 				if (typeof(this.const._enumerateObservers) !== 'undefined') {
+					trace.notifyChange && log("notify key enumeration change when setting " + key);
+					log(this.const.target, 2);
 					notifyChangeObservers(this.const._enumerateObservers);
 				}
 			}
