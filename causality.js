@@ -3670,6 +3670,7 @@
 			// Reactive primitives
 			uponChangeDo : uponChangeDo,
 			repeatOnChange : repeatOnChange,
+			reCreate : reCreate,
 			repeat: repeatOnChange,
 			getObjectAttatchedCache : getObjectAttatchedCache,
 			callAndCacheForUniqueArgumentLists : callAndCacheForUniqueArgumentLists, 
