@@ -1931,19 +1931,19 @@
 			// });
 			// However, will witout emitting events work for eternity? What does it want really?
 
-			if (state.inReCache !== null) {
+			if (state.inReCreate !== null) {
 				trace.reCreate && log("creating in re create: " + cacheId);
-				if (cacheId !== null && typeof(state.inReCache.cacheIdObjectMap[cacheId]) !== 'undefined') {
+				if (cacheId !== null && typeof(state.inReCreate.cacheIdObjectMap[cacheId]) !== 'undefined') {
 					trace.reCreate && log("...recreating...");
 					// Overlay previously created
-					let infusionTarget = state.inReCache.cacheIdObjectMap[cacheId]; // TODO: this map should be compressed in regards to multi level zombies.
+					let infusionTarget = state.inReCreate.cacheIdObjectMap[cacheId]; // TODO: this map should be compressed in regards to multi level zombies.
 					infusionTarget.nonForwardConst.storedForwardsTo = infusionTarget.nonForwardConst.forwardsTo;
 					infusionTarget.nonForwardConst.forwardsTo = proxy;
-					state.inReCache.newlyCreated.push(infusionTarget);
+					state.inReCreate.newlyCreated.push(infusionTarget);
 					return infusionTarget;   // Borrow identity of infusion target.
 				} else {
 					// Newly created in this reCache cycle. Including overlaid ones.
-					state.inReCache.newlyCreated.push(proxy);
+					state.inReCreate.newlyCreated.push(proxy);
 				}
 			}
 
@@ -2064,8 +2064,8 @@
 				state.inActiveRecording = (state.recordingPaused === 0 && state.context !== null && state.context.activeRecording !== null);
 				state.activeRecording = (state.inActiveRecording) ? state.context.activeRecording : null;
 				state.inCachedCall = state.context.inCachedCall;
-				state.inReCache = state.context.inCachedCall;
-				state.inReCreate = state.context.inCachedCall;				
+				state.inReCache = state.context.inReCache;
+				state.inReCreate = state.context.inReCreate;				
 			} else {
 				state.inActiveRecording = false;
 				state.activeRecording = null;
@@ -2080,11 +2080,13 @@
 			
 			trace.context && logGroup("removeChildContexts:" + context.type);
 			if (context.child !== null && !context.child.independent) {
+				// context.child.parent = null;
 				context.child.removeContextsRecursivley();
 			}
 			context.child = null; // always remove
 			if (context.children !== null) {				
 				context.children.forEach(function (child) {
+					// child.parent = null;
 					if (!child.independent) {
 						child.removeContextsRecursivley();
 					}
@@ -3380,75 +3382,75 @@
 		}
 		
 		
-		function genericReCacheFunction() {
-			// console.log("call reCache");
-			// Split argumentsp
-			let argumentsList = argumentsToArray(arguments);
-			let functionName = argumentsList.shift();
-			let cache = getObjectAttatchedCache(this, "_reCachedCalls", functionName);
-			let functionCacher = getFunctionCacher(cache, argumentsList);
+		// function genericReCacheFunction1() {
+			// // console.log("call reCache");
+			// // Split argumentsp
+			// let argumentsList = argumentsToArray(arguments);
+			// let functionName = argumentsList.shift();
+			// let cache = getObjectAttatchedCache(this, "_reCachedCalls", functionName);
+			// let functionCacher = getFunctionCacher(cache, argumentsList);
 
-			if (!functionCacher.cacheRecordExists()) {
-				// console.log("init reCache ");
-				let cacheRecord = functionCacher.createNewRecord();
-				cacheRecord.independent = true; // Do not delete together with parent
+			// if (!functionCacher.cacheRecordExists()) {
+				// // console.log("init reCache ");
+				// let cacheRecord = functionCacher.createNewRecord();
+				// cacheRecord.independent = true; // Do not delete together with parent
 
-				cacheRecord.cacheIdObjectMap = {};
-				cacheRecord.remove = function() {
-					functionCacher.deleteExistingRecord();
-				};
+				// cacheRecord.cacheIdObjectMap = {};
+				// cacheRecord.remove = function() {
+					// functionCacher.deleteExistingRecord();
+				// };
 
-				// Is this call non-automatic
-				cacheRecord.directlyInvokedByApplication = state.context === null;
+				// // Is this call non-automatic
+				// cacheRecord.directlyInvokedByApplication = state.context === null;
 
-				// Never encountered these arguments before, make a new cache
-				enterContext('reCache', cacheRecord);
-				getSpecifier(cacheRecord, 'contextObservers').removedCallback = function() {
-					state.contextsScheduledForPossibleDestruction.push(cacheRecord);
-				};
-				cacheRecord.repeaterHandler = repeatOnChange(
-					function () {
-						cacheRecord.newlyCreated = [];
-						let newReturnValue;
-						// console.log("better be true");
-						// console.log(inReCache);
-						newReturnValue = this[functionName].apply(this, argumentsList);
-						// console.log(cacheRecord.newlyCreated);
+				// // Never encountered these arguments before, make a new cache
+				// enterContext('reCache', cacheRecord);
+				// getSpecifier(cacheRecord, 'contextObservers').removedCallback = function() {
+					// state.contextsScheduledForPossibleDestruction.push(cacheRecord);
+				// };
+				// cacheRecord.repeaterHandler = repeatOnChange(
+					// function () {
+						// cacheRecord.newlyCreated = [];
+						// let newReturnValue;
+						// log("repeating inside reCached...");
+						// // console.log(inReCache);
+						// newReturnValue = this[functionName].apply(this, argumentsList);
+						// // console.log(cacheRecord.newlyCreated);
 
-						// console.log("Assimilating:");
-						withoutRecording(function() { // Do not observe reads from the overlays
-							cacheRecord.newlyCreated.forEach(function(created) {
-								if (created.nonForwardConst.forwardsTo !== null) {
-									// console.log("Has overlay, merge!!!!");
-									mergeOverlayIntoObject(created);
-								} else {
-									// console.log("Infusion id of newly created:");
-									// console.log(created.const.cacheId);
-									if (created.const.cacheId !== null) {
+						// // console.log("Assimilating:");
+						// withoutRecording(function() { // Do not observe reads from the overlays
+							// cacheRecord.newlyCreated.forEach(function(created) {
+								// if (created.nonForwardConst.forwardsTo !== null) {
+									// // console.log("Has overlay, merge!!!!");
+									// mergeOverlayIntoObject(created);
+								// } else {
+									// // console.log("Infusion id of newly created:");
+									// // console.log(created.const.cacheId);
+									// if (created.const.cacheId !== null) {
 
-										cacheRecord.cacheIdObjectMap[created.const.cacheId] = created;
-									}
-								}
-							});
-						}.bind(this));
+										// cacheRecord.cacheIdObjectMap[created.const.cacheId] = created;
+									// }
+								// }
+							// });
+						// }.bind(this));
 
-						// See if we need to trigger event on return value
-						if (newReturnValue !== cacheRecord.returnValue) {
-							cacheRecord.returnValue = newReturnValue;
-							notifyChangeObservers(cacheRecord.contextObservers);
-						}
-					}.bind(this)
-				);
-				leaveContext();
-				registerAnyChangeObserver(cacheRecord.contextObservers);
-				return cacheRecord.returnValue;
-			} else {
-				// Encountered these arguments before, reuse previous repeater
-				let cacheRecord = functionCacher.getExistingRecord();
-				registerAnyChangeObserver(cacheRecord.contextObservers);
-				return cacheRecord.returnValue;
-			}
-		}
+						// // See if we need to trigger event on return value
+						// if (newReturnValue !== cacheRecord.returnValue) {
+							// cacheRecord.returnValue = newReturnValue;
+							// notifyChangeObservers(cacheRecord.contextObservers);
+						// }
+					// }.bind(this)
+				// );
+				// leaveContext();
+				// registerAnyChangeObserver(cacheRecord.contextObservers);
+				// return cacheRecord.returnValue;
+			// } else {
+				// // Encountered these arguments before, reuse previous repeater
+				// let cacheRecord = functionCacher.getExistingRecord();
+				// registerAnyChangeObserver(cacheRecord.contextObservers);
+				// return cacheRecord.returnValue;
+			// }
+		// }
 		
 		function reCreate(reCreationState, creationAction) {
 			// state.inReCache.newlyCreated = [];
@@ -3479,7 +3481,7 @@
 			return returnValue;
 		}
 
-		function genericReCacheFunction2() {
+		function genericReCacheFunction() {
 			// console.log("call reCache");
 			// Split argumentsp
 			let argumentsList = argumentsToArray(arguments);
