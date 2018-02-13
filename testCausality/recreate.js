@@ -16,7 +16,7 @@ describe("Recreate", function(){
 		
 		let a2;
 		reCreate(state, () => {
-			a2 = create({name: "A"}, "id_A");
+			a2 = create({name: "A", newProperty : 42}, "id_A");
 		});
 		
 		assert.ok(a2 === a1);
