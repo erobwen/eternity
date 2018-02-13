@@ -2713,8 +2713,8 @@
 		function notifyChangeObserver(observer) {
 			trace.set && logGroup("notifyChangeObserver");
 			trace.set && log(observer);
-			if (observer != state.context) {
-			// if (state.context !== null && state.context.activeRecording !== observer) {
+			// if (observer != state.context) {
+			if (observer !== state.activeRecording) {
 				trace.set && log("not writing to itself...");
 				if (typeof(observer.remove) === 'function') {
 					trace.set && log("removing observer	...");
@@ -3379,6 +3379,77 @@
 			}
 		}
 		
+		
+		function genericReCacheFunction() {
+			// console.log("call reCache");
+			// Split argumentsp
+			let argumentsList = argumentsToArray(arguments);
+			let functionName = argumentsList.shift();
+			let cache = getObjectAttatchedCache(this, "_reCachedCalls", functionName);
+			let functionCacher = getFunctionCacher(cache, argumentsList);
+
+			if (!functionCacher.cacheRecordExists()) {
+				// console.log("init reCache ");
+				let cacheRecord = functionCacher.createNewRecord();
+				cacheRecord.independent = true; // Do not delete together with parent
+
+				cacheRecord.cacheIdObjectMap = {};
+				cacheRecord.remove = function() {
+					functionCacher.deleteExistingRecord();
+				};
+
+				// Is this call non-automatic
+				cacheRecord.directlyInvokedByApplication = state.context === null;
+
+				// Never encountered these arguments before, make a new cache
+				enterContext('reCache', cacheRecord);
+				getSpecifier(cacheRecord, 'contextObservers').removedCallback = function() {
+					state.contextsScheduledForPossibleDestruction.push(cacheRecord);
+				};
+				cacheRecord.repeaterHandler = repeatOnChange(
+					function () {
+						cacheRecord.newlyCreated = [];
+						let newReturnValue;
+						// console.log("better be true");
+						// console.log(inReCache);
+						newReturnValue = this[functionName].apply(this, argumentsList);
+						// console.log(cacheRecord.newlyCreated);
+
+						// console.log("Assimilating:");
+						withoutRecording(function() { // Do not observe reads from the overlays
+							cacheRecord.newlyCreated.forEach(function(created) {
+								if (created.nonForwardConst.forwardsTo !== null) {
+									// console.log("Has overlay, merge!!!!");
+									mergeOverlayIntoObject(created);
+								} else {
+									// console.log("Infusion id of newly created:");
+									// console.log(created.const.cacheId);
+									if (created.const.cacheId !== null) {
+
+										cacheRecord.cacheIdObjectMap[created.const.cacheId] = created;
+									}
+								}
+							});
+						}.bind(this));
+
+						// See if we need to trigger event on return value
+						if (newReturnValue !== cacheRecord.returnValue) {
+							cacheRecord.returnValue = newReturnValue;
+							notifyChangeObservers(cacheRecord.contextObservers);
+						}
+					}.bind(this)
+				);
+				leaveContext();
+				registerAnyChangeObserver(cacheRecord.contextObservers);
+				return cacheRecord.returnValue;
+			} else {
+				// Encountered these arguments before, reuse previous repeater
+				let cacheRecord = functionCacher.getExistingRecord();
+				registerAnyChangeObserver(cacheRecord.contextObservers);
+				return cacheRecord.returnValue;
+			}
+		}
+		
 		function reCreate(reCreationState, creationAction) {
 			// state.inReCache.newlyCreated = [];
 			let reCreationContext = {
@@ -3408,7 +3479,7 @@
 			return returnValue;
 		}
 
-		function genericReCacheFunction() {
+		function genericReCacheFunction2() {
 			// console.log("call reCache");
 			// Split argumentsp
 			let argumentsList = argumentsToArray(arguments);
