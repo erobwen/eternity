@@ -763,8 +763,8 @@
 		
 		function intitializeAsReverseReferencesChunkListThenAddIfNeeded(incomingStructure, referingObject, referingObjectId) {
 			let refererId = idExpression(referingObjectId);
-			// console.log("intitializeAsReverseReferencesChunkListThenAddIfNeeded:");
-			// console.log(referingObject);
+			// log("intitializeAsReverseReferencesChunkListThenAddIfNeeded:");
+			// log(referingObject);
 
 			if (typeof(incomingStructure.isChunkListHead) === 'undefined') {
 				incomingStructure.isChunkListHead = true;
@@ -1208,7 +1208,7 @@
 		
 		function getHandlerArray(target, key) {
 			if (this.const.forwardsTo !== null && key !== 'nonForwardConst') { // && (typeof(overlayBypass[key]) === 'undefined')
-				// console.log(this.const.forwardsTo);
+				// log(this.const.forwardsTo);
 				let overlayHandler = this.const.forwardsTo.const.handler;
 				return overlayHandler.get.apply(overlayHandler, [overlayHandler.target, key]);
 			}
@@ -1437,7 +1437,7 @@
 					}
 					if (state.incomingStructuresDisabled === 0) {
 						trace.get && log("find referred object");
-						// console.log(key);
+						// log(key);
 						if (trace.get > 0) logUngroup();
 						return getReferredObject(target[key]);
 					} else {
@@ -1479,7 +1479,7 @@
 			// Ensure initialized
 			if (trace.set > 0) {
 				logGroup("setHandlerObject: " + objectDigest(this.const.object) + "." + key + " = " + valueToString(value));
-				console.log(value);
+				log(value);
 				// throw new Error("What the actual fuck, I mean jesuz..!!!");
 			}
 			ensureInitialized(this, target);
@@ -1496,7 +1496,7 @@
 			
 			// Write protection
 			if (!canWrite(this.const.object)) {
-				console.log("Unautharized attempt to write property " + key + " of object " + target._);
+				log("Unautharized attempt to write property " + key + " of object " + target._);
 				if (trace.set > 0) logUngroup();
 				return;
 			}
@@ -1585,7 +1585,7 @@
 			if (!keyDefined) {
 				if (typeof(this.const._enumerateObservers) !== 'undefined') {
 					trace.notifyChange && log("notify key enumeration change when setting " + key);
-					log(this.const.target, 2);
+					// log(this.const.target, 2);
 					notifyChangeObservers(this.const._enumerateObservers);
 				}
 			}
@@ -1765,7 +1765,7 @@
 		}
 		
 		
-		function create(createdTarget, cacheIdOrInitData) { // maincreate
+		function create(createdTarget, cacheIdOrInitData) { // #maincreate
 			if (trace.basic > 0) {
 				log("create, target type: " + typeof(createdTarget));
 				logGroup();
@@ -1791,9 +1791,9 @@
 					if (typeof(classOrPrototype) !== 'function') {
 						throw new Error("No class found: " +  createdTarget);
 					}
-					// console.log(Object.keys(classRegistry));
-					// console.log(createdTarget);
-					// console.log(classOrPrototype);
+					// log(Object.keys(classRegistry));
+					// log(createdTarget);
+					// log(classOrPrototype);
 					createdTarget = new classRegistry[createdTarget]();
 				}
 			} 
@@ -1967,8 +1967,8 @@
 		}
 
 		function isObject(entity) {
-			// console.log();
-			// console.log("isObject:");
+			// log();
+			// log("isObject:");
 
 			let typeCorrect = typeof(entity) === 'object';
 			let notNull = entity !== null;
@@ -1977,20 +1977,20 @@
 			
 			if (typeCorrect && notNull) {
 				hasConst = typeof(entity.const) !== 'undefined';
-				// console.log("rightafter")
-				// console.log(hasConst);
+				// log("rightafter")
+				// log(hasConst);
 			
 				if (hasConst === true) {
 					rightCausalityInstance = entity.const.causalityInstance === causalityInstance;
 				}
 			}
 			
-			// console.log(typeCorrect);
-			// console.log(notNull);
-			// console.log(hasConst);
-			// console.log(rightCausalityInstance);
+			// log(typeCorrect);
+			// log(notNull);
+			// log(hasConst);
+			// log(rightCausalityInstance);
 			let result = (typeCorrect && notNull && hasConst && rightCausalityInstance); 
-			// console.log(result);
+			// log(result);
 			return result; 
 			
 			// One go!
@@ -2054,7 +2054,7 @@
 
 		/**********************************
 		 *
-		 *   Causality Global stack
+		 *   Causality Global #globalstack
 		 *
 		 **********************************/
 
@@ -2793,7 +2793,7 @@
 				action : repeaterAction,
 				remove : function() {
 					// throw new Error("Should nt happen");
-					// console.log("removeRepeater: " + repeater.const.id + "." + repeater.description);
+					// log("removeRepeater: " + repeater.const.id + "." + repeater.description);
 					// removeChildContexts(this);
 					detatchRepeater(this);
 				},
@@ -2807,12 +2807,12 @@
 		}
 
 		function refreshRepeater(repeater) {
-			// console.log("=====================Refresh =====");
+			// log("=====================Refresh =====");
 			// state.inPulse++;
 			state.refreshingRepeater = true;
 			enterContext('repeater_refreshing', repeater);
-			// console.log("parent context type: " + repeater.parent.type);
-			// console.log("context type: " + repeater.type);
+			// log("parent context type: " + repeater.parent.type);
+			// log("context type: " + repeater.type);
 			repeater.returnValue = uponChangeDo(
 				repeater.action,
 				function () {
@@ -2824,7 +2824,7 @@
 			leaveContext();
 			state.refreshingRepeater = false;
 			// if (--state.inPulse === 0) postPulseCleanup();
-			// console.log("=================================");
+			// log("=================================");
 			return repeater;
 		}
 
@@ -3318,7 +3318,7 @@
 		// };
 
 		function mergeInto(source, target) {
-			// console.log("merge into!!");
+			// log("merge into!!");
 			if (source instanceof Array) {
 				let splices = differentialSplices(target.const.target, source.const.target);
 				splices.forEach(function(splice) {
@@ -3380,78 +3380,7 @@
 				return this[functionName].apply(this, argumentsArray);
 			}
 		}
-		
-		
-		// function genericReCacheFunction1() {
-			// // console.log("call reCache");
-			// // Split argumentsp
-			// let argumentsList = argumentsToArray(arguments);
-			// let functionName = argumentsList.shift();
-			// let cache = getObjectAttatchedCache(this, "_reCachedCalls", functionName);
-			// let functionCacher = getFunctionCacher(cache, argumentsList);
-
-			// if (!functionCacher.cacheRecordExists()) {
-				// // console.log("init reCache ");
-				// let cacheRecord = functionCacher.createNewRecord();
-				// cacheRecord.independent = true; // Do not delete together with parent
-
-				// cacheRecord.cacheIdObjectMap = {};
-				// cacheRecord.remove = function() {
-					// functionCacher.deleteExistingRecord();
-				// };
-
-				// // Is this call non-automatic
-				// cacheRecord.directlyInvokedByApplication = state.context === null;
-
-				// // Never encountered these arguments before, make a new cache
-				// enterContext('reCache', cacheRecord);
-				// getSpecifier(cacheRecord, 'contextObservers').removedCallback = function() {
-					// state.contextsScheduledForPossibleDestruction.push(cacheRecord);
-				// };
-				// cacheRecord.repeaterHandler = repeatOnChange(
-					// function () {
-						// cacheRecord.newlyCreated = [];
-						// let newReturnValue;
-						// log("repeating inside reCached...");
-						// // console.log(inReCache);
-						// newReturnValue = this[functionName].apply(this, argumentsList);
-						// // console.log(cacheRecord.newlyCreated);
-
-						// // console.log("Assimilating:");
-						// withoutRecording(function() { // Do not observe reads from the overlays
-							// cacheRecord.newlyCreated.forEach(function(created) {
-								// if (created.nonForwardConst.forwardsTo !== null) {
-									// // console.log("Has overlay, merge!!!!");
-									// mergeOverlayIntoObject(created);
-								// } else {
-									// // console.log("Infusion id of newly created:");
-									// // console.log(created.const.cacheId);
-									// if (created.const.cacheId !== null) {
-
-										// cacheRecord.cacheIdObjectMap[created.const.cacheId] = created;
-									// }
-								// }
-							// });
-						// }.bind(this));
-
-						// // See if we need to trigger event on return value
-						// if (newReturnValue !== cacheRecord.returnValue) {
-							// cacheRecord.returnValue = newReturnValue;
-							// notifyChangeObservers(cacheRecord.contextObservers);
-						// }
-					// }.bind(this)
-				// );
-				// leaveContext();
-				// registerAnyChangeObserver(cacheRecord.contextObservers);
-				// return cacheRecord.returnValue;
-			// } else {
-				// // Encountered these arguments before, reuse previous repeater
-				// let cacheRecord = functionCacher.getExistingRecord();
-				// registerAnyChangeObserver(cacheRecord.contextObservers);
-				// return cacheRecord.returnValue;
-			// }
-		// }
-		
+				
 		function reCreate(reCreationState, creationAction) {
 			// state.inReCache.newlyCreated = [];
 			let reCreationContext = {
@@ -3465,11 +3394,11 @@
 			withoutRecording(function() { // Do not observe reads from the overlays
 				reCreationContext.newlyCreated.forEach(function(created) {
 					if (created.nonForwardConst.forwardsTo !== null) {
-						// console.log("Has overlay, merge!!!!");
+						// log("Has overlay, merge!!!!");
 						mergeOverlayIntoObject(created);
 					} else {
-						// console.log("Infusion id of newly created:");
-						// console.log(created.const.cacheId);
+						// log("Infusion id of newly created:");
+						// log(created.const.cacheId);
 						if (created.const.cacheId !== null) {
 
 							reCreationContext.cacheIdObjectMap[created.const.cacheId] = created;
@@ -3482,7 +3411,7 @@
 		}
 
 		function genericReCacheFunction() {
-			// console.log("call reCache");
+			// log("call reCache");
 			// Split argumentsp
 			let argumentsList = argumentsToArray(arguments);
 			let functionName = argumentsList.shift();
@@ -3490,7 +3419,7 @@
 			let functionCacher = getFunctionCacher(cache, argumentsList);
 
 			if (!functionCacher.cacheRecordExists()) {
-				// console.log("init reCache ");
+				// log("init reCache ");
 				let cacheRecord = functionCacher.createNewRecord();
 				cacheRecord.independent = true; // Do not delete together with parent
 
@@ -3894,8 +3823,8 @@
 		// Create configuration signature
 		let configuration = sortedKeys(defaultConfiguration);
 		let signature = JSON.stringify(configuration);
-		// console.log("================= REQUEST: ==========");
-		// console.log(signature);
+		// log("================= REQUEST: ==========");
+		// log(signature);
 		
 		if (typeof(configurationToSystemMap[signature]) === 'undefined') {
 			configurationToSystemMap[signature] = createCausalityInstance(configuration);

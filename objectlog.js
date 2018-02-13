@@ -219,7 +219,7 @@
 		}, 
 		
 		log : function(entity, pattern) {
-			if (objectlog.findLogs) throw new Error("No logs allowed!");
+			if (configuration.findLogs) throw new Error("No logs allowed!");
 			if (configuration.useConsoleDefault) {
 				console.log(entity);
 			} else {
@@ -228,7 +228,7 @@
 		},
 		
 		logVar : function(name, entity, pattern) {
-			if (objectlog.findLogs) throw new Error("No logs allowed!");
+			if (configuration.findLogs) throw new Error("No logs allowed!");
 			if (configuration.useConsoleDefault) {
 				console.log(name + ":");
 				console.group();
@@ -253,7 +253,7 @@
 		},
 		
 		group : function(entity, pattern) {
-			if (objectlog.findLogs) throw new Error("No logs allowed!");
+			if (configuration.findLogs) throw new Error("No logs allowed!");
 			if (configuration.useConsoleDefault) {
 				console.group(entity);
 			} else {
@@ -265,7 +265,7 @@
 		},
 		
 		groupEnd : function(entity, pattern) {
-			if (objectlog.findLogs) throw new Error("No logs allowed!");
+			if (configuration.findLogs) throw new Error("No logs allowed!");
 			if (configuration.useConsoleDefault) {
 				console.groupEnd();
 			} else {
