@@ -703,6 +703,8 @@
 		}
 		
 		function tryRemoveIncomingStructure(structure) {
+			// referencesChunk.contentsCounter--;
+			
 			if (typeof(structure.contentsCounter) === 'undefined' || structure.contentsCounter === 0) {
 				if (typeof(structure.removedCallback) !== 'undefined') { // referencesChunk.removedCallback this is probably wrong!
 					structure.removedCallback();
@@ -725,16 +727,34 @@
 					}
 					structure.next = null;
 					structure.previous = null;
+					// TODO: 
+					// if (typeof(structure.isIncomingStructureRoot) !== 'undefined') {
+						// delete root
+					// }
 					
 					if (structure.parent.first === null && structure.parent.last === null) {
 						tryRemoveParent = true;
 					}
 				}
 				
-				// TODO: Make this work... 
 				if (typeof(structure.isIncomingPropertyStructure) !== 'undefined') {
 					delete structure.parent[structure.propertyKey];
 				}
+				// // TODO: Make this work... 
+				// if (typeof(structure.isIncomingPropertyStructure) !== 'undefined') {
+					// delete structure.parent[structure.propertyKey];
+					// structure.parent = null;
+					// if (structure.parent.first === null && structure.parent.last === null) {
+						// tryRemoveParent = true;
+					// }
+					// // TODO tryRemoveParent = true, whenever there is no more property key
+				// }
+				
+				// TODO: remove root		referredObject: referencedObject,
+				// if (typeof(structure.isIncomingStructureRoot) !== 'undefined') {
+					// delete structure.referredObject.incoming;
+					// structure.referredObject = null;
+				// }
 				
 				if (tryRemoveParent) {
 					tryRemoveIncomingStructure(structure.parent);

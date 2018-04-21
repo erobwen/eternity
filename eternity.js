@@ -2064,6 +2064,7 @@
                             imageCausality.state.incomingStructuresDisabled++;
                             let value = current[property];
                             imageCausality.state.incomingStructuresDisabled--;
+							// TODO: fillDbImageFromCorrespondingObject here somehow?... what if we are going through destructed images? foobar
 							// console.log(instance.persistent);
 							// console.log(instance.persistent);
                             if (imageCausality.isObject(value) && isUnstable(value) && instance.persistent.const.dbImage !== value) { // Has to exists!
@@ -2215,6 +2216,7 @@
 					
 					// Make sure that object beeing destroyed is loaded.
 					objectCausality.pokeObject(toDestroy.const.correspondingObject);
+					// Dissconnect from object here?... 
 					
 					for(let property in toDestroy) {
 						if(property !== 'incoming') {
@@ -2226,6 +2228,15 @@
 					}
 					// addFirstToList(gcState, deallocationZone, toDestroy);
 					deallocateInDatabase(toDestroy);
+					// unpersistCorrespondingObjectAndDestroyImage(toDestroy);
+					// When i2 is unpersited:
+					// o1 ->  o2  ->  o3
+					//  |      x      |
+					// i1 ->  i2 -x-> i3
+
+					// destroy first... remove all outgoing references.... 
+					// set destroyed= true ?  
+					// dissconnect from object. foobar
 					loadedObjects--;
 					    // toDestroy._eternityDismanteled = true;
 					return false;
@@ -2614,9 +2625,17 @@
 						// TODO: check if this part of iteration, move iteration if so... 
 					}
 				}
+				// TODO:
+				// else {
+					// if (killImageIfDissconnectedAndNonReferred(dbImage)) {
+						// deallocateInDatabase(dbImage);
+						// // TODO: check if this part of iteration, move iteration if so... 
+					// }
+				// }
 			} else {
 				if (inList(deallocationZone, dbImage)) {
 					removeFirstFromList(gcState, deallocationZone, dbImage);
+					// removeFromList(gcState, deallocationZone, dbImage);
 				// if (typeof(dbImage._eternityDismanteled) !== 'undefined' && dbImage._eternityDismanteled === true) {
 					unpersistObjectOfImage(dbImage);
 				}
