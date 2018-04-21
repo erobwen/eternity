@@ -1,3 +1,12 @@
+NEW: 
+
+TODO: We need to prohibit object from beeing unloaded while it is still beeing written in eternity.
+
+// https://www.sencha.com/blog/react-and-ext-js-secret-besties/
+// https://moduscreate.com/blog/extjs_to_react_migration_to_open_source/
+// Idea: load then throw... to get out from algorithm... then go back again... ???
+
+
 TODO:
 Eternity work in progress:
 * Connect to an actual database. IMPORTANT

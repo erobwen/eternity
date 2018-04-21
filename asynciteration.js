@@ -25,39 +25,39 @@ async function accessDatabase(id) {
 }
 
 
-// New request
-let newRequest = false;
-let request = null;
-
-// Current result and past results
-let result = null;
+// In and out data
+let requests = [];
 let results = [];
 
-let processingRequest = false;
-function processAnyRequests() {
-	if (!processingRequest && request !== null) {
-		processingRequest = true;
-		
+	
+// Current result and past results
+let request = null;
+let result = null;
+function processRequest() {
+	if (request !== null) {
 		let index = request.pop();
-		if (request.length === 0) request = null;
-		
-		if (newRequest) {
-			newRequest = false;
-			result = [];
-		} 
-		
+				
 		accessDatabase(index).then((value) => {
 			result.push(value);
-			if (request === null) {
+			if (request.length === 0) {
 				results.push(result);
+				request = null;
 				result = null;
 			}
-			processingRequest = false;
-			processAnyRequests();
+			processRequest();
 		});
-	}
+	}	
 }
 
+
+function processAnyRequests() {
+	if (request === null && requests.length > 0) {
+		// log("picking a new request!");
+		request = requests.shift();
+		result = []; 
+		processRequest();
+	}
+}
 
 // Main flush loop
 function keepCheckingForRequests() {
@@ -71,14 +71,12 @@ keepCheckingForRequests();
 
 
 setTimeout(()=> {
-	newRequest = true;
-	request = [0, 1, 2];
+	requests.push([0, 1, 2]);
 }, 100, );
 
 
 setTimeout(()=> {
-	newRequest = true;
-	request = [1, 2];
+	requests.push([1, 2]);
 }, 500, );
 
 setTimeout(() => {

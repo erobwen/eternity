@@ -1,12 +1,18 @@
 
 class Bar {
-	function selectForFoo(selection) {
-		selection.addArrayAndElements("propertyWithArray", "ForFoo");
-		selection.add("a", "ForFoo");
-		selection.
+	function selectForFoo(selector) {
+		selector.addArrayAndElements("propertyWithArray", "ForFoo");
+		selector.add("a", "ForFoo");
+		selector.
 		
 	}	
 }
+
+class BasicSelector {
+	
+}
+
+
 
 class Selection {
 	let currentObject = null;

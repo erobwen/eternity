@@ -1,126 +1,83 @@
-// function resolveAfter2Seconds(x) { 
-  // return new Promise(resolve => {
-    // setTimeout(() => {
-      // resolve(x);
-    // }, 2000);
-  // });
-// }
+	let log = console.log;
 
-// async function f1() {
-  // var x = await resolveAfter2Seconds(10);
-  // console.log(x); // 10
-// }
-// f1();
+	// Async database access
+	let database = [1, 2, 3, 5, 9];
+	async function accessDatabase(id) {
+		return new Promise(function(resolve) {
+			setTimeout(() => { log("reading from database..."); resolve(database[id]) }, 7, 'foo');
+		});	
+	}
 
 
-let log = console.log;
+	async function releaseControl() {
+		return new Promise((resolve) => {
+			setTimeout(() => {resolve()}, 0);
+		}); 
+	}
 
+	// let releaseControl = new Promise((resolve) => { // Did not work for some reason... 
+		// setTimeout(() => {resolve()}, 0);
+	// }); 
 
-// Async database access
-let database = [1, 2, 3, 5, ];
-async function accessDatabase(id) {
-	return new Promise(function(resolve) {
-		setTimeout(() => { log("reading from database..."); resolve(database[id]) }, 7, 'foo');
-	});	
-}
+	// Input and output
+	let requests = [];
+	let results = [];
 
-
-async function releaseControl() {
-	return new Promise((resolve) => {
-		setTimeout(() => {resolve()}, 0);
-	}); 
-}
-
-// let releaseControl = new Promise((resolve) => {
-	// setTimeout(() => {resolve()}, 0);
-// }); 
-
-
-// New request
-let newRequest = false;
-let request = null;
-
-// Current result and past results
-let result = null;
-let results = [];
-
-
-
-let processingRequest = false;
-	// if (!processingRequest && request !== null) {
-		// processingRequest = true;
 		
-		// let index = request.pop();
-		// if (request.length === 0) request = null;
-		
-		// if (newRequest) {
-			// newRequest = false;
-			// result = [];
-		// } 
-		
-		// accessDatabase(index).then((value) => {
-			// result.push(value);
-			// if (request === null) {
-				// results.push(result);
-				// result = null;
-			// }
-			// processingRequest = false;
-			// processAnyRequests();
-		// });
-	// }
-
-
-
-
-function processAnyRequests() {
-}
-
-async function keepCheckingForRequests() {
-	while(true) {
-		// log("iterating");
-		if (request !== null) {
-			// log("##########################");
+	// Current process
+	let result = null;
+	let request = null;
+	async function processRequest() {
+		// Process existing request
+		while (request !== null) {
+			// log("processing a request one step!");
 			let index = request.pop();
-			if (request.length === 0) request = null;
 			
-			if (newRequest) {
-				newRequest = false;
-				result = [];
-			} 
-			// log("a");
 			let value = await accessDatabase(index);
-			// log("b");
-
 			result.push(value);
 			
-			if (request === null) {
+			if (request.length === 0) {
 				results.push(result);
+				request = null;
 				result = null;
 			}
 		}
-		// log("trying to release");
-		await releaseControl();
 	}
-}
+
+	async function checkForRequests() {
+		// Start work on new request
+		if (request === null && requests.length > 0) {
+			// log("picking a new request!");
+			request = requests.shift();
+			result = [] 
+			await processRequest();
+		}
+	}
+
+	async function keepCheckingForRequests() {
+		while(true) {
+			await checkForRequests();
+
+			// Release control
+			await new Promise((resolve) => { setTimeout(() => {resolve()}, 0) });
+			// await releaseControl();
+		}
+	}
 
 
+	keepCheckingForRequests().then();
+
+	setTimeout(()=> {
+		requests.push([0, 1, 2]);
+	}, 100, );
 
 
+	setTimeout(()=> {
+		requests.push([1, 2]);
+	}, 500, );
 
-setTimeout(()=> {
-	newRequest = true;
-	request = [0, 1, 2];
-}, 100, );
+	setTimeout(() => {
+		log(results);	
+	}, 1000);
 
-
-setTimeout(()=> {
-	newRequest = true;
-	request = [1, 2];
-}, 500, );
-
-setTimeout(() => {
-	log(results);	
-}, 1000);
-
-
-keepCheckingForRequests().then();
+// for (let file of files) {
