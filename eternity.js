@@ -112,24 +112,37 @@
 		function setPostPulseActionBeforeStorage(callback) {
 			postPulseCallbackBeforeStorage = callback;
 		}
-		
-		let unstableImages = [];
 
-		function postObjectPulseAction(events) {
-			if (postPulseCallbackBeforeStorage) postPulseCallbackBeforeStorage(events);
-			
+		function flushToImages() {
 			// log("postObjectPulseAction: " + events.length + " events");
 			// logGroup();
 			// if (events.length > 0) {
-			objectCausality.freezeActivityList(function() {
-				// log(events, 3);
-				transferChangesToImage(events);
-			});
+			while (pendingObjectChanges.length > 0) {
+				let events = pendingObjectChanges.shift();
+				objectCausality.freezeActivityList(function() {
+					// log(events, 3);
+					transferChangesToImage(events);
+				});				
+			}	
 			// }state
-			unloadAndKillObjects();
 			
+		}
+		
+		function flushToDatabase() {
 			// logUngroup();
-		} 
+			flushToImages();
+			flushImageToDatabase();			
+		}		
+		
+		let unstableImages = [];
+
+		let pendingObjectChanges = [];
+		function postObjectPulseAction(events) {
+			if (postPulseCallbackBeforeStorage) postPulseCallbackBeforeStorage(events);
+			pendingObjectChanges.push(events);
+			flushToImages();
+			unloadAndKillObjects();
+		}
 		
 		
 		function transferChangesToImage(events) {
@@ -506,7 +519,7 @@
 					// log("pendingUpdate after merge");
 					// log(pendingUpdate, 10);
 				}
-				// flushToDatabase();
+				// flushImageToDatabase();
 			} else {
 				// log("no events...");
 				// throw new Error("a pulse with no events?");
@@ -878,7 +891,7 @@
 
 		let tmpDbIdToDbId = {};
 
-		function flushToDatabase() {
+		function flushImageToDatabase() {
 			// log("FLUSH FLUSH FLUSH FLUSH FLUSH FLUSH FLUSH FLUSH FLUSH FLUSH FLUSH FLUSH FLUSH FLUSH ")
 			while(pendingUpdate !== null) {
 				twoPhaseComit();				
@@ -892,7 +905,7 @@
 		function startWriteDaemon() {
 			setTimeout(42, () => {
 				if (pendingUpdates.length > 0) {
-					flushToDatabase();					
+					flushImageToDatabase();					
 				}
 				startWriteDaemon();
 			});
@@ -1291,7 +1304,7 @@
 		
 		let peekedAtDbRecords = {};
 		function peekAtRecord(dbId) {
-			flushToDatabase();
+			flushImageToDatabase();
 			if (typeof(peekedAtDbRecords[dbId]) === 'undefined') {
 				peekedAtDbRecords[dbId] = mockMongoDB.getRecord(dbId);
 			}
@@ -1299,7 +1312,7 @@
 		}
 		
 		function getDbRecord(dbId) {
-			flushToDatabase();
+			flushImageToDatabase();
 			if (typeof(peekedAtDbRecords[dbId]) === 'undefined') {
 				// No previous peeking, just get it
 				return mockMongoDB.getRecord(dbId);
@@ -2343,7 +2356,7 @@
 		
 		// Note: causality.persistent is replace after an unload... 
 		function unloadAllAndClearMemory() {
-			flushToDatabase();
+			flushImageToDatabase();
 			objectCausality.resetObjectIds();
 			imageCausality.resetObjectIds();
 			delete instance.persistent;
@@ -2352,7 +2365,7 @@
 		}
 		
 		function clearDatabaseAndClearMemory() {
-			flushToDatabase();
+			flushImageToDatabase();
 			mockMongoDB.clearDatabase();
 			unloadAllAndClearMemory();
 		}
@@ -2722,6 +2735,7 @@
 			forAllPersistentIncomingNow : forAllPersistentIncomingNow,
 			createAction : createAction,
 			collectAll : collectAll,
+			flushImageToDatabase : flushImageToDatabase,
 			flushToDatabase : flushToDatabase,
 			oneStepCollection : oneStepCollection
 		});
