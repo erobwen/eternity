@@ -109,6 +109,7 @@ describe("loading, unloading & zombiefication", function () {
 		
 		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
 		A.B = B;
+		eternity.flushToDatabase();
 		assert.equal(isLoaded(persistent), false);
         assert.equal(isDead(persistent), false);
 		
@@ -120,6 +121,8 @@ describe("loading, unloading & zombiefication", function () {
 		// log("--------------------------- B.C = C; -----------------------------------");
 		// eternity.trace.basic++;
 		B.C = C;
+		eternity.flushToDatabase();
+
 		// eternity.trace.basic--;
 		// log("-----");
 		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);
@@ -137,6 +140,7 @@ describe("loading, unloading & zombiefication", function () {
 		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);
 		// log("--------------------------- Touch A -----------------------------------");
 		let dummy = A.name;
+		eternity.flushToDatabase();
 		
 		assert.equal(isLoaded(persistent), false);
         assert.equal(isDead(persistent), true);
@@ -153,6 +157,7 @@ describe("loading, unloading & zombiefication", function () {
 		
 		// log("--------------------------- Touch persistent -----------------------------------");
 		let persistentA = persistent.A;
+		eternity.flushToDatabase();
 		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);
 		
 		// Persistent becomes a zombie
@@ -187,6 +192,7 @@ describe("loading, unloading & zombiefication", function () {
 		// log("--------------------------- Touch C -----------------------------------");
 		// eternity.trace.basic++;
 		dummy = C.name;
+		eternity.flushToDatabase();
 		// eternity.trace.basic--;
 		// log("----------------------------------");
 		

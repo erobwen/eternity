@@ -111,10 +111,12 @@
 
 		let pendingObjectChanges = [];
 		function postObjectPulseAction(events) {
-			if (postPulseCallbackBeforeStorage) postPulseCallbackBeforeStorage(events);
-			pendingObjectChanges.push(events);
-			flushToImages();
-			unloadAndKillObjects();
+			if (events.length > 0) {
+				if (postPulseCallbackBeforeStorage) postPulseCallbackBeforeStorage(events);
+				pendingObjectChanges.push(events);
+				// flushToImages();
+				unloadAndKillObjects();				
+			}
 		}
 		
 		let postPulseCallbackBeforeStorage = null;
@@ -137,7 +139,8 @@
 		}
 		 
 		function flushToDatabase() {
-			// logUngroup();
+			trace.flush && log("flushToDatabase: " + pendingObjectChanges.length);
+			trace.flush && log(pendingObjectChanges, 3);
 			if (pendingObjectChanges.length > 0) {
 				while (pendingObjectChanges.length > 0) {
 					pushToDatabase();
@@ -145,10 +148,10 @@
 			} else {				
 				flushImageToDatabase();			
 			}
-			// flushToImages();
 		}
 		
 		function pushToDatabase() {
+			trace.flush && log("pushToDatabase");
 			pushToImages();
 			flushImageToDatabase();			
 		}
@@ -160,6 +163,7 @@
 		 * Write to images
 		 */
 		function flushToImages() {
+			trace.flush && log("flushToImages");
 			// log("postObjectPulseAction: " + events.length + " events");
 			// logGroup();
 			// if (events.length > 0) {
@@ -170,6 +174,7 @@
 		}
 		
 		function pushToImages() {
+			trace.flush && log("pushToImages");
 			let events = pendingObjectChanges.shift();
 			objectCausality.freezeActivityList(function() {
 				// log(events, 3);
@@ -925,7 +930,7 @@
 		let tmpDbIdToDbId = {};
 
 		function flushImageToDatabase() {
-			// log("FLUSH FLUSH FLUSH FLUSH FLUSH FLUSH FLUSH FLUSH FLUSH FLUSH FLUSH FLUSH FLUSH FLUSH ")
+			trace.flush && log("flushImageToDatabase")
 			while(pendingUpdate !== null) {
 				twoPhaseComit();				
 			}
@@ -934,15 +939,6 @@
 			nextTmpDbId = 0;
 			tmpDbIdToDbImage = {};
 		} 
-		 
-		function startWriteDaemon() {
-			setTimeout(42, () => {
-				if (pendingUpdates.length > 0) {
-					flushImageToDatabase();					
-				}
-				startWriteDaemon();
-			});
-		}
 		 
 		
 		function oneStepTwoPhaseCommit() {
@@ -1337,7 +1333,7 @@
 		
 		let peekedAtDbRecords = {};
 		function peekAtRecord(dbId) {
-			flushImageToDatabase();
+			// flushToDatabase(); TODO... really have here??
 			if (typeof(peekedAtDbRecords[dbId]) === 'undefined') {
 				peekedAtDbRecords[dbId] = mockMongoDB.getRecord(dbId);
 			}
@@ -1345,7 +1341,7 @@
 		}
 		
 		function getDbRecord(dbId) {
-			flushImageToDatabase();
+			// flushToDatabase(); TODO... really have here??
 			if (typeof(peekedAtDbRecords[dbId]) === 'undefined') {
 				// No previous peeking, just get it
 				return mockMongoDB.getRecord(dbId);
@@ -1582,7 +1578,7 @@
 		function unloadAndKillObjects() {
 			// log("unloadAndKillObjects");
 			if (loadedObjects > maxNumberOfLoadedObjects) {
-				// log("Too many objects, unload some... ");
+				log("Too many objects, unload some... ");
 				trace.unload && logGroup("unloadAndKillObjects");
 				objectCausality.withoutEmittingEvents(function() {
 					imageCausality.withoutEmittingEvents(function() {
@@ -2389,7 +2385,7 @@
 		
 		// Note: causality.persistent is replace after an unload... 
 		function unloadAllAndClearMemory() {
-			flushImageToDatabase();
+			flushToDatabase();
 			objectCausality.resetObjectIds();
 			imageCausality.resetObjectIds();
 			delete instance.persistent;
@@ -2398,7 +2394,7 @@
 		}
 		
 		function clearDatabaseAndClearMemory() {
-			flushImageToDatabase();
+			flushToDatabase();
 			mockMongoDB.clearDatabase();
 			unloadAllAndClearMemory();
 		}

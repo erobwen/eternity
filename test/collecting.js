@@ -28,13 +28,20 @@ describe("garbage-collection", function () {
 		let create = eternity.create;
 		let persistent = eternity.persistent;
 		let a = create({name: "a"});
+		// log("------------------------------------------");
+		// eternity.trace.flush = 1;
 		persistent.a = a;
+		// log("-------");
+		eternity.flushToDatabase();
+		// log("------------------------------------------");
 		assert.equal(typeof(a.const.dbImage) !== 'undefined', true);
+		// eternity.trace.flush = 0;
 		
 		eternity.flushToDatabase();
 		let aDbId = a.const.dbImage.const.dbId;
 
 		persistent.a = null;
+		eternity.flushToDatabase();
 
 		// GC in 6 steps
 		eternity.oneStepCollection();
@@ -42,6 +49,7 @@ describe("garbage-collection", function () {
 		eternity.oneStepCollection();
 		eternity.oneStepCollection();
 		// log("----------------------------------------")
+		// eternity.trace.flush = 1;
 		// eternity.trace.eternity = true;
 		eternity.oneStepCollection();		
 		eternity.oneStepCollection();
@@ -79,6 +87,7 @@ describe("garbage-collection", function () {
 		a.b = b;
 		persistent.a = a;
 		persistent.d = d;
+		eternity.flushToDatabase();
 		
 		//        persistent
 		//          |   |
@@ -104,6 +113,7 @@ describe("garbage-collection", function () {
 		
 		// Dissconnect a from persistent
 		persistent.a = null;
+		eternity.flushToDatabase();
 
 		// Garbage collect
 		eternity.collectAll();
