@@ -113,29 +113,6 @@
 			postPulseCallbackBeforeStorage = callback;
 		}
 
-		function flushToImages() {
-			// log("postObjectPulseAction: " + events.length + " events");
-			// logGroup();
-			// if (events.length > 0) {
-			while (pendingObjectChanges.length > 0) {
-				let events = pendingObjectChanges.shift();
-				objectCausality.freezeActivityList(function() {
-					// log(events, 3);
-					transferChangesToImage(events);
-				});				
-			}	
-			// }state
-			
-		}
-		
-		function flushToDatabase() {
-			// logUngroup();
-			flushToImages();
-			flushImageToDatabase();			
-		}		
-		
-		let unstableImages = [];
-
 		let pendingObjectChanges = [];
 		function postObjectPulseAction(events) {
 			if (postPulseCallbackBeforeStorage) postPulseCallbackBeforeStorage(events);
@@ -144,6 +121,50 @@
 			unloadAndKillObjects();
 		}
 		
+		/**
+		 * Write to database
+		 */
+		function flushToDatabase() {
+			// logUngroup();
+			if (pendingObjectChanges.length > 0) {
+				while (pendingObjectChanges.length > 0) {
+					pushToDatabase();
+				}
+			} else {				
+				flushImageToDatabase();			
+			}
+			// flushToImages();
+		}
+		
+		function pushToDatabase() {
+			pushToImages();
+			flushImageToDatabase();			
+		}
+		
+		// let unstableImages = [];
+
+
+		/**
+		 * Write to images
+		 */
+		function flushToImages() {
+			// log("postObjectPulseAction: " + events.length + " events");
+			// logGroup();
+			// if (events.length > 0) {
+			while (pendingObjectChanges.length > 0) {
+				pushToImages();
+			}	
+			// }state	
+		}
+		
+		function pushToImages() {
+			let events = pendingObjectChanges.shift();
+			objectCausality.freezeActivityList(function() {
+				// log(events, 3);
+				transferChangesToImage(events);
+			});			
+		}
+
 		
 		function transferChangesToImage(events) {
 			if (trace.eternity) {
