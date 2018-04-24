@@ -108,10 +108,6 @@
 		 *          Object post pulse events
 		 *-----------------------------------------------*/
 		
-		let postPulseCallbackBeforeStorage = null;
-		function setPostPulseActionBeforeStorage(callback) {
-			postPulseCallbackBeforeStorage = callback;
-		}
 
 		let pendingObjectChanges = [];
 		function postObjectPulseAction(events) {
@@ -121,9 +117,25 @@
 			unloadAndKillObjects();
 		}
 		
+		let postPulseCallbackBeforeStorage = null;
+		function setPostPulseActionBeforeStorage(callback) {
+			postPulseCallbackBeforeStorage = callback;
+		}
+		
 		/**
 		 * Write to database
 		 */
+		function startPersisterDaemon() {
+			pushToDatabaseRepeatedly();
+		}
+		
+		function pushToDatabaseRepeatedly() {
+			pushToDatabase();
+			setTimeout(() => {
+				pushToDatabaseRepeatedly();
+			}, 0); 
+		}
+		 
 		function flushToDatabase() {
 			// logUngroup();
 			if (pendingObjectChanges.length > 0) {
