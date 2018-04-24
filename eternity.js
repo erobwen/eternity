@@ -114,6 +114,11 @@
 			if (events.length > 0) {
 				if (postPulseCallbackBeforeStorage) postPulseCallbackBeforeStorage(events);
 				pendingObjectChanges.push(events);
+				events.forEach((event) => {
+					if (event.type !== 'creation') {
+						pin(event.object);
+					}
+				});
 				// flushToImages();
 				unloadAndKillObjects();				
 			}
@@ -218,6 +223,10 @@
 																
 								delete dbImage[event.property]; // TODO: Do we need something special when deleting indicies?
 							}
+						}
+						
+						if (event.type !== 'creation') {							
+							unpin(event.object);
 						}
 					});
 				});
