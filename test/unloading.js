@@ -219,6 +219,7 @@ describe("loading, unloading & zombiefication", function () {
 		
 		// log("--------------------------- Touch A -----------------------------------");
 		dummy = A.name;
+		eternity.flushToDatabase();
 		
 		// Persistent becomes a zombie
 		assert.equal(isLoaded(persistent), false);

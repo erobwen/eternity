@@ -148,6 +148,7 @@
 			} else {				
 				flushImageToDatabase();			
 			}
+			unloadAndKillObjects();
 		}
 		
 		function pushToDatabase() {
@@ -1578,7 +1579,7 @@
 		function unloadAndKillObjects() {
 			// log("unloadAndKillObjects");
 			if (loadedObjects > maxNumberOfLoadedObjects) {
-				log("Too many objects, unload some... ");
+				// log("Too many objects, unload some... ");
 				trace.unload && logGroup("unloadAndKillObjects");
 				objectCausality.withoutEmittingEvents(function() {
 					imageCausality.withoutEmittingEvents(function() {
