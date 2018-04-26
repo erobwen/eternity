@@ -1,9 +1,9 @@
 NEW: 
 
 CONSIDER: Should we merge object-pulses?
-TODO: We need to prohibit object from beeing unloaded while it is still beeing written in eternity.
 TODO: Make independent unloading system for the image level. Otherwise we always need to create objects, even for the GC... 
-TODO: Make a novel system for image deleting... When there is no longer any incoming references... 
+TODO: We need to prohibit images from beeing unloaded while it is still beeing written in eternity.
+TODO: Make a novel system for image deleting... Only delete image when there is no longer any incoming references (at the end of image-pulse), except for root image that has special status... 
 
 
 // https://www.sencha.com/blog/react-and-ext-js-secret-besties/

@@ -573,9 +573,13 @@
 				// throw new Error("a pulse with no events?");
 			}
 			// logUngroup();
+			unloadAndForgetImages();
 		} 
 		
-
+		function unloadAndForgetImages() {
+			// TODO NOW
+		}
+		
 		function addImageClassNames(events) {
 			imageCausality.assertNotRecording();
 			imageCausality.disableIncomingRelations(function() {
@@ -773,6 +777,11 @@
 								property = imageCausality.transformPossibleIdExpression(property, imageIdToDbIdOrTmpDbId);
 								deletedKeys[property] = true;
 								
+								// Deallocate if last incoming reference
+								if (imageCausality.isObject(event.oldValue) && event.oldValue.const.persistentIncomingReferencesCount === 0 && event.oldValue !== persistentRootImage) {
+									compiledUpdate.imageDeallocations[event.oldValue.const.dbId] = true;
+								} // TODO NOW
+								
 								// No update if delete
 								delete imageUpdates[property];
 							}		
@@ -789,7 +798,7 @@
 					}
 				});								
 
-				// Find all deallocations.
+				// // Find all deallocations. TODO remove this chunk of code!!! 
 				events.forEach(function(event) {
 					if (event.type === 'set' && event.property === eternityTag + "_to_deallocate") {
 						if (typeof(event.object.const.dbId) !== 'undefined') {
@@ -1253,16 +1262,16 @@
 		}
 		
 		function imageFromDbIdInitializer(dbImage) {
+			loadFromDbIdToImage(dbImage);
 			// if (dbImage.const.dbId === 1)
 				// dbImage.foo.bar;
 			// log("");
 			// log("initialize image " + dbImage.const.id + " from dbId: " + dbImage.const.dbId); 
 			// logGroup();
-			objectCausality.withoutEmittingEvents(function() {
-				imageCausality.withoutEmittingEvents(function() {
-					loadFromDbIdToImage(dbImage);
-				});
-			});
+			// objectCausality.withoutEmittingEvents(function() {
+				// imageCausality.withoutEmittingEvents(function() {
+				// });
+			// });
 			// log(dbImage);
 			// logUngroup();
 			// log(dbImage);
@@ -1364,59 +1373,63 @@
 		}
 		
 		function loadFromDbIdToImage(dbImage) {
-			// log("loadFromDbIdToImage dbId: " + dbImage.const.dbId + " dbImage:" + dbImage.const.id);
-			imageCausality.disableIncomingRelations(function() {			
-				let dbId = dbImage.const.dbId;
-				
-				// log("loadFromDbIdToImage, dbId: " + dbId);
-				let dbRecord = getDbRecord(dbId);
-				// log(dbRecord);
-				for (let property in dbRecord) {
-					// printKeys(dbImage);
-					if (property !== 'const' && property !== 'id' && property !== "_eternityIncoming") {
-						// log("loadFromDbIdToImage: " + dbId + " property: " + property);
-						// log(dbRecord);
-						let recordValue = dbRecord[property];
-						// log(dbRecord);
-						let value = loadDbValue(recordValue);
-						
-						// log(dbRecord);
-						// log("loadFromDbIdToImage: " + dbId + " property: " + property + "...assigning");
-						// if (property !== 'A') imageCausality.startTrace();
-						// log("value loaded to image:");
-						// log(value);
-						property = imageCausality.transformPossibleIdExpression(property, dbIdToImageId);
-						// increaseImageIncomingLoadedCounter(value);
-						increaseLoadedIncomingMacroReferenceCounters(dbImage, property);
-						dbImage[property] = value;
-						// if (property !== 'A') imageCausality.endTrace();
-						// log("loadFromDbIdToImage: " + dbId + " property: " + property + "...finished assigning");
-						// printKeys(dbImage);
-					}
-					if (property === "_eternityIncoming") {
-						let recordValue = dbRecord["_eternityIncoming"];
-						// log(dbRecord);
-						let value = loadDbValue(recordValue);
-						
-						// log(dbRecord);
-						// log("loadFromDbIdToImage: " + dbId + " property: " + property + "...assigning");
-						// if (property !== 'A') imageCausality.startTrace();
-						// log("value loaded to image:");
-						// log(value);
-						// increaseImageIncomingLoadedCounter(value);
-						increaseLoadedIncomingMacroReferenceCounters(dbImage, "_eternityIncoming");
-						dbImage.const.incoming = value; // TODO: Consider, do we need to merge here? Is it possible another incoming is created that is not loaded?... prob. not... 
-					}
-				}
-				dbImage.const.name = dbRecord.name; // TODO remove debugg
+			imageCausality.state.inPulse++;
+			imageCausality.state.emitEventPaused++;
+			imageCausality.state.incomingStructuresDisabled++;
 
-				// log("finished loadFromDbIdToImage: ");
-				// log(dbImage.const.dbId);
+			// log("loadFromDbIdToImage dbId: " + dbImage.const.dbId + " dbImage:" + dbImage.const.id)-;
+			let dbId = dbImage.const.dbId;
+			
+			// log("loadFromDbIdToImage, dbId: " + dbId);
+			let dbRecord = getDbRecord(dbId);
+			// log(dbRecord);
+			for (let property in dbRecord) {
 				// printKeys(dbImage);
-				dbImage.const.loaded = true;
-				// log("-- ");
-			});
+				if (property !== 'const' && property !== 'id' && property !== "_eternityIncoming") {
+					// log("loadFromDbIdToImage: " + dbId + " property: " + property);
+					// log(dbRecord);
+					let recordValue = dbRecord[property];
+					// log(dbRecord);
+					let value = loadDbValue(recordValue);
 					
+					// log(dbRecord);
+					// log("loadFromDbIdToImage: " + dbId + " property: " + property + "...assigning");
+					// if (property !== 'A') imageCausality.startTrace();
+					// log("value loaded to image:");
+					// log(value);
+					property = imageCausality.transformPossibleIdExpression(property, dbIdToImageId);
+					// increaseImageIncomingLoadedCounter(value);
+					increaseLoadedIncomingMacroReferenceCounters(dbImage, property);
+					dbImage[property] = value;
+					// if (property !== 'A') imageCausality.endTrace();
+					// log("loadFromDbIdToImage: " + dbId + " property: " + property + "...finished assigning");
+					// printKeys(dbImage);
+				}
+				if (property === "_eternityIncoming") {
+					let recordValue = dbRecord["_eternityIncoming"];
+					// log(dbRecord);
+					let value = loadDbValue(recordValue);
+					
+					// log(dbRecord);
+					// log("loadFromDbIdToImage: " + dbId + " property: " + property + "...assigning");
+					// if (property !== 'A') imageCausality.startTrace();
+					// log("value loaded to image:");
+					// log(value);
+					// increaseImageIncomingLoadedCounter(value);
+					increaseLoadedIncomingMacroReferenceCounters(dbImage, "_eternityIncoming");
+					dbImage.const.incoming = value; // TODO: Consider, do we need to merge here? Is it possible another incoming is created that is not loaded?... prob. not... 
+				}
+			}
+			dbImage.const.name = dbRecord.name; // TODO remove debugg
+
+			// log("finished loadFromDbIdToImage: ");
+			// log(dbImage.const.dbId);
+			// printKeys(dbImage);
+			dbImage.const.loaded = true;
+			// log("-- ");
+			imageCausality.state.incomingStructuresDisabled--;
+			imageCausality.state.emitEventPaused--;
+			imageCausality.state.inPulse--;	if (imageCausality.state.inPulse === 0) imageCausality.postPulseCleanup();	
 			// if (typeof(dbRecord.const) !== 'undefined') {
 				// for (property in dbRecord.const) {
 					// if (typeof(dbImage.const[property]) === 'undefined') {
@@ -1734,6 +1747,10 @@
 		
 		
 		function unloadImage(dbImage) {
+			imageCausality.state.inPulse++;
+			imageCausality.state.emitEventPaused++;
+			imageCausality.state.incomingStructuresDisabled++;
+
 			// log("unloadImage");
 			// logGroup();
 			// without emitting events.
@@ -1751,6 +1768,9 @@
 			// log(dbImage.const.incomingReferencesCount)
 			killImageIfDissconnectedAndNonReferred(dbImage);
 			
+			imageCausality.state.incomingStructuresDisabled--;
+			imageCausality.state.emitEventPaused--;
+			imageCausality.state.inPulse--;	if (imageCausality.state.inPulse === 0) imageCausality.postPulseCleanup();	
 			// logUngroup();
 		}
 		
@@ -2657,6 +2677,7 @@
 		let imageCausality = require("./causality.js")({ 
 			name : 'imageCausality' + (typeof(configuration.name) !== 'undefined') ? configuration.name : "",
 			recordPulseEvents : true, 
+			objectActivityList : true,
 			incomingStructureChunkSize : configuration.persistentIncomingChunkSize,
 			incomingChunkRemovedCallback : incomingChunkRemovedForImage,
 			useIncomingStructures: true,
