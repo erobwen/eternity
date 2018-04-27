@@ -554,6 +554,7 @@
 				// Set the class of objects created... TODO: Do this in-pulse somehow instead?
 				addImageClassNames(events);
 				
+				updateIncomingReferencesCounters(events);
 				// pendingUpdates.push(events);
 				
 				// Push to pending updates
@@ -591,8 +592,24 @@
 							throw new Error("Could not set _eternityImageClass");
 						}
 					}
-				});				
+				});		
 			});
+		}
+		
+		
+		function updateIncomingReferencesCounters(events) {
+			let counterEvents = [];
+			imageCausality.pulseEvents = counterEvents;
+			// events.forEach(function(event) {
+				// if (event.type === 'creation') { // Note: it only works 
+					// for(let property in event.object) {
+						// let value = event.object[property];
+						// if (imageCausality.isObject(value)) {
+							
+						// }
+					// }
+				// }
+			// });				
 		}
 		
 		
@@ -1372,7 +1389,7 @@
 			}
 		}
 		
-		function loadFromDbIdToImage(dbImage) {
+		function loadFromDbIdToImage(dbImage) { //loadImage
 			imageCausality.state.inPulse++;
 			imageCausality.state.emitEventPaused++;
 			imageCausality.state.incomingStructuresDisabled++;

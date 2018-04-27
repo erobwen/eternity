@@ -33,7 +33,7 @@
 		// State
 		let state = { 
 			inPulse : 0,
-			inPostPulseProcess : 0,
+			// inPostPulseProcess : 0,
 			pulseEvents : [],
 			
 			// causalityStack : [],
@@ -2254,7 +2254,7 @@
 			trace.pulse && logGroup("postPulseCleanup (" + state.pulseEvents.length + " events, " + configuration.name + ")");
 			trace.pulse && log(state.pulseEvents, 2);
 			state.inPulse++; // block new pulses!			
-			state.inPostPulseProcess++;
+			// state.inPostPulseProcess++;
 			
 			// Cleanup reactive structures no longer needed
 			// log("postPulseCleanup: " + state.contextsScheduledForPossibleDestruction.length);
@@ -2285,7 +2285,7 @@
 			
 			// Prepare for next pulse.
 			state.pulseEvents = [];
-			state.inPostPulseProcess--;
+			// state.inPostPulseProcess--;
 			state.inPulse--;
 			trace.pulse && logUngroup();
 		}
