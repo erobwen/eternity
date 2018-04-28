@@ -22,7 +22,9 @@
 		findLogs : false, 
 		
 		// Set to true in web browser that already has a good way to display objects with expandable trees.
-		useConsoleDefault : false
+		useConsoleDefault : false,
+		
+		nameExtractor : null
 	};	
 	
 	// State
@@ -116,19 +118,27 @@
 		return !context.terminated;
 	}
 
+	function extractName(entity) {
+		if (configuration.nameExtractor !== null) {
+			return configuration.nameExtractor(entity);
+		} else {
+			return "";
+		}
+	}
+	
 	function logPattern(entity, pattern, context) {
 		if (typeof(pattern) === "undefined") {
 			pattern = 1;
 		} 
 		
-		// Apply transformation
-		// let originalEntity = entity;
-		if (typeof(pattern) === 'function') {
-			// console.log(pattern);
-			// console.log(entity);
-			entity = pattern(entity);
-			pattern = -1;
-		}
+		// // Apply transformation
+		// // let originalEntity = entity;
+		// if (typeof(pattern) === 'function') {
+			// // console.log(pattern);
+			// // console.log(entity);
+			// entity = pattern(entity);
+			// pattern = -1;
+		// }
 		
 		// Setup of process
 		let outer = false;
@@ -160,7 +170,12 @@
 				if (entity instanceof Array) {
 					context.log("[...]"); 
 				} else {
-					context.log("{...}"); 				
+					let name = extractName(entity)
+					if (name !== "") {
+						context.log("{ name : " + name + ", ...}"); 				
+					} else {						
+						context.log("{...}"); 				
+					}
 				}
 			} else {
 				let isArray = (entity instanceof Array);
@@ -211,6 +226,10 @@
 		// Configuration
 		configuration : configuration, 
 
+		setNameExtractor : function(extractor) {
+			configuration.nameExtractor = extractor;
+		},
+		
 		// If you need the output as a string.
 		logToString: function(entity, pattern) {
 			let context = createToStringContext();

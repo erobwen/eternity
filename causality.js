@@ -1767,15 +1767,26 @@
 			if (typeof(initial.const) === 'undefined') {			
 				initial.const = {
 					id : nextId++,
-					causalityInstance : causalityInstance
+					causalityInstance : causalityInstance,
+					object : initial
 				};
 			} else {
 				initial.const.id = nextId++;
 				initial.const.causalityInstance = causalityInstance;
+				initial.const.object = initial;
 			}
 			if (configuration.incomingReferenceCounters) initial.const.incomingReferencesCount = 0;
 			
 			emitImmutableCreationEvent(initial);
+			
+			//Note: immutable cannot handle complex outgoing references...
+			if (disableIncomingRelations === 0) throw new Error("immutable cannot handle complex outgoing references");
+			for (property in initial) {
+				if (configuration.recordPulseEvents || typeof(handler.observers) !== 'undefined') {
+					emitEvent(initial, {type: 'set', property: property, value: initial[property], oldValue: initial["__causality__"]});
+				}
+			}				
+			
 			if (--state.inPulse === 0) postPulseCleanup();
 			return initial;
 		} 

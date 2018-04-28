@@ -27,6 +27,21 @@
 	
 	// Neat logging
 	let objectlog = require('./objectlog.js');
+	objectlog.setNameExtractor(function(entity) {
+		let name = "";
+		let id = "";
+		if (typeof(entity.name) !== 'undefined') {
+			name = entity.name;
+		}
+		if (typeof(entity.const) !== 'undefined' && typeof(entity.const.id) !== 'undefined') {
+			id = entity.const.id;
+			return name + "(" + id + ")";
+		} else {
+			return name;			
+		}
+	})
+	
+	const fs = require('fs');
 
 	function createEternityInstance(configuration) {
 		// objectlog.log("createEternityInstance: " + configuration.name);
@@ -102,6 +117,31 @@
 			objectCausality.updateInActiveRecording();
 			imageCausality.updateInActiveRecording();
 			return result;
+		}
+		
+		function logToFile(entity, pattern, filename) {
+			objectCausality.state.withoutRecording++;	
+			imageCausality.state.withoutRecording++;	
+			objectCausality.state.blockingInitialize++;	
+			imageCausality.state.blockingInitialize++;	
+			objectCausality.state.freezeActivityList++;	
+			objectCausality.updateInActiveRecording();
+			imageCausality.updateInActiveRecording();
+
+			let result = objectlog.logToString(entity, pattern);
+			fs.writeFile(filename, result, function(err) {
+				if(err) {
+					return console.log(err);
+				}
+			}); 
+
+			objectCausality.state.withoutRecording--;	
+			imageCausality.state.withoutRecording--;	
+			objectCausality.state.blockingInitialize--;	
+			imageCausality.state.blockingInitialize--;	
+			objectCausality.state.freezeActivityList--;	
+			objectCausality.updateInActiveRecording();
+			imageCausality.updateInActiveRecording();
 		}
 
 		/*-----------------------------------------------
@@ -2814,7 +2854,12 @@
 			collectAll : collectAll,
 			flushImageToDatabase : flushImageToDatabase,
 			flushToDatabase : flushToDatabase,
-			oneStepCollection : oneStepCollection
+			oneStepCollection : oneStepCollection,
+			log : log,
+			logGroup : logGroup,
+			logUngroup : logUngroup,
+			logToString : logToString,
+			logToFile : logToFile
 		});
 
 		let trace = instance.trace;
