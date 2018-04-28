@@ -1,58 +1,33 @@
+let log = console.log;
 
-class Bar {
-	function selectForFoo(selector) {
-		selector.addArrayAndElements("propertyWithArray", "ForFoo");
-		selector.add("a", "ForFoo");
-		selector.
-		
-	}	
-}
+// let source = {a : 1};
+let source = [1, 2, 3];
+log("plain object");
+log(source);
+log(source.constructor.name);
+log();
 
-class BasicSelector {
-	
-}
+// source = Object.create(source);
+// source.field = true;
+// log("created object with prototype");
+// log(source);
+// log(source.constructor.name);
+// log();
 
+source = Object.getPrototypeOf(source);
+log("1 st proto");
+log(source);
+log(source.constructor.name);
+log();
 
+source = Object.getPrototypeOf(source);
+log("2 st proto");
+log(source);
+log(source.constructor.name);
+log();
 
-class Selection {
-	let currentObject = null;
-	let nextPropertiesAndSelectors = {}
-	
-	addArrayAndElements() {}
-	
-	
-}
-
-function loadAndSelect(object, selector) {
-	
-	
-	
-}
-
-
-{
-	loadForEdit : {
-		"b" : "Edit", 
-		"[]" : "Edit",
-		"c" : "Edit"
-	}
-}
-
-liquid.addSubSelection(this.b, "Edit", selection);
-
-
-
-	class Manager {
-		loadAllSubjects : { "subjects[]" : "this"} // Load all elements of array subjects
-		async teamSalaryCost() {
-			return ensureLoaded(this, "AllSubjects", () => {
-				let result = this.salary;
-				this.subjects.forEach((subject) => {
-					result += await subject.teamSalaryCost();
-				});
-				return result;
-			});			
-		}
-	}
-
-
+source = Object.getPrototypeOf(source);
+log("3 st proto");
+log(source);
+log(source.constructor.name);
+log();

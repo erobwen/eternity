@@ -1785,38 +1785,61 @@
 		}
 		
 		
-		function create(createdTarget, cacheIdOrInitData) { // #maincreate
+		function create(source, cacheIdOrInitData) { // #maincreate
 			if (trace.basic > 0) {
-				log("create, target type: " + typeof(createdTarget));
+				log("create, target type: " + typeof(source));
 				logGroup();
 			}
 			
 			state.inPulse++;
 			let id = nextId++;
 			
+			let createdTarget = null;
+			let initialConst = null;
+			let transferFromSource = false;
 			let initializer = null;
-			if (typeof(createdTarget) === 'undefined') {
+			if (typeof(source) === 'undefined') {
+				// Create from nothing
 				createdTarget = {};
-			} else if (typeof(createdTarget) === 'function') {
-				initializer = createdTarget; 
+			} else if (typeof(source) === 'function') {
+				// Create from initializer
+				initializer = source; 
 				createdTarget = {};
-			} else if (typeof(createdTarget) === 'string') {
-				// log("create: " +  createdTarget);
-				if (createdTarget === 'Array') {
+			} else if (typeof(source) === 'string') {
+				// Create from a string
+				if (source === 'Array') {
 					createdTarget = []; // On Node.js this is different from Object.create(eval("Array").prototype) for some reason... 
-				} else if (createdTarget === 'Object') {
+				} else if (source === 'Object') {
 					createdTarget = {}; // Just in case of similar situations to above for some Javascript interpretors... 
 				} else {
-					let classOrPrototype = classRegistry[createdTarget];
+					let classOrPrototype = classRegistry[source];
 					if (typeof(classOrPrototype) !== 'function') {
 						throw new Error("No class found: " +  createdTarget);
 					}
-					// log(Object.keys(classRegistry));
-					// log(createdTarget);
-					// log(classOrPrototype);
 					createdTarget = new classRegistry[createdTarget]();
 				}
-			} 
+			} else {
+				// Create from source object
+				let firstPrototype = Object.getPrototypeOf(source);
+				let className = firstPrototype.constructor.name;
+				
+				let secondPrototype = Object.getPrototypeOf(firstPrototype);
+				if (className === 'Object' && secondPrototype === null) {
+					createdTarget = {};
+					transferFromSource = true;
+					if (typeof(source.const) !== 'undefined') {
+						initialConst = source.const;
+						delete source.const;						
+					}
+				} else if (className === 'Array') {
+					createdTarget = [];
+					transferFromSource = true;
+				} else {
+					// Got a class instance directly... just use it as target.
+					createdTarget = source;
+					transferFromSource = false;
+				}
+			}
 			// else if (typeof(createdTarget) === 'object') {
 			// }
 			let cacheId = null;
@@ -1886,8 +1909,6 @@
 				// }
 			}
 
-			let initialConst = createdTarget.const;
-			delete createdTarget.const;
 			handler.target = createdTarget;
 			
 			// createdTarget.const.id = id; // TODO ??? 
@@ -1926,11 +1947,13 @@
 				mergeFrom : genericMergeFrom.bind(proxy),
 				forwardTo : genericForwarder.bind(proxy),
 				removeForwarding : genericRemoveForwarding.bind(proxy),
-				mergeAndRemoveForwarding: genericMergeAndRemoveForwarding.bind(proxy)
+				mergeAndRemoveForwarding : genericMergeAndRemoveForwarding.bind(proxy)
 			};
 			if (configuration.incomingReferenceCounters) handler.const.incomingReferencesCount = 0;
-			for(property in initialConst) {
-				handler.const[property] = initialConst[property];
+			if (initialConst !== 'undefined') {
+				for(property in initialConst) {
+					handler.const[property] = initialConst[property];
+				}				
 			}
 			
 			if (typeof(createdTarget.const) !== 'undefined') {
@@ -1941,15 +1964,6 @@
 			
 			handler.const.const = handler.const;
 			// handler.const.nonForwardConst = handler.const;
-			
-			// TODO: consider what we should do when we have reverse references. Should we loop through createdTarget and form proper reverse structures?
-			// Experiments: 
-			// withoutEmittingEvents(function() {
-				// for (property in createdTarget) {
-					// proxy[property] = createdTarget[property];
-				// }
-			// });
-			// However, will witout emitting events work for eternity? What does it want really?
 
 			if (state.inReCreate !== null) {
 				trace.reCreate && log("creating in re create: " + cacheId);
@@ -1983,6 +1997,19 @@
 				}
 				proxy.initialize.apply(proxy, [initialData]);
 			}
+
+			// TODO: consider what we should do when we have reverse references. Should we loop through createdTarget and form proper reverse structures?
+			// Experiments: 
+			// withoutEmittingEvents(function() {
+			// });
+			// However, will without emitting events work for eternity? What does it want really?
+
+			if (transferFromSource) {
+				for (property in source) {
+					proxy[property] = source[property];
+				}				
+			}
+
 			return proxy;
 		}
 
