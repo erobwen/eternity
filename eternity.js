@@ -625,7 +625,7 @@
 			imageCausality.assertNotRecording();
 			imageCausality.disableIncomingRelations(function() {
 				events.forEach(function(event) {
-					if (event.type === 'creation') { // Note: it only works 
+					if (event.type === 'creation') { // Note: this extends the pulse and adds additional events to it 
 						event.object._eternityImageClass = Object.getPrototypeOf(event.object).constructor.name;
 						// log("className: " + event.object._eternityImageClass);
 						if (typeof(event.object._eternityImageClass) === 'unefined' || event.object._eternityImageClass === 'undefined') {
@@ -637,19 +637,56 @@
 		}
 		
 		
+		// NOW
 		function updateIncomingReferencesCounters(events) {
 			let counterEvents = [];
 			imageCausality.pulseEvents = counterEvents;
-			// events.forEach(function(event) {
-				// if (event.type === 'creation') { // Note: it only works 
-					// for(let property in event.object) {
-						// let value = event.object[property];
-						// if (imageCausality.isObject(value)) {
-							
-						// }
-					// }
-				// }
-			// });				
+			events.forEach(function(event) {
+				if (event.type === 'set') { 
+					log("process event...");
+					log(event, 1);
+				
+					// Increase new value counter
+					let value = event.value;
+					if (imageCausality.isObject(value)) {
+						log("value...");
+						if (typeof(value._eternityIncomingCount) === 'undefined') {
+							log("setting a value for the first time... ");
+							value._eternityIncomingCount = 0;
+						}
+						log("increasing counter... ");
+						value._eternityIncomingCount++;
+					}
+					
+					// Decrease old value counter
+					let oldValue = event.oldValue;
+					if (imageCausality.isObject(oldValue)) {
+						log("old value...");
+						if (typeof(oldValue._eternityIncomingCount) === 'undefined') {
+							throw new Error("Counter could not be zero in this state... ");
+						}
+						log("decreasing counter... ");
+						oldValue._eternityIncomingCount--;
+					}
+				}
+				if (event.type === 'delete') { 
+					// Decrease old value counter
+					let oldValue = event.oldValue;
+					if (imageCausality.isObject(oldValue)) {
+						log("old value...");
+						if (typeof(oldValue._eternityIncomingCount) === 'undefined') {
+							throw new Error("Counter could not be zero in this state... ");
+						}
+						log("decreasing counter... ");
+						oldValue._eternityIncomingCount--;
+					}					
+				}
+			});
+			// logToFile(events, 3, "./eventDump.json");
+			// logToFile(counterEvents, 3, "./eventDump.json");
+			Array.prototype.push.apply(events, counterEvents);
+			// logToFile(events, 2, "./eventDump.json");
+			imageCausality.pulseEvents = events; // Note: Some of the events might cancel each other out... 
 		}
 		
 		
@@ -768,7 +805,7 @@
 				pendingOtherDbOperations : 0,
 				imageWritings : {},
 				imageDeallocations : {},
-				imageUpdates : {},
+				imageUpdates : {}, // TODO: Remember initial value for each field, so that events that cancel each other out might be removed altogether.
 				needsSaving : true
 			}
 			imageCausality.disableIncomingRelations(function () { // All incoming structures fully visible!
@@ -833,11 +870,6 @@
 								let property = event.property;
 								property = imageCausality.transformPossibleIdExpression(property, imageIdToDbIdOrTmpDbId);
 								deletedKeys[property] = true;
-								
-								// Deallocate if last incoming reference
-								if (imageCausality.isObject(event.oldValue) && event.oldValue.const.persistentIncomingReferencesCount === 0 && event.oldValue !== persistentRootImage) {
-									compiledUpdate.imageDeallocations[event.oldValue.const.dbId] = true;
-								} // TODO NOW
 								
 								// No update if delete
 								delete imageUpdates[property];
@@ -1135,6 +1167,7 @@
 		function twoPhaseComit() {
 			while(!oneStepTwoPhaseCommit()) {}
 			pendingUpdate = null;
+			if (configuration.twoPhaseComit) mockMongoDB.updateRecord(updateDbId, { name: "updatePlaceholder" });
 			return;
 			// log("twoPhaseComit:");
 			// logGroup();
@@ -2019,9 +2052,10 @@
 		
 		
 		/*-----------------------------------------------
-		 *           Garbage collection
+		 *           Garbage collection [collecting]
 		 *-----------------------------------------------*/
 		
+		// TODO: Remove this... 
 		function deallocateInDatabase(dbImage) {
 			// trace.deallocate && 
 			// log("deallocateInDatabase: " + dbImage.const.id + ", " + dbImage.const.dbId);

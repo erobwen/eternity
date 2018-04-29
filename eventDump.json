@@ -1,0 +1,390 @@
+[
+  {
+    type : "set", 
+    property : "_eternityPendingUnstableOriginMember", 
+    value : true, 
+    oldValue : undefined, 
+    object : { name : a(2), ...}
+  }, 
+  {
+    type : "set", 
+    property : "_eternityPendingUnstableOriginCounter", 
+    value : 1, 
+    oldValue : 0, 
+    object : { name : garbageCollection(0), ...}
+  }, 
+  {
+    type : "set", 
+    property : "_eternityPendingUnstableOriginFirst", 
+    value : { name : a(2), ...}, 
+    oldValue : null, 
+    object : { name : garbageCollection(0), ...}
+  }, 
+  {
+    type : "set", 
+    property : "_eternityPendingUnstableOriginLast", 
+    value : { name : a(2), ...}, 
+    oldValue : null, 
+    object : { name : garbageCollection(0), ...}
+  }, 
+  {
+    type : "set", 
+    property : "_eternityPendingUnstableOriginPrevious", 
+    value : null, 
+    oldValue : undefined, 
+    object : { name : a(2), ...}
+  }, 
+  {
+    type : "set", 
+    property : "_eternityPendingUnstableOriginNext", 
+    value : null, 
+    oldValue : undefined, 
+    object : { name : a(2), ...}
+  }, 
+  {
+    type : "delete", 
+    property : "_id_1_di_", 
+    oldValue : { name : Persistent(1), ...}, 
+    object : { name : (5), ...}
+  }, 
+  {
+    type : "set", 
+    property : "contentsCounter", 
+    value : 0, 
+    oldValue : 1, 
+    object : { name : (4), ...}
+  }, 
+  {
+    type : "delete", 
+    property : "property:a", 
+    oldValue : { name : (4), ...}, 
+    object : { name : (3), ...}
+  }, 
+  {
+    type : "set", 
+    property : "parent", 
+    value : null, 
+    oldValue : { name : (3), ...}, 
+    object : { name : (4), ...}
+  }, 
+  {
+    type : "set", 
+    property : "a", 
+    value : null, 
+    oldValue : { name : (4), ...}, 
+    object : { name : Persistent(1), ...}
+  }, 
+  {
+    type : "set", 
+    property : "_eternityIncomingCount", 
+    value : 3, 
+    oldValue : 2, 
+    object : { name : a(2), ...}
+  }, 
+  {
+    type : "set", 
+    property : "_eternityIncomingCount", 
+    value : 4, 
+    oldValue : 3, 
+    object : { name : a(2), ...}
+  }, 
+  {
+    type : "set", 
+    property : "_eternityIncomingCount", 
+    value : 0, 
+    oldValue : 1, 
+    object : { name : (3), ...}
+  }, 
+  {
+    type : "set", 
+    property : "_eternityIncomingCount", 
+    value : 3, 
+    oldValue : 4, 
+    object : { name : (4), ...}
+  }
+], 
+    oldValue : undefined, 
+    object : { name : (4), ...}
+  }, 
+  {
+    type : "set", 
+    property : "referredObject", 
+    value : { name : a(2), ...}, 
+    oldValue : undefined, 
+    object : { name : (4), ...}
+  }, 
+  {
+    type : "set", 
+    property : "isIncomingPropertyStructure", 
+    value : true, 
+    oldValue : undefined, 
+    object : { name : (4), ...}
+  }, 
+  {
+    type : "set", 
+    property : "propertyKey", 
+    value : "property:a", 
+    oldValue : undefined, 
+    object : { name : (4), ...}
+  }, 
+  {
+    type : "set", 
+    property : "isListElement", 
+    value : true, 
+    oldValue : undefined, 
+    object : { name : (4), ...}
+  }, 
+  {
+    type : "set", 
+    property : "parent", 
+    value : { name : (3), ...}, 
+    oldValue : undefined, 
+    object : { name : (4), ...}
+  }, 
+  {
+    type : "set", 
+    property : "next", 
+    value : null, 
+    oldValue : undefined, 
+    object : { name : (4), ...}
+  }, 
+  {
+    type : "set", 
+    property : "previous", 
+    value : null, 
+    oldValue : undefined, 
+    object : { name : (4), ...}
+  }, 
+  {
+    type : "set", 
+    property : "first", 
+    value : { name : (4), ...}, 
+    oldValue : null, 
+    object : { name : (3), ...}
+  }, 
+  {
+    type : "set", 
+    property : "last", 
+    value : { name : (4), ...}, 
+    oldValue : null, 
+    object : { name : (3), ...}
+  }, 
+  {
+    type : "set", 
+    property : "property:a", 
+    value : { name : (4), ...}, 
+    oldValue : undefined, 
+    object : { name : (3), ...}
+  }, 
+  {
+    type : "set", 
+    property : "isChunkListHead", 
+    value : true, 
+    oldValue : undefined, 
+    object : { name : (4), ...}
+  }, 
+  {
+    type : "set", 
+    property : "isReferencesChunk", 
+    value : true, 
+    oldValue : undefined, 
+    object : { name : (4), ...}
+  }, 
+  {
+    type : "set", 
+    property : "contents", 
+    value : {...}, 
+    oldValue : undefined, 
+    object : { name : (4), ...}
+  }, 
+  {
+    type : "set", 
+    property : "contentsCounter", 
+    value : 0, 
+    oldValue : undefined, 
+    object : { name : (4), ...}
+  }, 
+  {
+    type : "set", 
+    property : "initialized", 
+    value : true, 
+    oldValue : undefined, 
+    object : { name : (4), ...}
+  }, 
+  {
+    type : "set", 
+    property : "isList", 
+    value : true, 
+    oldValue : undefined, 
+    object : { name : (4), ...}
+  }, 
+  {
+    type : "set", 
+    property : "first", 
+    value : null, 
+    oldValue : undefined, 
+    object : { name : (4), ...}
+  }, 
+  {
+    type : "set", 
+    property : "last", 
+    value : null, 
+    oldValue : undefined, 
+    object : { name : (4), ...}
+  }, 
+  {type : "creation", object : { name : (5), ...}}, 
+  {
+    type : "set", 
+    property : "contents", 
+    value : { name : (5), ...}, 
+    oldValue : {...}, 
+    object : { name : (4), ...}
+  }, 
+  {
+    type : "set", 
+    property : "contentsCounter", 
+    value : 1, 
+    oldValue : 0, 
+    object : { name : (4), ...}
+  }, 
+  {
+    type : "set", 
+    property : "_id_1_di_", 
+    value : { name : Persistent(1), ...}, 
+    oldValue : undefined, 
+    object : { name : (5), ...}
+  }, 
+  {
+    type : "set", 
+    property : "a", 
+    value : { name : (4), ...}, 
+    oldValue : undefined, 
+    object : { name : Persistent(1), ...}
+  }, 
+  {
+    type : "set", 
+    property : "_eternityImageClass", 
+    value : "Object", 
+    oldValue : undefined, 
+    object : { name : (3), ...}
+  }, 
+  {
+    type : "set", 
+    property : "_eternityImageClass", 
+    value : "Object", 
+    oldValue : undefined, 
+    object : { name : (4), ...}
+  }, 
+  {
+    type : "set", 
+    property : "_eternityImageClass", 
+    value : "Object", 
+    oldValue : undefined, 
+    object : { name : (5), ...}
+  }, 
+  {
+    type : "set", 
+    property : "_eternityIncomingCount", 
+    value : 0, 
+    oldValue : undefined, 
+    object : { name : Persistent(1), ...}
+  }, 
+  {
+    type : "set", 
+    property : "_eternityIncomingCount", 
+    value : 1, 
+    oldValue : 0, 
+    object : { name : Persistent(1), ...}
+  }, 
+  {
+    type : "set", 
+    property : "_eternityIncomingCount", 
+    value : 0, 
+    oldValue : undefined, 
+    object : { name : a(2), ...}
+  }, 
+  {
+    type : "set", 
+    property : "_eternityIncomingCount", 
+    value : 1, 
+    oldValue : 0, 
+    object : { name : a(2), ...}
+  }, 
+  {
+    type : "set", 
+    property : "_eternityIncomingCount", 
+    value : 2, 
+    oldValue : 1, 
+    object : { name : a(2), ...}
+  }, 
+  {
+    type : "set", 
+    property : "_eternityIncomingCount", 
+    value : 0, 
+    oldValue : undefined, 
+    object : { name : (3), ...}
+  }, 
+  {
+    type : "set", 
+    property : "_eternityIncomingCount", 
+    value : 1, 
+    oldValue : 0, 
+    object : { name : (3), ...}
+  }, 
+  {
+    type : "set", 
+    property : "_eternityIncomingCount", 
+    value : 0, 
+    oldValue : undefined, 
+    object : { name : (4), ...}
+  }, 
+  {
+    type : "set", 
+    property : "_eternityIncomingCount", 
+    value : 1, 
+    oldValue : 0, 
+    object : { name : (4), ...}
+  }, 
+  {
+    type : "set", 
+    property : "_eternityIncomingCount", 
+    value : 2, 
+    oldValue : 1, 
+    object : { name : (4), ...}
+  }, 
+  {
+    type : "set", 
+    property : "_eternityIncomingCount", 
+    value : 3, 
+    oldValue : 2, 
+    object : { name : (4), ...}
+  }, 
+  {
+    type : "set", 
+    property : "_eternityIncomingCount", 
+    value : 0, 
+    oldValue : undefined, 
+    object : { name : (5), ...}
+  }, 
+  {
+    type : "set", 
+    property : "_eternityIncomingCount", 
+    value : 1, 
+    oldValue : 0, 
+    object : { name : (5), ...}
+  }, 
+  {
+    type : "set", 
+    property : "_eternityIncomingCount", 
+    value : 2, 
+    oldValue : 1, 
+    object : { name : Persistent(1), ...}
+  }, 
+  {
+    type : "set", 
+    property : "_eternityIncomingCount", 
+    value : 4, 
+    oldValue : 3, 
+    object : { name : (4), ...}
+  }
+]

@@ -1,32 +1,39 @@
-let eternity = require("./eternity.js");
-eternity.install();
+let eternity = require("./eternity.js")();
 
 // Neat logging
-let objectlog = require('./objectlog.js');
-let log = objectlog.log;
+// let objectlog = require('../objectlog.js');
+// let log = objectlog.log;
+// let logGroup = objectlog.enter;
+// let logUngroup = objectlog.exit;
+let log = eternity.log;
+let logGroup = eternity.enter;
+let logUngroup = eternity.exit;
 
+
+let create = eternity.create;
+let persistent = eternity.persistent;
+let a = create({name: "a"});
+// log("------------------------------------------");
+// eternity.trace.flush = 1;
 eternity.pulse(function() {
-	let a = create({name : "a"});
-	// console.log(a.const.id);
-	let b = create({name : "b"});
-	// console.log(b.const.id);
-	let c = create({name : "c"});
-	// console.log(c.const.id);
-	let d = create({name : "d"});
-	// console.log(d.const.id);
-	
-	transaction(function() {
-		a.B = b;
-		b.A = a;
-	}); 
-	
-	a._independentlyPersistent = true;
-
-	// log(a.const.dbImage, 2);	
+	persistent.a = a;
 });
+// log("-------");
+eternity.flushToDatabase();
+log(eternity.mockMongoDB.getAllRecordsParsed(), 10);
+// // log("------------------------------------------");
+// assert.equal(typeof(a.const.dbImage) !== 'undefined', true);
+// // eternity.trace.flush = 0;
+
+// eternity.flushToDatabase();
+// // log(eternity.mockMongoDB.getAllRecordsParsed(), 10);
+// let aDbId = a.const.dbImage.const.dbId;
+
+// persistent.a = null;
+// eternity.flushToDatabase();
 
 
-console.log(eternity.mockMongoDB.getAllRecordsParsed());
+// console.log(eternity.mockMongoDB.getAllRecordsParsed(), 10);
 
 
 // let foo = create({name: "foo", const: {someProperty : 42}});

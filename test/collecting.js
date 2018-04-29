@@ -1,15 +1,16 @@
 const assert = require('assert');
 // const log = console.log.bind(console);
 
-// Neat logging
-let objectlog = require('../objectlog.js');
-let log = objectlog.log;
-let logGroup = objectlog.enter;
-let logUngroup = objectlog.exit;
 let eternity = require('../eternity')({
 	name: "collecting.js", 
 	maxNumberOfLoadedObjects : 200
 });  // Includes persistent root.
+
+// Neat logging
+let log = eternity.log;
+let logGroup = eternity.logGroup;
+let logUngroup = eternity.logUngroup;
+let logToFile = eternity.logToFile;
 
 // Tests based on mobx test/array.js
 describe("garbage-collection", function () {
