@@ -34,25 +34,45 @@ describe("garbage-collection", function () {
 		persistent.a = a;
 		// log("-------");
 		eternity.flushToDatabase();
+		// log(eternity.mockMongoDB.getAllRecordsParsed(), 10);
 		// log("------------------------------------------");
 		assert.equal(typeof(a.const.dbImage) !== 'undefined', true);
 		// eternity.trace.flush = 0;
 		
 		eternity.flushToDatabase();
+		// log(eternity.mockMongoDB.getAllRecordsParsed(), 10);
 		let aDbId = a.const.dbImage.const.dbId;
 
 		persistent.a = null;
 		eternity.flushToDatabase();
 
 		// GC in 6 steps
+		// log("1");
+		// eternity.trace.gc = true;
+		// eternity.trace.killing = true;
 		eternity.oneStepCollection();
+		eternity.flushToDatabase();
+		
+		// log("2");
 		eternity.oneStepCollection();
+		eternity.flushToDatabase();
+		
+		// log("3");
 		eternity.oneStepCollection();
+		eternity.flushToDatabase();
+		
+		// log("4");
+		// eternity.trace.refc = true;
+		// logToFile(eternity.mockMongoDB.getAllRecordsParsed(), 10, "./databaseDump.json");
 		eternity.oneStepCollection();
+		eternity.flushToDatabase();
 		// log("----------------------------------------")
 		// eternity.trace.flush = 1;
 		// eternity.trace.eternity = true;
+		// log("5");
 		eternity.oneStepCollection();		
+		eternity.flushToDatabase();
+		
 		eternity.oneStepCollection();
 		eternity.flushToDatabase();
 		// eternity.trace.eternity = false;
@@ -61,11 +81,10 @@ describe("garbage-collection", function () {
 		assert.equal(typeof(a.const.dbImage) === 'undefined', true);
 		// log("pending updates: " + eternity.pendingUpdates.length);
 		// log("aDbId: ", aDbId);
-		// log(eternity.mockMongoDB.getAllRecordsParsed(), 10);
 		assert.ok(eternity.mockMongoDB.isDeallocated(aDbId));
 				
-		eternity.trace.eternity = true;
-		delete eternity.trace.eternity;
+		// eternity.trace.eternity = true;
+		// delete eternity.trace.eternity;
 	});
 	
 	

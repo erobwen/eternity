@@ -33,9 +33,9 @@
 		if (typeof(entity.name) !== 'undefined') {
 			name = entity.name;
 		}
-		if (typeof(entity.const) !== 'undefined' && typeof(entity.const.id) !== 'undefined') {
-			id = entity.const.id;
-			return name + "(" + id + ")";
+		if (typeof(entity.const) !== 'undefined' && typeof(entity.const.dbId) !== 'undefined') {
+			id = entity.const.dbId;
+			return name + "(_id_" + id + "_di_)";
 		} else {
 			return name;			
 		}
@@ -643,30 +643,33 @@
 			imageCausality.pulseEvents = counterEvents;
 			events.forEach(function(event) {
 				if (event.type === 'set') { 
-					// log("process event...");
-					// log(event, 1);
+					// trace.refc && log("process event...");
+					// trace.refc && log(event, 1);
 				
 					// Increase new value counter
 					let value = event.value;
 					if (imageCausality.isObject(value)) {
-						// log("value...");
+						trace.refc && log("value...");
 						if (typeof(value._eternityIncomingCount) === 'undefined') {
-							// log("setting a value for the first time... ");
+							trace.refc && log("setting a value for the first time... ");
 							value._eternityIncomingCount = 0;
 						}
-						// log("increasing counter... ");
+						trace.refc && log("increasing counter... ");
 						value._eternityIncomingCount++;
 					}
 					
 					// Decrease old value counter
 					let oldValue = event.oldValue;
 					if (imageCausality.isObject(oldValue)) {
-						// log("old value...");
+						trace.refc && log("old value...");
+						trace.refc && log(oldValue, 2);
 						if (typeof(oldValue._eternityIncomingCount) === 'undefined') {
-							throw new Error("Counter could not be zero in this state... ");
+							// leave for now.. 
+							// throw new Error("Counter could not be zero in this state... ");
+						} else {
+							trace.refc && log("decreasing counter... ");
+							oldValue._eternityIncomingCount--;							
 						}
-						// log("decreasing counter... ");
-						oldValue._eternityIncomingCount--;
 					}
 				}
 				if (event.type === 'delete') { 
@@ -675,10 +678,12 @@
 					if (imageCausality.isObject(oldValue)) {
 						// log("old value...");
 						if (typeof(oldValue._eternityIncomingCount) === 'undefined') {
-							throw new Error("Counter could not be zero in this state... ");
+							// Ok for now.. 
+							// throw new Error("Counter could not be zero in this state... ");
+						} else {
+							// log("decreasing counter... ");
+							oldValue._eternityIncomingCount--;							
 						}
-						// log("decreasing counter... ");
-						oldValue._eternityIncomingCount--;
 					}					
 				}
 			});
@@ -936,8 +941,8 @@
 				}
 			}
 			
-			let value = convertReferencesToDbIdsOrTemporaryIds(dbImage.const.incoming);
-			serialized["_eternityIncoming"] = value;				
+			// let value = convertReferencesToDbIdsOrTemporaryIds(dbImage.incoming);
+			// serialized["_eternityIncoming"] = value;				
 
 			return serialized;			
 		}
@@ -1475,7 +1480,7 @@
 			// log(dbRecord);
 			for (let property in dbRecord) {
 				// printKeys(dbImage);
-				if (property !== 'const' && property !== 'id' && property !== "_eternityIncoming") {
+				if (property !== 'const' && property !== 'id') {// && property !== "_eternityIncoming"
 					// log("loadFromDbIdToImage: " + dbId + " property: " + property);
 					// log(dbRecord);
 					let recordValue = dbRecord[property];
@@ -1495,20 +1500,20 @@
 					// log("loadFromDbIdToImage: " + dbId + " property: " + property + "...finished assigning");
 					// printKeys(dbImage);
 				}
-				if (property === "_eternityIncoming") {
-					let recordValue = dbRecord["_eternityIncoming"];
-					// log(dbRecord);
-					let value = loadDbValue(recordValue);
+				// if (property === "_eternityIncoming") {
+					// let recordValue = dbRecord["_eternityIncoming"];
+					// // log(dbRecord);
+					// let value = loadDbValue(recordValue);
 					
-					// log(dbRecord);
-					// log("loadFromDbIdToImage: " + dbId + " property: " + property + "...assigning");
-					// if (property !== 'A') imageCausality.startTrace();
-					// log("value loaded to image:");
-					// log(value);
-					// increaseImageIncomingLoadedCounter(value);
-					increaseLoadedIncomingMacroReferenceCounters(dbImage, "_eternityIncoming");
-					dbImage.const.incoming = value; // TODO: Consider, do we need to merge here? Is it possible another incoming is created that is not loaded?... prob. not... 
-				}
+					// // log(dbRecord);
+					// // log("loadFromDbIdToImage: " + dbId + " property: " + property + "...assigning");
+					// // if (property !== 'A') imageCausality.startTrace();
+					// // log("value loaded to image:");
+					// // log(value);
+					// // increaseImageIncomingLoadedCounter(value);
+					// increaseLoadedIncomingMacroReferenceCounters(dbImage, "_eternityIncoming");
+					// dbImage.incoming = value; // TODO: Consider, do we need to merge here? Is it possible another incoming is created that is not loaded?... prob. not... 
+				// }
 			}
 			dbImage.const.name = dbRecord.name; // TODO remove debugg
 
@@ -2058,7 +2063,7 @@
 		// TODO: Remove this... 
 		function deallocateInDatabase(dbImage) {
 			// trace.deallocate && 
-			// log("deallocateInDatabase: " + dbImage.const.id + ", " + dbImage.const.dbId);
+			trace.gc && log("deallocateInDatabase: " + dbImage.const.id + ", " + dbImage.const.dbId);
 			// log(dbImage, 2);
 			if (typeof(dbImage[eternityTag + "_to_deallocate"]) === 'undefined') {			
 				// if (typeof(dbImage.const.dbId) === 'undefined') {
@@ -2179,7 +2184,7 @@
 		
 		
 		function tryReconnectFromIncomingContents(contents) {
-			// log("tryReconnectFromIncomingContents");
+			trace.gc && log("tryReconnectFromIncomingContents");
 			for(id in contents) {
 				if (!id.startsWith("_eternity")) {
 					let referer = contents[id];
@@ -2304,10 +2309,10 @@
 					// log("<<<<                        >>>>>");
 					let currentImage = removeFirstFromList(gcState, unstableZone);
 					// log(currentImage.const.name);
-					if (typeof(currentImage.const.incoming) !== 'undefined') {
+					if (typeof(currentImage.incoming) !== 'undefined') {
 						gcState.scanningIncomingFor = currentImage;
-						gcState.currentIncomingStructures = currentImage.const.incoming;
-						gcState.currentIncomingStructureRoot = currentImage.const.incoming.first;
+						gcState.currentIncomingStructures = currentImage.incoming;
+						gcState.currentIncomingStructureRoot = currentImage.incoming.first;
 						gcState.currentIncomingStructureChunk = null;
 						
 						if (tryReconnectFromIncomingContents(gcState.currentIncomingStructureRoot.contents)) {
@@ -2382,7 +2387,7 @@
 					// Dissconnect from object here?... 
 					
 					for(let property in toDestroy) {
-						if(property !== 'incoming') {
+						if(property !== 'incoming' && property !== '_incomingReferencesCount' && property !== 'id') {
 							// log(property);
 							imageCausality.state.incomingStructuresDisabled++; // Activate macro events.
 							delete toDestroy[property]; 
@@ -2445,7 +2450,7 @@
 				} else {
 					// Finally! everything is done
 					// log("<<<<                 >>>>>");
-					// log("<<<< Finished......  >>>>>");
+					trace.gc && log("<<<< Finished......  >>>>>");
 					// log("<<<<                 >>>>>");
 					return true;
 				}
@@ -2561,8 +2566,8 @@
 				// imageCausality.state.incomingStructuresDisabled--;
 				if (typeof(object.const.dbImage) !== 'undefined') {
 					let dbImage = object.const.dbImage;
-					if (typeof(dbImage.const.incoming) !== 'undefined') {
-						let relations = dbImage.const.incoming;
+					if (typeof(dbImage.incoming) !== 'undefined') {
+						let relations = dbImage.incoming;
 						// log(relations, 3);
 						// log("here");
 						let propertyKey = "property:" + property;
@@ -2691,8 +2696,8 @@
 			imageCausality.disableIncomingRelations(function() {
 				if (typeof(object.const.dbImage) !== 'undefined') {
 					let dbImage = object.const.dbImage;
-					if (typeof(dbImage.const.incoming) !== 'undefined') {
-						let relations = dbImage.const.incoming;
+					if (typeof(dbImage.incoming) !== 'undefined') {
+						let relations = dbImage.incoming;
 						// log(relations, 3);
 						// log("here");
 						let propertyKey = "property:" + property;
