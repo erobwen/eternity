@@ -326,6 +326,14 @@
 		 *
 		 ***************************************************************/
 		 
+		function getIncoming(object) {
+			return object.const.incoming;
+		}
+		 
+		function setIncoming(object, incoming) {
+			object.const.incoming = incoming;
+		} 
+		 
 		function isIncomingStructure(entity) {
 			return typeof(entity) === 'object' && entity !== null && typeof(entity.isIncomingStructure) !== 'undefined';
 		} 
@@ -393,12 +401,12 @@
 		
 		function forAllIncoming(object, property, callback, filter) {
 			if(trace.incoming) log("forAllIncoming");
-			if(trace.incoming) log(object.const.incoming, 2);
+			if(trace.incoming) log(getIncoming(object), 2);
 			if (state.inActiveRecording) registerAnyChangeObserver(getSpecifier(getSpecifier(getSpecifier(object.const, "incoming"), "property:" + property), "observers"));
 			withoutRecording(function() { // This is needed for setups where incoming structures are made out of causality objects. 
-				if (typeof(object.const.incoming) !== 'undefined') {
+				if (typeof(getIncoming(object)) !== 'undefined') {
 					if(trace.incoming) log("incoming exists!");
-					let relations = object.const.incoming;
+					let relations = getIncoming(object);
 					let propertyKey = "property:" + property;
 					if (typeof(relations[propertyKey]) !== 'undefined') {
 						trace.incoming && log("property exists");
@@ -510,8 +518,8 @@
 				if (trace.incoming) log("tear down previous incoming... ");
 				if (configuration.blockInitializeForIncomingStructures) state.blockingInitialize++;
 				removeReverseReference(objectProxy.const.id, previousStructure);
-				if (previousValue.const.incoming && previousValue.const.incoming[referringRelation]&& previousValue.const.incoming[referringRelation].observers) {
-					notifyChangeObservers(previousValue.const.incoming[referringRelation]);
+				if (getIncoming(previousValue) && getIncoming(previousValue)[referringRelation]&& getIncoming(previousValue)[referringRelation].observers) {
+					notifyChangeObservers(getIncoming(previousValue)[referringRelation]);
 				}
 				if (configuration.blockInitializeForIncomingStructures) state.blockingInitialize--;
 			}
@@ -522,10 +530,10 @@
 				
 				let referencedValue = createAndAddReverseReferenceToIncomingStructure(objectProxy, objectProxy.const.id, referringRelation, value);
 				if (trace.basic) log(referringRelation);
-				if (trace.basic) log(value.const.incoming);
+				if (trace.basic) log(getIncoming(value));
 				
-				if (value.const.incoming && value.const.incoming[referringRelation].observers) {
-					notifyChangeObservers(value.const.incoming[referringRelation].observers);
+				if (getIncoming(value) && getIncoming(value)[referringRelation].observers) {
+					notifyChangeObservers(getIncoming(value)[referringRelation].observers);
 				}
 				value = referencedValue;
 			}
@@ -547,10 +555,10 @@
 			if (isObject(removedValue) && isIncomingStructure(previousStructure)) {
 				if (configuration.blockInitializeForIncomingStructures) state.blockingInitialize++;
 				removeReverseReference(objectProxy.const.id, previousStructure);
-				if (removedValue.const && removedValue.const.incoming && removedValue.const.incoming[referringRelation] && removedValue.const.incoming[referringRelation].observers) {
-					notifyChangeObservers(removedValue.const.incoming[referringRelation].observers);
+				if (removedValue.const && getIncoming(removedValue) && getIncoming(removedValue)[referringRelation] && getIncoming(removedValue)[referringRelation].observers) {
+					notifyChangeObservers(getIncoming(removedValue)[referringRelation].observers);
 				}
-				// if (removedValue.const && removedValue.const.incoming && removedValue.const.incoming[referringRelation] && removedValue.const.incoming[referringRelation].observers) {
+				// if (removedValue.const && getIncoming(removedValue) && getIncoming(removedValue)[referringRelation] && getIncoming(removedValue)[referringRelation].observers) {
 				if (configuration.blockInitializeForIncomingStructures) state.blockingInitialize--;
 			}
 		}
@@ -580,8 +588,8 @@
 					addedElement.const.incomingReferences++; // TODO: Move elsewhere... 
 					// log("added element is object");
 					let referencedValue = createAndAddReverseReferenceToIncomingStructure(arrayProxy, arrayProxy.const.id, referringRelation, addedElement);
-					if (typeof(addedElement.const.incoming[referringRelation].observers) !== 'undefined') {
-						notifyChangeObservers(addedElement.const.incoming[referringRelation].observers);
+					if (typeof(getIncoming(addedElement)[referringRelation].observers) !== 'undefined') {
+						notifyChangeObservers(getIncoming(addedElement)[referringRelation].observers);
 					}
 					addedAdjusted.push(referencedValue);
 				} else {
@@ -599,10 +607,10 @@
 						if ((removedObject.const.incomingReferences -= 1) === 0)  removedLastIncomingRelation(removedObject);
 						if (isIncomingStructureResult) {
 							removeReverseReference(arrayProxy.const.id, removedOrIncomingStructure);
-							if (typeof(removedObject.const.incoming) !== 'undefined' 
-								&& typeof(removedObject.const.incoming[referringRelation]) !== 'undefined' 
-								&& typeof(removedObject.const.incoming[referringRelation].observers) !== 'undefined') {
-								notifyChangeObservers(removedObject.const.incoming[referringRelation].observers);
+							if (typeof(getIncoming(removedObject)) !== 'undefined' 
+								&& typeof(getIncoming(removedObject)[referringRelation]) !== 'undefined' 
+								&& typeof(getIncoming(removedObject)[referringRelation].observers) !== 'undefined') {
+								notifyChangeObservers(getIncoming(removedObject)[referringRelation].observers);
 							}
 						}
 					}					
@@ -631,7 +639,7 @@
 			
 			// Create incoming structure
 			let incomingPropertiesStructure;
-			if (typeof(referencedObject.const.incoming) === 'undefined') {
+			if (typeof(getIncoming(referencedObject)) === 'undefined') {
 				incomingPropertiesStructure = {
 					isIncomingStructure : true, 
 					referredObject: referencedObject,
@@ -645,9 +653,9 @@
 				if (configuration.incomingStructuresAsCausalityObjects) {
 					incomingPropertiesStructure = create(incomingPropertiesStructure);
 				}
-				referencedObject.const.incoming = incomingPropertiesStructure;
+				setIncoming(referencedObject, incomingPropertiesStructure);
 			} else {
-				incomingPropertiesStructure = referencedObject.const.incoming;
+				incomingPropertiesStructure = getIncoming(referencedObject);
 			}
 			
 			// Create incoming for this particular property
