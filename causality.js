@@ -327,11 +327,15 @@
 		 ***************************************************************/
 		 
 		function getIncoming(object) {
-			return object.const.incoming;
+			return configuration.hideIncoming ? object.const.incoming : object.incoming;
 		}
 		 
 		function setIncoming(object, incoming) {
-			object.const.incoming = incoming;
+			if (configuration.hideIncoming) {
+				object.const.incoming = incoming;				
+			} else {
+				object.incoming = incoming;
+			}
 		} 
 		 
 		function isIncomingStructure(entity) {
@@ -3856,6 +3860,7 @@
 			// Special features
 			useFreshTargetInCreate : false,
 			useIncomingStructures : false,
+			hideIncoming : true,
 			incomingStructureChunkSize: 500,
 			incomingChunkRemovedCallback : null,
 			incomingStructuresAsCausalityObjects: false, // implies events will be on an incoming structure level as well. 

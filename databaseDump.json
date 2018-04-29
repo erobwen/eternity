@@ -36,8 +36,8 @@
     _eternityParentProperty : "a", 
     _eternityIsObjectImage : true, 
     name : "a", 
+    incoming : "_id_4_di_", 
     _eternityIncomingCount : 4, 
-    _eternityIncoming : "_id_4_di_", 
     _eternityPendingUnstableOriginMember : true, 
     _eternityPendingUnstableOriginPrevious : null, 
     _eternityPendingUnstableOriginNext : null
@@ -52,7 +52,7 @@
     last : "_id_5_di_", 
     first : "_id_5_di_", 
     _eternityImageClass : "Object", 
-    _eternityIncomingCount : 0
+    _eternityIncomingCount : 1
   }, 
   {
     id : "_id_5_di_", 

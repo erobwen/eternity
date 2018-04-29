@@ -643,29 +643,29 @@
 			imageCausality.pulseEvents = counterEvents;
 			events.forEach(function(event) {
 				if (event.type === 'set') { 
-					log("process event...");
-					log(event, 1);
+					// log("process event...");
+					// log(event, 1);
 				
 					// Increase new value counter
 					let value = event.value;
 					if (imageCausality.isObject(value)) {
-						log("value...");
+						// log("value...");
 						if (typeof(value._eternityIncomingCount) === 'undefined') {
-							log("setting a value for the first time... ");
+							// log("setting a value for the first time... ");
 							value._eternityIncomingCount = 0;
 						}
-						log("increasing counter... ");
+						// log("increasing counter... ");
 						value._eternityIncomingCount++;
 					}
 					
 					// Decrease old value counter
 					let oldValue = event.oldValue;
 					if (imageCausality.isObject(oldValue)) {
-						log("old value...");
+						// log("old value...");
 						if (typeof(oldValue._eternityIncomingCount) === 'undefined') {
 							throw new Error("Counter could not be zero in this state... ");
 						}
-						log("decreasing counter... ");
+						// log("decreasing counter... ");
 						oldValue._eternityIncomingCount--;
 					}
 				}
@@ -673,11 +673,11 @@
 					// Decrease old value counter
 					let oldValue = event.oldValue;
 					if (imageCausality.isObject(oldValue)) {
-						log("old value...");
+						// log("old value...");
 						if (typeof(oldValue._eternityIncomingCount) === 'undefined') {
 							throw new Error("Counter could not be zero in this state... ");
 						}
-						log("decreasing counter... ");
+						// log("decreasing counter... ");
 						oldValue._eternityIncomingCount--;
 					}					
 				}
@@ -2769,6 +2769,7 @@
 			name : 'imageCausality' + (typeof(configuration.name) !== 'undefined') ? configuration.name : "",
 			recordPulseEvents : true, 
 			objectActivityList : true,
+			hideIncoming : false,
 			incomingStructureChunkSize : configuration.persistentIncomingChunkSize,
 			incomingChunkRemovedCallback : incomingChunkRemovedForImage,
 			useIncomingStructures: true,
