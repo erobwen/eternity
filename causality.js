@@ -337,6 +337,14 @@
 				object.incoming = incoming;
 			}
 		} 
+		
+		function deleteIncoming(object) {
+			if (configuration.hideIncoming) {
+				delete object.const.incoming;				
+			} else {
+				delete object.incoming;
+			}			
+		}
 		 
 		function isIncomingStructure(entity) {
 			return typeof(entity) === 'object' && entity !== null && typeof(entity.isIncomingStructure) !== 'undefined';
@@ -497,11 +505,11 @@
 		function createAndRemoveIncomingRelations(objectProxy, key, value, previousValue, previousStructure) {
 			// Note: sometimes value and previous value are just strings. Optimize for this case... 
 			let referringRelation = key;
-			if (trace.incoming) {
-				logGroup("createAndRemoveIncomingRelations");
-				log(referringRelation);
-				log(objectProxy);
-			}
+			// if (trace.incoming) {
+				// logGroup("createAndRemoveIncomingRelations");
+				// log(referringRelation);
+				// log(objectProxy);
+			// }
 			
 			// Get refering object 
 			while (typeof(objectProxy.indexParent) !==  'undefined') {
@@ -515,7 +523,7 @@
 				}
 			}
 			referringRelation = "property:" + referringRelation;
-			trace.incoming && log("referringRelation : " + referringRelation);
+			// trace.incoming && log("referringRelation : " + referringRelation);
 			
 			// Tear down structure to old value
 			if (isReferencesChunk(previousStructure)) {
@@ -715,21 +723,26 @@
 		}
 		
 		function tryRemoveIncomingStructure(structure) {
-			// referencesChunk.contentsCounter--;
-			
-			if (typeof(structure.contentsCounter) === 'undefined' || structure.contentsCounter === 0) {
+			trace.incoming && log("tryRemoveIncomingStructure");
+			if (structure.isList && structure.first === null && structure.last === null) {
+				let tryRemoveParent = false;
+				
 				if (typeof(structure.removedCallback) !== 'undefined') { // referencesChunk.removedCallback this is probably wrong!
 					structure.removedCallback();
 				}
 				
-				let tryRemoveParent = false;
-				
 				if (typeof(structure.isListElement) !== 'undefined') {
-					if (structure.parent.first === structure) {
-						structure.parent.first === structure.next;
+					trace.incoming && log("ListElement");
+					log(structure, 1);
+					if (structure.parent.first === structure) {						
+						trace.incoming && log("HERE!!!!!");
+						structure.parent.first = structure.next;
+						trace.incoming && log(structure.parent.first);
 					}
 					if (structure.parent.last === structure) {
-						structure.parent.last === structure.previous;
+						trace.incoming && log("HERE TOOO!!!!!");
+						structure.parent.last = structure.previous;
+						trace.incoming && log(structure.parent.first);
 					}
 					if (structure.next !== null) {
 						structure.next.previous = structure.previous;
@@ -737,42 +750,33 @@
 					if (structure.previous !== null) {
 						structure.previous.next = structure.next;
 					}
+					delete structure.referredObject;
+
 					structure.next = null;
 					structure.previous = null;
-					// TODO: 
-					// if (typeof(structure.isIncomingStructureRoot) !== 'undefined') {
-						// delete root
-					// }
-					
+					log(structure, 1);
+					log(structure.parent, 1);
+					log(structure.parent.first === structure);
 					if (structure.parent.first === null && structure.parent.last === null) {
+						trace.incoming && log("parent was emptied!!!");
 						tryRemoveParent = true;
 					}
+				} else if (typeof(structure.isIncomingStructureRoot) !== 'undefined') {
+					trace.incoming && log("IncomingStructureRoot");
+					let referredObject = structure.referredObject;
+					deleteIncoming(referredObject);
+					delete structure.referredObject;
 				}
-				
+
 				if (typeof(structure.isIncomingPropertyStructure) !== 'undefined') {
 					delete structure.parent[structure.propertyKey];
-				}
-				// // TODO: Make this work... 
-				// if (typeof(structure.isIncomingPropertyStructure) !== 'undefined') {
-					// delete structure.parent[structure.propertyKey];
-					// structure.parent = null;
-					// if (structure.parent.first === null && structure.parent.last === null) {
-						// tryRemoveParent = true;
-					// }
-					// // TODO tryRemoveParent = true, whenever there is no more property key
-				// }
-				
-				// TODO: remove root		referredObject: referencedObject,
-				// if (typeof(structure.isIncomingStructureRoot) !== 'undefined') {
-					// delete structure.referredObject.incoming;
-					// structure.referredObject = null;
-				// }
+				}					
 				
 				if (tryRemoveParent) {
 					tryRemoveIncomingStructure(structure.parent);
 				}
-				
 				structure.parent = null;
+				
 			}
 		}
 	
@@ -780,15 +784,20 @@
 		* Structure helpers
 		*/				
 		function removeReverseReference(refererId, referencesChunk) {
+			trace.incoming && log("removeReverseReference");
 			if (trace.incoming) {
 				logGroup("removeReverseReference");
 				// log(refererId);
 				// log(referencesChunk, 3);
 			}
-			let referencesChunkContents = referencesChunk['contents'];
+			let referencesChunkContents = referencesChunk.contents;
 			delete referencesChunkContents[idExpression(refererId)];
 			referencesChunk.contentsCounter--;
-			tryRemoveIncomingStructure(referencesChunk);
+			if (referencesChunk.contentsCounter === 0) {
+				trace.incoming && log("hit zero!");
+				delete referencesChunk.contents;
+				tryRemoveIncomingStructure(referencesChunk);
+			}
 			trace.incoming && logUngroup();
 		}
 		
