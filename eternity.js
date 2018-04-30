@@ -2383,6 +2383,9 @@
 							gcState.currentIncomingStructureRoot = null;
 							gcState.currentIncomingStructureChunk = null;
 						}
+					} else {
+						// Has no more chunks! Fail
+						addLastToList(gcState, destructionZone, currentImage);
 					}
 					return false;
 				}

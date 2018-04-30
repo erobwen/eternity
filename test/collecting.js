@@ -60,11 +60,11 @@ describe("garbage-collection", function () {
 		log("2");
 		eternity.oneStepCollection();
 		eternity.flushToDatabase();
-		logToFile(eternity.mockMongoDB.getAllRecordsParsed(), 10, "./databaseDump.json");
 		
 		log("3");
 		eternity.oneStepCollection();
 		eternity.flushToDatabase();
+		logToFile(eternity.mockMongoDB.getAllRecordsParsed(), 10, "./databaseDump.json");
 		
 		log("4");
 		// eternity.trace.refc = true;
