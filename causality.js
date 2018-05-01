@@ -199,25 +199,26 @@
 		 *
 		 *  Specifiers
 		 * 
-		 * Specifiers has no id since they are never streamed independently of references. 
-		 *
 		 ***************************************************************/
 		 
-		 // TODO: Specifiers needs a reference to its causality object... 
+		 // TODO: Specifiers needs a reference to its causality object... fixit
 		function getSpecifier(javascriptObject, specifierName) {
 			if (typeof(javascriptObject[specifierName]) === 'undefined' || javascriptObject[specifierName] === null) {
 				let referredObject = typeof(javascriptObject.referredObject) !== 'undefined' ? javascriptObject.referredObject : javascriptObject;
+				let referredObjectProperty = typeof(javascriptObject.referredObjectProperty) !== 'undefined' ? javascriptObject.referredObjectProperty : specifierName;
 				let specifier = {
 					// Incoming structure
 					isIncomingStructure : true,
 					referredObject : referredObject, // should be object instead.... 
 					referredObjectProperty : specifierName,
+					
+					specifierName : specifierName,
 					parent : javascriptObject,
 
 					// Specifier
-					isSpecifier : true,
+					isSpecifier : true
 					// name : "incomingStructure" // This fucked up things for incoming relations of name "name"
-				}
+				};
 				if (configuration.incomingStructuresAsCausalityObjects) specifier = createImmutable(specifier);
 				javascriptObject[specifierName] = specifier;
 			}
@@ -725,7 +726,7 @@
 		function tryRemoveIncomingStructure(structure) {
 			trace.incoming && log("tryRemoveIncomingStructure");
 			if (structure.isList && structure.first === null && structure.last === null) {
-				let tryRemoveParent = false;
+				let tryRemoveParent = null;
 				
 				if (typeof(structure.removedCallback) !== 'undefined') { // referencesChunk.removedCallback this is probably wrong!
 					structure.removedCallback();
@@ -759,24 +760,30 @@
 					log(structure.parent.first === structure);
 					if (structure.parent.first === null && structure.parent.last === null) {
 						trace.incoming && log("parent was emptied!!!");
-						tryRemoveParent = true;
+						tryRemoveParent = structure.parent;
 					}
+					if (typeof(structure.isIncomingPropertyStructure) !== 'undefined') {
+						delete structure.parent[structure.propertyKey];
+					}					
+					structure.parent = null;
 				} else if (typeof(structure.isIncomingStructureRoot) !== 'undefined') {
 					trace.incoming && log("IncomingStructureRoot");
 					let referredObject = structure.referredObject;
 					deleteIncoming(referredObject);
 					delete structure.referredObject;
+				} else if (typeof(structure.isSpecifier) !== 'undefined') {
+					trace.incoming && log("Specifier");
+					tryRemoveParent = structure.parent;
+					let referredObject = structure.referredObject;
+					delete structure.parent[structure.specifierName];
+					delete structure.parent;
+					delete structure.referredObject;
 				}
 
-				if (typeof(structure.isIncomingPropertyStructure) !== 'undefined') {
-					delete structure.parent[structure.propertyKey];
-				}					
 				
-				if (tryRemoveParent) {
-					tryRemoveIncomingStructure(structure.parent);
+				if (tryRemoveParent !== null) {
+					tryRemoveIncomingStructure(tryRemoveParent);
 				}
-				structure.parent = null;
-				
 			}
 		}
 	
@@ -795,7 +802,7 @@
 			referencesChunk.contentsCounter--;
 			if (referencesChunk.contentsCounter === 0) {
 				trace.incoming && log("hit zero!");
-				delete referencesChunk.contents;
+				// delete referencesChunk.contents;
 				tryRemoveIncomingStructure(referencesChunk);
 			}
 			trace.incoming && logUngroup();
@@ -2321,7 +2328,7 @@
 				// log("destroy context?" + context.type);
 				if (!context.directlyInvokedByApplication) {
 					// log("... indirect...");
-					if (emptyObserverSet(context.contextObservers)) {
+					if (typeof(context.contextObservers) === 'undefined' || context.contextObservers === null || emptyObserverSet(context.contextObservers)) {
 						// log("... emptyObserverSet...");
 						context.removeContextsRecursivley();
 					}
@@ -3156,6 +3163,10 @@
 				return cacheRecord.repeaterHandle; // return something else...
 			} else {
 				let cacheRecord = functionCacher.getExistingRecord();
+				getSpecifier(cacheRecord, "contextObservers").removedCallback = function() {
+					// log("removeCallback: in repeater... ");
+					state.contextsScheduledForPossibleDestruction.push(cacheRecord);
+				};
 				registerAnyChangeObserver(cacheRecord.contextObservers);
 				return functionCacher.getExistingRecord().repeaterHandle;
 			}
