@@ -142,33 +142,33 @@ describe("Incoming Relations", function(){
 		assert.equal(y.incomingFoo()[0], x);
     });
 
-    it("Testing reaction to change in incoming relation", function(){
-		let x = create();
-		let y = create()
+    // it("Testing reaction to change in incoming relation", function(){
+		// let x = create();
+		// let y = create();
 		
-		// Setup a repeater that extracts all incoming
-		let yIncomingFoo;		
-		function updateYIncomingFoo() {
-			// logPattern(y, { _incoming_incoming_relations : { foo : { contents : {}}}});
-			yIncomingFoo = [];
-			causality.forAllIncoming(y, 'foo', function(referer) {
-				yIncomingFoo.push(referer);
-			});			
-		}
-		causality.repeatOnChange(function() {
-			updateYIncomingFoo();
-		});
-		assert.equal(yIncomingFoo.length, 0);
-		// log("===========================================");
-		// causality.trace.basic++;
-		// causality.trace.incoming++;
-		// Assign x.foo
-		x.foo = y;
-		// causality.trace.basic--;
-		// causality.trace.incoming--;
-		// log("===========================================");
+		// // Setup a repeater that extracts all incoming
+		// let yIncomingFoo;		
+		// function updateYIncomingFoo() {
+			// // logPattern(y, { _incoming_incoming_relations : { foo : { contents : {}}}});
+			// yIncomingFoo = [];
+			// causality.forAllIncoming(y, 'foo', function(referer) {
+				// yIncomingFoo.push(referer);
+			// });			
+		// }
+		// causality.repeatOnChange(function() {
+			// updateYIncomingFoo();
+		// });
+		// assert.equal(yIncomingFoo.length, 0);
+		// // log("===========================================");
+		// // causality.trace.basic++;
+		// // causality.trace.incoming++;
+		// // Assign x.foo
+		// x.foo = y;
+		// // causality.trace.basic--;
+		// // causality.trace.incoming--;
+		// // log("===========================================");
 
-		assert.equal(yIncomingFoo.length, 1);
-		assert.equal(yIncomingFoo[0], x);
-    });
+		// assert.equal(yIncomingFoo.length, 1);
+		// assert.equal(yIncomingFoo[0], x);
+    // });
 });

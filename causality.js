@@ -3272,6 +3272,9 @@
 			} else {
 				// Encountered these arguments before, reuse previous repeater
 				let cacheRecord = functionCacher.getExistingRecord();
+				getSpecifier(cacheRecord, "contextObservers").removedCallback = function() {
+					state.contextsScheduledForPossibleDestruction.push(cacheRecord);
+				};
 				registerAnyChangeObserver(cacheRecord.contextObservers);
 				return cacheRecord.returnValue;
 			}
@@ -3550,6 +3553,9 @@
 			} else {
 				// Encountered these arguments before, reuse previous repeater
 				let cacheRecord = functionCacher.getExistingRecord();
+				getSpecifier(cacheRecord, 'contextObservers').removedCallback = function() {
+					state.contextsScheduledForPossibleDestruction.push(cacheRecord);
+				};
 				registerAnyChangeObserver(cacheRecord.contextObservers);
 				return cacheRecord.returnValue;
 			}
