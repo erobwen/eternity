@@ -142,6 +142,7 @@ describe("Incoming Relations", function(){
 		assert.equal(y.incomingFoo()[0], x);
     });
 
+	// TODO: Fix the iterators way of possibly reconstructing the incoming structure... or checking if it is there... 
     // it("Testing reaction to change in incoming relation", function(){
 		// let x = create();
 		// let y = create();
