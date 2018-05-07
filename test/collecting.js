@@ -42,31 +42,31 @@ describe("garbage-collection", function () {
 		// log(eternity.mockMongoDB.getAllRecordsParsed(), 10);
 		let aDbId = a.const.dbImage.const.dbId;
 
-		log("------------------------------------------");
-		eternity.imageCausality.trace.incoming = 1;
+		// log("------------------------------------------");
+		// eternity.imageCausality.trace.incoming = 1;
 		persistent.a = null;
 		eternity.flushToDatabase();
-		eternity.imageCausality.trace.incoming = 0;
-		log("------------------------------------------");
+		// eternity.imageCausality.trace.incoming = 0;
+		// log("------------------------------------------");
 		// return;
 		
 		// GC in 6 steps
-		eternity.trace.gc = true;
-		log("1");
+		// eternity.trace.gc = true;
+		// log("1");
 		// eternity.trace.killing = true;
 		eternity.oneStepCollection();
 		eternity.flushToDatabase();
 		
-		log("2");
+		// log("2");
 		eternity.oneStepCollection();
 		eternity.flushToDatabase();
 		
-		log("3");
+		// log("3");
 		eternity.oneStepCollection();
 		eternity.flushToDatabase();
 		logToFile(eternity.mockMongoDB.getAllRecordsParsed(), 10, "./databaseDump.json");
 		
-		log("4");
+		// log("4");
 		// eternity.trace.refc = true;
 		eternity.oneStepCollection();
 		eternity.flushToDatabase();
@@ -74,11 +74,11 @@ describe("garbage-collection", function () {
 		// eternity.trace.flush = 1;
 		// eternity.trace.eternity = true;
 		// log("5");
-		log("5");
+		// log("5");
 		eternity.oneStepCollection();		
 		eternity.flushToDatabase();
 		
-		log("6");
+		// log("6");
 		eternity.oneStepCollection();
 		eternity.flushToDatabase();
 		// eternity.trace.eternity = false;

@@ -19,7 +19,7 @@
 		indentToken : "  ",
 		
 		// Change to true in order to find all logs hidden in your code.
-		findLogs : false, 
+		findLogs : true, 
 		
 		// Set to true in web browser that already has a good way to display objects with expandable trees.
 		useConsoleDefault : false,
@@ -272,7 +272,7 @@
 		},
 		
 		group : function(entity, pattern) {
-			if (configuration.findLogs) throw new Error("No logs allowed!");
+			if (configuration.findLogs && typeof(entity) !== 'undefined') throw new Error("No logs allowed!");
 			if (configuration.useConsoleDefault) {
 				console.group(entity);
 			} else {
@@ -284,7 +284,7 @@
 		},
 		
 		groupEnd : function(entity, pattern) {
-			if (configuration.findLogs) throw new Error("No logs allowed!");
+			if (configuration.findLogs && typeof(entity) !== 'undefined') throw new Error("No logs allowed!");
 			if (configuration.useConsoleDefault) {
 				console.groupEnd();
 			} else {

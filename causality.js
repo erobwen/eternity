@@ -734,7 +734,7 @@
 				
 				if (typeof(structure.isListElement) !== 'undefined') {
 					trace.incoming && log("ListElement");
-					log(structure, 1);
+					// log(structure, 1);
 					if (structure.parent.first === structure) {						
 						trace.incoming && log("HERE!!!!!");
 						structure.parent.first = structure.next;
@@ -755,9 +755,9 @@
 
 					structure.next = null;
 					structure.previous = null;
-					log(structure, 1);
-					log(structure.parent, 1);
-					log(structure.parent.first === structure);
+					// log(structure, 1);
+					// log(structure.parent, 1);
+					// log(structure.parent.first === structure);
 					if (structure.parent.first === null && structure.parent.last === null) {
 						trace.incoming && log("parent was emptied!!!");
 						tryRemoveParent = structure.parent;
