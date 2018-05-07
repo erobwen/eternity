@@ -53,7 +53,7 @@ describe("garbage-collection", function () {
 		// GC in 6 steps
 		// eternity.trace.gc = true;
 		// log("1");
-		// eternity.trace.killing = true;
+		// eternity.trace.forgetting = true;
 		eternity.oneStepCollection();
 		eternity.flushToDatabase();
 		

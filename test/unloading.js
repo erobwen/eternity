@@ -36,7 +36,7 @@ describe("loading, unloading & zombiefication", function () {
             eternity.blockInitialize(function() {
                 eternity.freezeActivityList(function() {
                     // log(object.const);
-                    result = typeof(object.const.isKilled) !== 'undefined';
+                    result = typeof(object.const.isForgotten) !== 'undefined';
                     // log(object.name + " isLoaded: " + result);
                 });
             });
@@ -117,7 +117,7 @@ describe("loading, unloading & zombiefication", function () {
 		
 		assert.equal(isLoaded(B), true);
 		
-		// Exceed the memory limit again, persistent and A no longer has any incoming references and will be killed
+		// Exceed the memory limit again, persistent and A no longer has any incoming references and will be forgeted
 		// log("--------------------------- B.C = C; -----------------------------------");
 		// eternity.trace.basic++;
 		B.C = C;

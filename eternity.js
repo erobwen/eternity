@@ -160,7 +160,7 @@
 					}
 				});
 				// flushToImages();
-				unloadAndKillObjects();				
+				unloadAndForgetObjects();				
 			}
 		}
 		
@@ -193,7 +193,7 @@
 			} else {				
 				flushImageToDatabase();			
 			}
-			unloadAndKillObjects();
+			unloadAndForgetObjects();
 		}
 		
 		function pushToDatabase() {
@@ -301,7 +301,7 @@
 				// Get existing or create new image. 
 				if (typeof(objectValue.const.dbImage) === 'object') {
 					imageValue = objectValue.const.dbImage;
-					if (unstableOrBeeingKilledInGcProcess(imageValue)) {
+					if (unstableOrBeeingForgetedInGcProcess(imageValue)) {
 						// log("here...filling");
 						imageValue._eternityParent = object.const.dbImage;
 						imageValue._eternityParentProperty = property;
@@ -521,14 +521,14 @@
 					}
 				}
 				
-				// // What to do with the object... kill if unloaded?
+				// // What to do with the object... forget if unloaded?
 				// imageCausality.blockInitialize(function() {
 					// referedDbImage.const.loadedIncomingMacroReferenceCount--;
 					// // Idea: perhaps referedDbImage.const.incomingCount could be used.... as it is not persistent...
 					// if (referedDbImage.const.loadedIncomingMacroReferenceCount === 0) {
 						// // if (referedDbImage.const.correspondingObject.const.)
 						// // unloadImage(referedDbImage);
-						// // if there are no incoming relations on the object also, kill both... 
+						// // if there are no incoming relations on the object also, forget both... 
 					// } 					
 				// });
 			}			
@@ -553,7 +553,7 @@
 					// }
 					// entity.const.incomingLoadedMicroCounter--;
 					// if (entity.const.incomingLoadedMicroCounter === 0 && entity.const.initializer !== null) {
-						// killDbImage(entity);
+						// forgetDbImage(entity);
 					// }
 				// }				
 			// });
@@ -1698,7 +1698,7 @@
 		
 		
 		/*-----------------------------------------------
-		 *           Unloading and killing
+		 *           Unloading and forgetting
 		 *-----------------------------------------------*/
 		
 		let maxNumberOfLoadedObjects = configuration.maxNumberOfLoadedObjects; //10000;
@@ -1739,18 +1739,18 @@
 			return leastActiveObject;
 		}
 		
-		function unloadAndKillObjects() {
-			// log("unloadAndKillObjects");
+		function unloadAndForgetObjects() {
+			// log("unloadAndForgetObjects");
 			if (loadedObjects > maxNumberOfLoadedObjects) {
 				// log("Too many objects, unload some... ");
-				trace.unload && logGroup("unloadAndKillObjects");
+				trace.unload && logGroup("unloadAndForgetObjects");
 				objectCausality.withoutEmittingEvents(function() {
 					imageCausality.withoutEmittingEvents(function() {
 						let leastActiveObject = objectCausality.getActivityListLast();
 						objectCausality.freezeActivityList(function() {
 							while (leastActiveObject !== null && loadedObjects > maxNumberOfLoadedObjects) {
 								// log("considering object for unload...");
-								// while(leastActiveObject !== null && typeof(leastActiveObject.const.dbImage) === 'undefined') { // Warning! can this wake a killed object to life? ... no should not be here!
+								// while(leastActiveObject !== null && typeof(leastActiveObject.const.dbImage) === 'undefined') { // Warning! can this wake a forgeted object to life? ... no should not be here!
 									// // log("skipping unsaved object (cannot unload something not saved)...");
 									// objectCausality.removeFromActivityList(leastActiveObject); // Just remove them and make GC possible. Consider pre-filter for activity list.... 
 									// leastActiveObject = objectCausality.getActivityListLast();
@@ -1788,13 +1788,13 @@
 				
 				object.const.isUnloaded = true;
 				object.const.initializer = objectFromIdInitializer;
-				// log("try to kill object just unloaded...");
-				tryKillObject(object);
+				// log("try to forget object just unloaded...");
+				tryForgetObject(object);
 				// objectCausality.blockInitialize(function() {
-					// // log("Trying to kill object...");
+					// // log("Trying to forget object...");
 					// // log(object.const.incomingReferencesCount)
 					// if (object.const.incomingReferencesCount === 0) {
-						// killObject(object);
+						// forgetObject(object);
 					// }
 				// });
 				trace.unload && logUngroup();
@@ -1822,23 +1822,23 @@
 			}); 
 		}
 		
-		function tryKillObject(object) {
-            trace.killing && log("tryKillObject: " + objName(object));
-			trace.killing && logGroup();
+		function tryForgetObject(object) {
+            trace.forgetting && log("tryForgetObject: " + objName(object));
+			trace.forgetting && logGroup();
 			// logObj(object);
             objectCausality.blockInitialize(function() {
                 objectCausality.freezeActivityList(function() {
-                    // Kill if unloaded
+                    // Forget if unloaded
 					let isPersistentlyStored = typeof(object.const.dbImage) !== 'undefined';
 					let isUnloaded = typeof(object.const.initializer) === 'function'
 					let hasNoIncoming = object.const.incomingReferencesCount === 0;
-					trace.killing && log("is unloaded: " + isUnloaded);
-					trace.killing && log("has no incoming: " + hasNoIncoming + " (count=" + object.const.incomingReferencesCount + ")");
-					trace.killing && log("is persistently stored: " + isPersistentlyStored);
+					trace.forgetting && log("is unloaded: " + isUnloaded);
+					trace.forgetting && log("has no incoming: " + hasNoIncoming + " (count=" + object.const.incomingReferencesCount + ")");
+					trace.forgetting && log("is persistently stored: " + isPersistentlyStored);
 					
 					if (isPersistentlyStored && isUnloaded && hasNoIncoming) {
-						// log("kill it!");
-                        killObject(object);
+						// log("forget it!");
+                        forgetObject(object);
                     } else {
 						// log("show mercy!");
 						
@@ -1847,22 +1847,22 @@
 					}
                 });
             });
-			trace.killing && logUngroup();
+			trace.forgetting && logUngroup();
         }
 
 		
-		function killObject(object) {
-			// log("killObject: " + objName(object));
+		function forgetObject(object) {
+			// log("forgetObject: " + objName(object));
 			let dbImage = object.const.dbImage;
 
 			// log(object.const.target);
-			object.const.isKilled = true;
+			object.const.isForgotten = true;
 			object.const.dbId = object.const.dbImage.const.dbId;
 			delete object.const.dbImage.const.correspondingObject;
 			delete object.const.dbImage;
 
-			// Kill DB image if possible...
-			killImageIfDissconnectedAndNonReferred(dbImage);
+			// Forget DB image if possible...
+			forgetImageIfDissconnectedAndNonReferred(dbImage);
 			
 			object.const.initializer = zombieObjectInitializer;
 		}
@@ -1871,7 +1871,7 @@
 			// log("zombieObjectInitializer: " + objName(object));
 			logGroup();
 			// log("zombieObjectInitializer");
-            delete object.const.isKilled;
+            delete object.const.isForgotten;
             object.const.isZombie = true;
 			
 			// log("zombieObjectInitializer");
@@ -1907,7 +1907,7 @@
 			dbImage.const.initializer = imageFromDbIdInitializer;
 			
 			// log(dbImage.const.incomingReferencesCount)
-			killImageIfDissconnectedAndNonReferred(dbImage);
+			forgetImageIfDissconnectedAndNonReferred(dbImage);
 			
 			imageCausality.state.incomingStructuresDisabled--;
 			imageCausality.state.emitEventPaused--;
@@ -1915,20 +1915,20 @@
 			// logUngroup();
 		}
 		
-		function killImageIfDissconnectedAndNonReferred(dbImage) {
-			// log("Trying to kill image...");
+		function forgetImageIfDissconnectedAndNonReferred(dbImage) {
+			// log("Trying to forget image...");
 			let result = false;
 			imageCausality.blockInitialize(function() {
 				if (dbImage.const.incomingReferencesCount === 0 && typeof(dbImage.const.correspondingObject) === 'undefined') {
-					killDbImage(dbImage);
+					forgetDbImage(dbImage);
 					result = true;
 				}
 			});
 			return result;
 		}
 		
-		function killDbImage(dbImage) {
-			// log("killDbImage");
+		function forgetDbImage(dbImage) {
+			// log("forgetDbImage");
 			// if (typeof(dbImage.const.correspondingObject) !== 'undefined') {
 				// let object = dbImage.const.correspondingObject;
 				// delete object.const.dbImage;
@@ -2208,7 +2208,7 @@
 			return typeof(dbImage._eternityParent) === 'undefined';
 		}
 		
-		function unstableOrBeeingKilledInGcProcess(dbImage) {
+		function unstableOrBeeingForgetedInGcProcess(dbImage) {
 			let result = false;
 			result = result || inList(pendingUnstableOrigins, dbImage);
 			result = result || inList(unstableZone, dbImage);
@@ -2837,15 +2837,15 @@
 			// // log(dbImage.const.dbId);
 			// if (!dbImage.const.isObjectImage) {
 				// if (!imageCausality.isIncomingStructure(dbImage)) {
-					// // log("killing spree");
-					// if (killImageIfDissconnectedAndNonReferred(dbImage)) {
+					// // log("forgetting spree");
+					// if (forgetImageIfDissconnectedAndNonReferred(dbImage)) {
 						// deallocateInDatabase(dbImage);
 						// // TODO: check if this part of iteration, move iteration if so... 
 					// }
 				// }
 				// // TODO:
 				// // else {
-					// // if (killImageIfDissconnectedAndNonReferred(dbImage)) {
+					// // if (forgetImageIfDissconnectedAndNonReferred(dbImage)) {
 						// // deallocateInDatabase(dbImage);
 						// // // TODO: check if this part of iteration, move iteration if so... 
 					// // }
@@ -2866,7 +2866,7 @@
 			// objectCausality.removeFromActivityList(dbImage.const.correspondingObject);
 			// delete dbImage.const.correspondingObject;
 
-			// if (killImageIfDissconnectedAndNonReferred(dbImage)) {						
+			// if (forgetImageIfDissconnectedAndNonReferred(dbImage)) {						
 				// deallocateInDatabase(dbImage);
 			// }			
 		// }
@@ -2895,7 +2895,7 @@
 		objectCausality.addPostPulseAction(postObjectPulseAction);
 		objectCausality.addRemovedLastIncomingRelationCallback(function(dbImage) {
 			// log("incoming relations reaced zero...");
-            tryKillObject(dbImage);
+            tryForgetObject(dbImage);
         });
 		
 		// TODO: install this... 
@@ -2951,7 +2951,7 @@
 		});
 
 		let trace = instance.trace;
-		// trace.killing = 0;
+		// trace.forgetting = 0;
 		// trace.loading = 0;
 		// trace.zombies = 0;
 		// trace.eternity = false;
