@@ -8,7 +8,7 @@ let logGroup = objectlog.enter;
 let logUngroup = objectlog.exit;
 
 // Tests based on mobx test/array.js
-describe("loading, unloading & zombiefication", function () {
+describe("loading, unloading & unforgottenfication", function () {
 
 
     it('should unload nodes as memory reaches limit', function () {
@@ -43,25 +43,25 @@ describe("loading, unloading & zombiefication", function () {
             return result;
         }
         
-        function isZombie(object) {
+        function isUnforgotten(object) {
             let result;
             eternity.blockInitialize(function() {
                 eternity.freezeActivityList(function() {
                     // log(object.const.initializer);
-                    result = typeof(object.nonForwardConst.isZombie) !== 'undefined';
+                    result = typeof(object.nonForwardConst.isUnforgotten) !== 'undefined';
                     // log(object.name + " isLoaded: " + result);
                 });
             });
             return result;
         }
 		
-		function zombieLevel(object) {
+		function unforgottenLevel(object) {
             let result = 0;
             eternity.blockInitialize(function() {
                 eternity.freezeActivityList(function() {
                     // log(object.const.initializer);
 					let current = object;
-					while (typeof(current.nonForwardConst.isZombie) !== 'undefined') {
+					while (typeof(current.nonForwardConst.isUnforgotten) !== 'undefined') {
 						result++;
 						current = current.nonForwardConst.forwardsTo;
 					}
@@ -71,13 +71,13 @@ describe("loading, unloading & zombiefication", function () {
             return result;			
 		}
 		
-		function logZombie(object) {
+		function logUnforgotten(object) {
 			let result = "";
             eternity.blockInitialize(function() {
                 eternity.freezeActivityList(function() {
 					let current = object;
 					while(current !== null) {
-						result += (typeof(current.nonForwardConst.isZombie) !== 'undefined') ? 'zombie,': '';
+						result += (typeof(current.nonForwardConst.isUnforgotten) !== 'undefined') ? 'unforgotten,': '';
 						current = current.nonForwardConst.forwardsTo;
 					}
                 });
@@ -145,10 +145,10 @@ describe("loading, unloading & zombiefication", function () {
 		assert.equal(isLoaded(persistent), false);
         assert.equal(isDead(persistent), true);
 		
-		// A becomes a zombie
+		// A becomes a unforgotten
 		assert.equal(isLoaded(A), true);
 		assert.equal(isDead(A), false);
-		assert.equal(isZombie(A), true);
+		assert.equal(isUnforgotten(A), true);
 
 		assert.equal(isLoaded(B), false);
 		
@@ -160,28 +160,28 @@ describe("loading, unloading & zombiefication", function () {
 		eternity.flushToDatabase();
 		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);
 		
-		// Persistent becomes a zombie
+		// Persistent becomes a unforgotten
 		assert.equal(isLoaded(persistent), true);
         assert.equal(isDead(persistent), false);
-		assert.equal(isZombie(persistent), true);
+		assert.equal(isUnforgotten(persistent), true);
 		
-		// A is still a zombie
+		// A is still a unforgotten
 		assert.equal(isLoaded(A), true);
 		assert.equal(isDead(A), false);
-		assert.equal(isZombie(A), true);
+		assert.equal(isUnforgotten(A), true);
 
 		assert.equal(isLoaded(B), false);
 		
 		assert.equal(isLoaded(C), false);
 		
-		// Examine zombie properties 
-		assert.equal(A === persistent.A, false);  // Equality without const does not work anymore, becuase one of them is a zombie. 
+		// Examine unforgotten properties 
+		assert.equal(A === persistent.A, false);  // Equality without const does not work anymore, becuase one of them is a unforgotten. 
 		assert.equal(A.const === persistent.A.const, true);
 		
-		// Persistent is also a zombie, but A.persistent refers to its non-zombie version. 
-		logZombie(A);
-		logZombie(persistent);
-		assert.equal(A.persistent === persistent, false);  // Equality without const does not work anymore, becuase one of them is a zombie. 
+		// Persistent is also a unforgotten, but A.persistent refers to its non-unforgotten version. 
+		logUnforgotten(A);
+		logUnforgotten(persistent);
+		assert.equal(A.persistent === persistent, false);  // Equality without const does not work anymore, becuase one of them is a unforgotten. 
 		// log(A.persistent);
 		// log(A.persistent.const);
 		// log(persistent.const);
@@ -196,47 +196,47 @@ describe("loading, unloading & zombiefication", function () {
 		// eternity.trace.basic--;
 		// log("----------------------------------");
 		
-		// Persistent becomes a zombie
+		// Persistent becomes a unforgotten
 		assert.equal(isLoaded(persistent), false);
 		assert.equal(isDead(persistent), true);
-		// assert.equal(isZombie(persistent), true);
-		// log(zombieLevel(persistent));
+		// assert.equal(isUnforgotten(persistent), true);
+		// log(unforgottenLevel(persistent));
 		
-		// A is still a zombie
+		// A is still a unforgotten
 		assert.equal(isLoaded(A), false);
 		assert.equal(isDead(A), true);
-		// assert.equal(isZombie(A), true);
-		// log(zombieLevel(A));
+		// assert.equal(isUnforgotten(A), true);
+		// log(unforgottenLevel(A));
 
 		assert.equal(isLoaded(B), true);
 		assert.equal(isDead(B), false);
-		assert.equal(isZombie(B), true);
-		// log(zombieLevel(B));
+		assert.equal(isUnforgotten(B), true);
+		// log(unforgottenLevel(B));
 		
 		assert.equal(isLoaded(C), true);
 		assert.equal(isDead(C), false);
-		assert.equal(isZombie(C), true);
+		assert.equal(isUnforgotten(C), true);
 		
 		// log("--------------------------- Touch A -----------------------------------");
 		dummy = A.name;
 		eternity.flushToDatabase();
 		
-		// Persistent becomes a zombie
+		// Persistent becomes a unforgotten
 		assert.equal(isLoaded(persistent), false);
 		assert.equal(isDead(persistent), true);
-		// log(zombieLevel(persistent));
+		// log(unforgottenLevel(persistent));
 		
-		// A is still a zombie
+		// A is still a unforgotten
 		assert.equal(isLoaded(A), true);
 		assert.equal(isDead(A), false);
-		assert.equal(isZombie(A), true);
-		assert.equal(zombieLevel(A), 2);
+		assert.equal(isUnforgotten(A), true);
+		assert.equal(unforgottenLevel(A), 2);
 
 		assert.equal(isLoaded(B), false);
 		
 		assert.equal(isLoaded(C), true);
 		assert.equal(isDead(C), false);
-		assert.equal(isZombie(C), true);
+		assert.equal(isUnforgotten(C), true);
 	});
 });
 

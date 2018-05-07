@@ -2009,7 +2009,7 @@
 				if (cacheId !== null && typeof(state.inReCreate.cacheIdObjectMap[cacheId]) !== 'undefined') {
 					trace.reCreate && log("...recreating...");
 					// Overlay previously created
-					let infusionTarget = state.inReCreate.cacheIdObjectMap[cacheId]; // TODO: this map should be compressed in regards to multi level zombies.
+					let infusionTarget = state.inReCreate.cacheIdObjectMap[cacheId]; // TODO: this map should be compressed in regards to multi level unforgottens.
 					infusionTarget.nonForwardConst.storedForwardsTo = infusionTarget.nonForwardConst.forwardsTo;
 					infusionTarget.nonForwardConst.forwardsTo = proxy;
 					state.inReCreate.newlyCreated.push(infusionTarget);
@@ -3460,7 +3460,7 @@
 		 *
 		 *  Projection (continous creation and infusion)
 		 *
-		 *  TODO: Deal with zombie objects that is already forwarding... 
+		 *  TODO: Deal with unforgotten objects that is already forwarding... 
 		 *
 		 ************************************************************************/
 

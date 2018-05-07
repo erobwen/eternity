@@ -1864,22 +1864,22 @@
 			// Forget DB image if possible...
 			forgetImageIfDissconnectedAndNonReferred(dbImage);
 			
-			object.const.initializer = zombieObjectInitializer;
+			object.const.initializer = unforgottenObjectInitializer;
 		}
 		
-		function zombieObjectInitializer(object) {
-			// log("zombieObjectInitializer: " + objName(object));
+		function unforgottenObjectInitializer(object) {
+			// log("unforgottenObjectInitializer: " + objName(object));
 			logGroup();
-			// log("zombieObjectInitializer");
+			// log("unforgottenObjectInitializer");
             delete object.const.isForgotten;
-            object.const.isZombie = true;
+            object.const.isUnforgotten = true;
 			
-			// log("zombieObjectInitializer");
+			// log("unforgottenObjectInitializer");
 			let dbId = object.const.dbId;
 			let dbImage = getDbImage(dbId);
 			// log("Set forward to..." + dbId);
-			// object.const.isZombie = true; // Access this by object.nonForwardConst.isZombie
-			object.const.forwardsTo = getObjectFromImage(dbImage); // note: the dbImage might become a zombie as well...
+			// object.const.isUnforgotten = true; // Access this by object.nonForwardConst.isUnforgotten
+			object.const.forwardsTo = getObjectFromImage(dbImage); // note: the dbImage might become a unforgotten as well...
 			// log("Finished setting forward too....");
 			// log(object === object.nonForwardConst.forwardsTo);
 			logUngroup();
@@ -1937,12 +1937,12 @@
 			delete dbIdToDbImageMap[dbImage.const.dbId];
 			delete imageIdToImageMap[dbImage.const.id]; // This means all outgoing references to dbImage has to be removed first... ??? what does it mean??
 
-			// dbImage.const.initializer = zombieImageInitializer;
+			// dbImage.const.initializer = unforgottenImageInitializer;
 		}
 		
-		// There should never be any zombie image... 
-		// function zombieImageInitializer(dbImage) {
-			// // log("zombieImageInitializer");
+		// There should never be any unforgotten image... 
+		// function unforgottenImageInitializer(dbImage) {
+			// // log("unforgottenImageInitializer");
 			// dbImage.const.forwardsTo = getDbImage(dbImage.const.dbId);
 		// }
 		
@@ -2901,15 +2901,15 @@
 		// TODO: install this... 
 		objectCausality.setActivityListFilter(function(object) {
 			// throw new Error("Here!"); 
-			let isZombie = false;
+			let isUnforgotten = false;
             // objectCausality.blockInitialize(function() {
                 // objectCausality.freezeActivityList(function() {
-                    isZombie = typeof(object.nonForwardConst.isZombie) !== 'undefined';
-                    // log("isZombie: " + isZombie);
+                    isUnforgotten = typeof(object.nonForwardConst.isUnforgotten) !== 'undefined';
+                    // log("isUnforgotten: " + isUnforgotten);
                 // });
             // });
-			if (isZombie) {
-				// log("isZombie");
+			if (isUnforgotten) {
+				// log("isUnforgotten");
 				return false;				
 			}
 			
@@ -2953,7 +2953,7 @@
 		let trace = instance.trace;
 		// trace.forgetting = 0;
 		// trace.loading = 0;
-		// trace.zombies = 0;
+		// trace.unforgottens = 0;
 		// trace.eternity = false;
 		
 		// Setup database
