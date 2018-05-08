@@ -34,6 +34,16 @@ Typically, eternity.persistent will refer to a couple of index tree structures t
 
 The objects of eternity appear as normal javascript objects. The only difference is that you create them using the eternity.create function that sets up the proxies. 
 
+## Reactive databases compared to conventional databases, summary
+
+* subscribe/notify instead of query/result
+
+* transparent loading/saving (memory as a cache for the database) vs explicit loading/saving
+
+* Indexes as application managed objects as opposed to built in (DB managed) and global for each table.
+
+* Automatic persistent storage management (garbage collection) as opposed to application driven record deletion.
+
 
 ## Reference anatomy
 This is an image of the reference anatomy in eternity. The system is based on the following premises: 

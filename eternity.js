@@ -1697,9 +1697,9 @@
 		}
 		
 		
-		/*-----------------------------------------------
-		 *           Unloading and forgetting
-		 *-----------------------------------------------*/
+		/*-----------------------------------------------------
+		 *           Unloading and forgetting objects
+		 *-----------------------------------------------------*/
 		
 		let maxNumberOfLoadedObjects = configuration.maxNumberOfLoadedObjects; //10000;
 		// let unloadedObjects = 0;
@@ -1886,33 +1886,105 @@
 		}
 		
 		
+		/*-----------------------------------------------------
+		 *           Unloading and forgetting images
+		 *-----------------------------------------------------*/
 		
-		function unloadImage(dbImage) {
-			imageCausality.state.inPulse++;
-			imageCausality.state.emitEventPaused++;
-			imageCausality.state.incomingStructuresDisabled++;
-
-			// log("unloadImage");
-			// logGroup();
-			// without emitting events.
-			imageCausality.disableIncomingRelations(function() {
-				for (let property in dbImage) {
-					// Incoming should be unloaded here also, since it can be recovered.
-					let value = dbImage[property];
-					decreaseLoadedIncomingMacroReferenceCounters(dbImage, property);
-					// decreaseImageIncomingLoadedCounter(value);
-					delete dbImage[property]; 
+		let maxNumberOfLoadedImages = configuration.maxNumberOfLoadedObjects * 10;
+		// let unloadedObjects = 0;
+		let loadedImages = 0;
+		let pinnedImages = 0;
+		
+		function isPinnedImage(image) {
+			return typeof(image.const.pinned) !== 'undefined' && image.const.pinned > 0;
+		}
+		
+		function pinImage(image) {
+			if (typeof(image.const.pinned) === 'undefined') {
+				image.const.pinned = 1;
+				pinnedImages++;
+			} else {
+				image.const.pinned++;				
+			}
+		}
+		
+		function unpinImage(image) {
+			if (typeof(image.const.pinned) === 'undefined') {
+				throw new Error("Cannot unpin an image that is not pinned!");
+			} else {
+				image.const.pinned--;
+				if (image.const.pinned === 0) {
+					delete image.const.pinned;
+					pinnedImages--;
 				}
+			}
+		}
+		
+		function getLeastActiveNonPinnedImage() {
+			let leastActiveObject = imageCausality.getActivityListLast();
+			while(leastActiveObject !== null && isPinned(leastActiveObject)) {
+				leastActiveObject = imageCausality.getActivityListPrevious(leastActiveObject)
+			}
+			return leastActiveObject;
+		}
+
+		function unloadAndForgetImages() {
+			// log("unloadAndForgetObjects");
+			if (loadedImages > maxNumberOfLoadedImages) {
+				// log("Too many objects, unload some... ");
+				trace.unload && logGroup("unloadAndForgetObjects");
+				imageCausality.withoutEmittingEvents(function() {
+					let leastActiveImage = imageCausality.getActivityListLast();
+					imageCausality.freezeActivityList(function() {
+						while (leastActiveImage !== null && loadedImages > maxNumberOfLoadedImages) {
+							// log("considering object for unload...");
+							// while(leastActiveObject !== null && typeof(leastActiveObject.const.dbImage) === 'undefined') { // Warning! can this wake a forgeted object to life? ... no should not be here!
+								// // log("skipping unsaved object (cannot unload something not saved)...");
+								// imageCausality.removeFromActivityList(leastActiveObject); // Just remove them and make GC possible. Consider pre-filter for activity list.... 
+								// leastActiveObject = imageCausality.getActivityListLast();
+							// }
+							// if (leastActiveObject !== null) {
+								// log("remove it!!");
+								imageCausality.removeFromActivityList(leastActiveImage);
+								unloadImage(leastActiveImage);
+							// }
+						}
+					});
+				});
+				trace.unload && logUngroup();
+			} else {
+				// log("... still room for all loaded... ");
+			}
+		}
+				
+		function unloadImage(dbImage) {
+			imageCausality.freezeActivityList(function() {				
+				imageCausality.state.inPulse++;
+				imageCausality.state.emitEventPaused++;
+				imageCausality.state.incomingStructuresDisabled++;
+
+				// log("unloadImage");
+				// logGroup();
+				// without emitting events.
+				imageCausality.disableIncomingRelations(function() {
+					for (let property in dbImage) {
+						// Incoming should be unloaded here also, since it can be recovered.
+						let value = dbImage[property];
+						decreaseLoadedIncomingMacroReferenceCounters(dbImage, property);
+						// decreaseImageIncomingLoadedCounter(value);
+						delete dbImage[property]; 
+					}
+				});
+				dbImage.const.initializer = imageFromDbIdInitializer;
+				
+				// log(dbImage.const.incomingReferencesCount)
+				forgetImageIfDissconnectedAndNonReferred(dbImage);
+				
+				imageCausality.state.incomingStructuresDisabled--;
+				imageCausality.state.emitEventPaused--;
+				imageCausality.state.inPulse--;	if (imageCausality.state.inPulse === 0) imageCausality.postPulseCleanup();	
+				// logUngroup();
 			});
-			dbImage.const.initializer = imageFromDbIdInitializer;
-			
-			// log(dbImage.const.incomingReferencesCount)
-			forgetImageIfDissconnectedAndNonReferred(dbImage);
-			
-			imageCausality.state.incomingStructuresDisabled--;
-			imageCausality.state.emitEventPaused--;
-			imageCausality.state.inPulse--;	if (imageCausality.state.inPulse === 0) imageCausality.postPulseCleanup();	
-			// logUngroup();
 		}
 		
 		function forgetImageIfDissconnectedAndNonReferred(dbImage) {
