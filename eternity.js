@@ -1218,10 +1218,11 @@
 		
 		 
 		function twoPhaseComit() {
-			while(!oneStepTwoPhaseCommit()) {}
-			pendingUpdate = null;
-			if (configuration.twoPhaseComit) mockMongoDB.updateRecord(updateDbId, { name: "updatePlaceholder", _eternityIncomingCount : 1 });
-			return;
+			// while(!oneStepTwoPhaseCommit()) {}
+			// pendingUpdate = null;
+			// if (configuration.twoPhaseComit) mockMongoDB.updateRecord(updateDbId, { name: "updatePlaceholder", _eternityIncomingCount : 1 });
+			// return;
+
 			// log("twoPhaseComit:");
 			// logGroup();
 			// log(pendingUpdate, 10);
@@ -1283,6 +1284,7 @@
 				delete dbImage.const.tmpDbId;
 				// log(dbImage.const.name);
 				dbImage.const.dbId = dbId;
+				dbIdToDbImageMap[dbId] = dbImage;
 				dbImage.const.serializedMongoDbId = imageCausality.idExpression(dbId);
 				// log(dbImage.const);
 			}
@@ -1501,6 +1503,7 @@
 			if (typeof(dbIdToDbImageMap[dbId]) !== 'undefined') {
 				return dbIdToDbImageMap[dbId].const.id;
 			} else {
+				throw new Error("DB id not loaded!");
 				// TODO: create a placeholder anyways here...?
 				return "";
 			}
