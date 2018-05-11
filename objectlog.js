@@ -19,7 +19,7 @@
 		indentToken : "  ",
 		
 		// Change to true in order to find all logs hidden in your code.
-		findLogs : true, 
+		findLogs : false, 
 		
 		// Set to true in web browser that already has a good way to display objects with expandable trees.
 		useConsoleDefault : false,

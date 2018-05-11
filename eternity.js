@@ -390,6 +390,7 @@
 		}
 		
 		function connectObjectWithDbImage(object, dbImage) {
+			pinImage(dbImage);
 			imageCausality.blockInitialize(function() {
 				// log("connectObjectWithDbImage: " + dbImage.const.dbId);
 				dbImage.const.correspondingObject = object;	
@@ -408,6 +409,7 @@
 			// log("foo");
 			if (typeof(object.const.dbImage) === 'undefined') {
 				let dbImage = createEmptyDbImage(object, potentialParentImage, potentialParentProperty);
+				pinImage(dbImage);
 				object.const.dbImage = dbImage;
 				dbImage.const.name = object.const.name + "(dbImage)";
 				dbImage.const.correspondingObject = object;
@@ -471,68 +473,68 @@
 		}
 		
 		
-		function decreaseLoadedIncomingMacroReferenceCounters(dbImage, property) {
-			let value = dbImage[property];
-			if (imageCausality.isObject(value) && value.isIncomingRelationStructure) {
-				let currentIncomingStructure = value;
-				let nextIncomingStructure;
-				if (typeof(value.parent) !== 'undefined') {
-					nextIncomingStructure = currentIncomingStructure.parent
-				} else {
-					nextIncomingStructure = currentIncomingStructure.incomingStructures;
-				}
+		// function decreaseLoadedIncomingMacroReferenceCounters(dbImage, property) {
+			// let value = dbImage[property];
+			// if (imageCausality.isObject(value) && value.isIncomingRelationStructure) {
+				// let currentIncomingStructure = value;
+				// let nextIncomingStructure;
+				// if (typeof(value.parent) !== 'undefined') {
+					// nextIncomingStructure = currentIncomingStructure.parent
+				// } else {
+					// nextIncomingStructure = currentIncomingStructure.incomingStructures;
+				// }
 	
-				// Possibly unload incoming structure
-				currentIncomingStructure.const.loadedIncomingMacroReferenceCount--;
-				if (currentIncomingStructure.const.loadedIncomingMacroReferenceCount === 0) {
-					unloadImage(currentIncomingStructure);
-				}
+				// // Possibly unload incoming structure
+				// currentIncomingStructure.const.loadedIncomingMacroReferenceCount--;
+				// if (currentIncomingStructure.const.loadedIncomingMacroReferenceCount === 0) {
+					// unloadImage(currentIncomingStructure);
+				// }
 				
-				// Incoming structures or root incoming structure
-				currentIncomingStructure = nextIncomingStructure;
-				let referedDbImage;
-				if (imageCausality.isIncomingStructure(currentIncomingStructure)) {
-					// We were at the root incoming structure, proceed to the main incoming structure
-					nextIncomingStructure = currentIncomingStructure.incomingStructures;
-				} else {
-					// Reached the object
-					referedDbImage = currentIncomingStructure.referencedObject;
-					nextIncomingStructure = null;
-				}
+				// // Incoming structures or root incoming structure
+				// currentIncomingStructure = nextIncomingStructure;
+				// let referedDbImage;
+				// if (imageCausality.isIncomingStructure(currentIncomingStructure)) {
+					// // We were at the root incoming structure, proceed to the main incoming structure
+					// nextIncomingStructure = currentIncomingStructure.incomingStructures;
+				// } else {
+					// // Reached the object
+					// referedDbImage = currentIncomingStructure.referencedObject;
+					// nextIncomingStructure = null;
+				// }
 				
-				// Possibly unload incoming structure
-				currentIncomingStructure.const.loadedIncomingMacroReferenceCount--;
-				if (currentIncomingStructure.const.loadedIncomingMacroReferenceCount === 0) {
-					unloadImage(currentIncomingStructure);
-				}
+				// // Possibly unload incoming structure
+				// currentIncomingStructure.const.loadedIncomingMacroReferenceCount--;
+				// if (currentIncomingStructure.const.loadedIncomingMacroReferenceCount === 0) {
+					// unloadImage(currentIncomingStructure);
+				// }
 				
 				
-				if (nextIncomingStructure !== null) {
-					currentIncomingStructure = nextIncomingStructure;
+				// if (nextIncomingStructure !== null) {
+					// currentIncomingStructure = nextIncomingStructure;
 					
-					// Reached the object
-					referedDbImage = currentIncomingStructure.referencedObject;
-					nextIncomingStructure = null;
+					// // Reached the object
+					// referedDbImage = currentIncomingStructure.referencedObject;
+					// nextIncomingStructure = null;
 
-					// Possibly unload incoming structure
-					currentIncomingStructure.const.loadedIncomingMacroReferenceCount--;
-					if (currentIncomingStructure.const.loadedIncomingMacroReferenceCount === 0) {
-						unloadImage(currentIncomingStructure);
-					}
-				}
+					// // Possibly unload incoming structure
+					// currentIncomingStructure.const.loadedIncomingMacroReferenceCount--;
+					// if (currentIncomingStructure.const.loadedIncomingMacroReferenceCount === 0) {
+						// unloadImage(currentIncomingStructure);
+					// }
+				// }
 				
-				// // What to do with the object... forget if unloaded?
-				// imageCausality.blockInitialize(function() {
-					// referedDbImage.const.loadedIncomingMacroReferenceCount--;
-					// // Idea: perhaps referedDbImage.const.incomingCount could be used.... as it is not persistent...
-					// if (referedDbImage.const.loadedIncomingMacroReferenceCount === 0) {
-						// // if (referedDbImage.const.correspondingObject.const.)
-						// // unloadImage(referedDbImage);
-						// // if there are no incoming relations on the object also, forget both... 
-					// } 					
-				// });
-			}			
-		}
+				// // // What to do with the object... forget if unloaded?
+				// // imageCausality.blockInitialize(function() {
+					// // referedDbImage.const.loadedIncomingMacroReferenceCount--;
+					// // // Idea: perhaps referedDbImage.const.incomingCount could be used.... as it is not persistent...
+					// // if (referedDbImage.const.loadedIncomingMacroReferenceCount === 0) {
+						// // // if (referedDbImage.const.correspondingObject.const.)
+						// // // unloadImage(referedDbImage);
+						// // // if there are no incoming relations on the object also, forget both... 
+					// // } 					
+				// // });
+			// }			
+		// }
 		
 		// function increaseImageIncomingLoadedCounter(entity) {
 			// imageCausality.blockInitialize(function() {
@@ -1781,7 +1783,11 @@
 					}
 				}
 				loadedObjects--;
-				unloadImage(object.const.dbImage);
+				unpinImage(object.const.dbImage);
+				
+				unloadImage(object.const.dbImage); // TODO: REMOVE THIS LINE OF CODE!!
+				
+				// unloadImage();
 
 				object.const.dbId = object.const.dbImage.const.dbId;
 				
@@ -1890,8 +1896,11 @@
 		 *           Unloading and forgetting images
 		 *-----------------------------------------------------*/
 		
-		let maxNumberOfLoadedImages = configuration.maxNumberOfLoadedObjects * 10;
+		let nominalNumberOfLoadedImages = configuration.maxNumberOfLoadedObjects * 10;
+		let maxNumberOfAdditionalLoadedImages = Math.round(nominalNumberOfLoadedImages * 0.1);
+		
 		// let unloadedObjects = 0;
+		
 		let loadedImages = 0;
 		let pinnedImages = 0;
 		
@@ -1930,6 +1939,7 @@
 
 		function unloadAndForgetImages() {
 			// log("unloadAndForgetObjects");
+			let maxNumberOfLoadedImages = Math.max(nominalNumberOfLoadedImages, pinnedImages + maxNumberOfAdditionalLoadedImages) 
 			if (loadedImages > maxNumberOfLoadedImages) {
 				// log("Too many objects, unload some... ");
 				trace.unload && logGroup("unloadAndForgetObjects");
@@ -1970,9 +1980,10 @@
 					for (let property in dbImage) {
 						// Incoming should be unloaded here also, since it can be recovered.
 						let value = dbImage[property];
-						decreaseLoadedIncomingMacroReferenceCounters(dbImage, property);
+						// decreaseLoadedIncomingMacroReferenceCounters(dbImage, property);
 						// decreaseImageIncomingLoadedCounter(value);
 						delete dbImage[property]; 
+						// TODO: check if value has incoming counters of zero?... no... 
 					}
 				});
 				dbImage.const.initializer = imageFromDbIdInitializer;

@@ -3829,6 +3829,9 @@
 			state : state,
 			configuration : configuration, 
 			
+			// Pulse manipulation
+			postPulseCleanup : postPulseCleanup,
+			
 			// Install causality to global scope. 
 			install : install,
 			addClasses : addClasses,
