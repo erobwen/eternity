@@ -1375,8 +1375,9 @@
 		let dbIdToDbImageMap = {};
 		
 		function getDbImage(dbId) {
-			// log("getDbImage: " + dbId);
+			trace.load && log("getDbImage: " + dbId);
 			if (typeof(dbIdToDbImageMap[dbId]) === 'undefined') {
+				trace.load && log("getDbImage: actually create an image...  dbId = " + dbId);
 				dbIdToDbImageMap[dbId] = createImagePlaceholderFromDbId(dbId);
 			}
 			// log("placeholder keys:");
@@ -1431,6 +1432,7 @@
 		}
 		
 		function objectFromImageInitializer(object) {
+			trace.load && log("objectFromImageInitializer");
 			// log("initialize object " + object.const.id + " from dbImage " + object.const.dbImage.const.id + ", dbId:" + object.const.dbId);
 			logGroup();
 			objectCausality.withoutEmittingEvents(function() {
@@ -1471,8 +1473,19 @@
 			return placeholder;
 		}
 	
+		function loadObjectInitializer(object)  {
+			trace.load && log("loadObjectInitializer");
+			if (typeof(object.const.dbImage) !== 'undefined') {
+				objectFromImageInitializer(object);
+			} else if (typeof(object.const.dbId) !== 'undefined'){
+				objectFromIdInitializer(object);
+			} else {
+				throw new Error("Trying to unload an object without both dbImage and dbId ");
+			}
+		}
 		
 		function objectFromIdInitializer(object) {
+			trace.load && log("objectFromIdInitializer");
 			// log("initialize object " + object.const.id + " from dbId: " + object.const.dbId);
 			// logGroup();
 			objectCausality.withoutEmittingEvents(function() {
@@ -1588,7 +1601,7 @@
 		
 		function loadFromDbIdToObject(object) {
 			let dbId = object.const.dbId;
-			// log("loadFromDbIdToObject: " + dbId);
+			trace.load && logGroup("loadFromDbIdToObject: " + dbId);
 
 			// Ensure there is an image.
 			if (typeof(object.const.dbImage) === 'undefined') {
@@ -1597,6 +1610,7 @@
 				connectObjectWithDbImage(object, placeholder);
 			}
 			loadFromDbImageToObject(object);
+			trace.load && logUngroup();
 		}
 		
 		function printKeys(object) {
@@ -1606,7 +1620,7 @@
 		function loadFromDbImageToObject(object) {
 			let dbImage = object.const.dbImage;
 			// log("----------------------------------------");
-			// log("loadFromDbImageToObject dbId: " + dbImage.const.dbId);
+			trace.load && log("loadFromDbImageToObject dbId= " + dbImage.const.dbId);
 			// logGroup();
 			// log(dbImage);
 			// log(object);
@@ -1675,6 +1689,7 @@
 		// }
 		
 		function loadDbValue(dbValue) {
+			// trace.load && log("loadDbValue");
 			if (typeof(dbValue) === 'string') {
 				if (imageCausality.isIdExpression(dbValue)) {
 					let dbId = imageCausality.extractIdFromExpression(dbValue);
@@ -1938,7 +1953,7 @@
 		}
 
 		function unloadAndForgetImages() {
-			// log("unloadAndForgetObjects");
+			trace.unforget && log("unloadAndForgetObjects");
 			let maxNumberOfLoadedImages = Math.max(nominalNumberOfLoadedImages, pinnedImages + maxNumberOfAdditionalLoadedImages) 
 			if (loadedImages > maxNumberOfLoadedImages) {
 				// log("Too many objects, unload some... ");
@@ -1999,7 +2014,7 @@
 		}
 		
 		function forgetImageIfDissconnectedAndNonReferred(dbImage) {
-			// log("Trying to forget image...");
+			trace.forget && logGroup("Trying to forget image...dbId = " + dbImage.const.dbId);
 			let result = false;
 			imageCausality.blockInitialize(function() {
 				if (dbImage.const.incomingReferencesCount === 0 && typeof(dbImage.const.correspondingObject) === 'undefined') {
@@ -2007,6 +2022,7 @@
 					result = true;
 				}
 			});
+			trace.forget && logUngroup();
 			return result;
 		}
 		

@@ -77,8 +77,13 @@ describe("loading, unloading & unforgottenfication", function () {
                 eternity.freezeActivityList(function() {
 					let current = object;
 					while(current !== null) {
-						result += (typeof(current.nonForwardConst.isUnforgotten) !== 'undefined') ? 'unforgotten,': '';
-						current = current.nonForwardConst.forwardsTo;
+						if (current.nonForwardConst.isUnforgotten) {
+							result += 'unforgotten(id=' + current.nonForwardConst.id + ", name=" + current.nonForwardConst.target.name + "), ";
+							current = current.nonForwardConst.forwardsTo;		
+						} else {
+							result += 'object(id=' + current.const.id + ", name= " + current.name + ")";
+							current = null;
+						}
 					}
                 });
             });
@@ -138,7 +143,9 @@ describe("loading, unloading & unforgottenfication", function () {
 		assert.equal(isLoaded(C), true);
 		
 		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);
-		// log("--------------------------- Touch A -----------------------------------");
+		log("--------------------------- Touch A -----------------------------------");
+		eternity.trace.unforget = 1;
+		eternity.trace.load = 1;
 		let dummy = A.name;
 		eternity.flushToDatabase();
 		
@@ -155,7 +162,7 @@ describe("loading, unloading & unforgottenfication", function () {
 		assert.equal(isLoaded(C), true);
 		
 		
-		// log("--------------------------- Touch persistent -----------------------------------");
+		log("--------------------------- Touch persistent -----------------------------------");
 		let persistentA = persistent.A;
 		eternity.flushToDatabase();
 		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);
@@ -178,9 +185,13 @@ describe("loading, unloading & unforgottenfication", function () {
 		assert.equal(A === persistent.A, false);  // Equality without const does not work anymore, becuase one of them is a unforgotten. 
 		// log(A.name);
 		// log(persistent.A.name);
-		// logUnforgotten(A);
-		// logUnforgotten(persistent);
+		logUnforgotten(A);
+		logUnforgotten(persistent);
+		logUnforgotten(persistent.A);
+		eternity.trace.load = 0;
+		eternity.trace.unforget = 0;
 		// log("-----------------------------------------")
+		assert.equal(A.name === persistent.A.name, true);
 		assert.equal(A.const === persistent.A.const, true);
 		
 		// Persistent is also a unforgotten, but A.persistent refers to its non-unforgotten version. 
