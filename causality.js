@@ -1456,12 +1456,12 @@
 				return result;
 			}
 			
-			if (configuration.objectActivityList) registerActivity(this);
 					
 			if (key === "const" || key === "nonForwardConst") {
 				if (trace.get > 0) logUngroup();
 				return this.const;
 			} else {
+				if (configuration.objectActivityList) registerActivity(this);
 				if (typeof(key) !== 'undefined') {
 					let scan = target;
 					while ( scan !== null && typeof(scan) !== 'undefined' ) {
