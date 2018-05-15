@@ -160,7 +160,7 @@
 					}
 				});
 				// flushToImages();
-				unloadAndForgetObjects();				
+				// unloadAndForgetObjects();			
 			}
 		}
 		
