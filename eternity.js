@@ -355,7 +355,7 @@
 
 		function createEmptyDbImage(object, potentialParentImage, potentialParentProperty) {
 			let dbImage = createDbImageConnectedWithObject(object);
-			dbImage.const.name = object.const.name + "(dbImage)";
+			dbImage.const.name = object.const.name + "(dbImage.)";
 			imageCausality.state.incomingStructuresDisabled--;
 			dbImage[eternityTag + "Persistent"] = true;
 			dbImage[eternityTag + "Parent"] = potentialParentImage;
@@ -391,12 +391,13 @@
 		
 		function connectObjectWithDbImage(object, dbImage) {
 			imageCausality.blockInitialize(function() {
-				// log("connectObjectWithDbImage: " + dbImage.const.dbId);
-				dbImage.const.correspondingObject = object;	
-				dbImage.const.isObjectImage = true;				
-			});
-			objectCausality.blockInitialize(function() {
-				object.const.dbImage = dbImage;
+				objectCausality.blockInitialize(function() {
+					// log("connectObjectWithDbImage: " + dbImage.const.dbId);
+					dbImage.const.correspondingObject = object;	
+					dbImage.const.isObjectImage = true;				
+					// object.const.dbId = dbImage.const.dbId; //Note: this is needed in order to define object as persistently stored
+					object.const.dbImage = dbImage;
+				});
 			});
 		}
 		
@@ -410,7 +411,7 @@
 				let dbImage = createEmptyDbImage(object, potentialParentImage, potentialParentProperty);
 				pinImage(dbImage);
 				object.const.dbImage = dbImage;
-				dbImage.const.name = object.const.name + "(dbImage)";
+				dbImage.const.name = object.const.name + "(dbImage..)";
 				dbImage.const.correspondingObject = object;
 				fillDbImageFromCorrespondingObject(object);
 			}	
@@ -423,7 +424,7 @@
 			}			
 			loadedObjects++;
 			// log("fillDbImageFromCorrespondingObject, and poking...");
-			objectCausality.pokeObject(object); // poke all newly saved?
+			// objectCausality.pokeObject(object); // poke all newly saved?
 		}
 		
 		// function createDbImageRecursivley(entity, potentialParentImage, potentialParentProperty) {
@@ -1285,9 +1286,13 @@
 				delete dbImage.const.tmpDbId;
 				// log(dbImage.const.name);
 				dbImage.const.dbId = dbId;
-				dbIdToDbImageMap[dbId] = dbImage;
 				dbImage.const.serializedMongoDbId = imageCausality.idExpression(dbId);
-				// log(dbImage.const);
+				dbIdToDbImageMap[dbId] = dbImage;
+				
+				// Poke newly saved object 
+				if (typeof(dbImage.const.correspondingObject) !== 'undefined') {					
+					objectCausality.pokeObject(dbImage.const.correspondingObject);
+				}
 			}
 			
 			// Finish, clean up transaction
@@ -1429,7 +1434,7 @@
 			let placeholder = objectCausality.create(createTarget(peekAtRecord(dbImage.const.dbId)._eternityObjectClass));
 			connectObjectWithDbImage(placeholder, dbImage);
 			placeholder.const.dbId = dbImage.const.dbId;
-			placeholder.const.name = dbImage.const.name + "(object)"; // TODO: remove? 
+			placeholder.const.name = dbImage.const.name + "(object...)"; // TODO: remove? 
 			placeholder.const.initializer = objectFromImageInitializer;
 			return placeholder;
 		}
@@ -1775,18 +1780,9 @@
 							trace.load && log(loadedObjects);
 							while (leastActiveObject !== null && loadedObjects > maxNumberOfLoadedObjects) {
 								trace.load && log("unload....");
-								// trace.load && log(maxNumberOfLoadedObjects);
-								// log("considering object for unload...");
-								// while(leastActiveObject !== null && typeof(leastActiveObject.const.dbImage) === 'undefined') { // Warning! can this wake a forgeted object to life? ... no should not be here!
-									// // log("skipping unsaved object (cannot unload something not saved)...");
-									// objectCausality.removeFromActivityList(leastActiveObject); // Just remove them and make GC possible. Consider pre-filter for activity list.... 
-									// leastActiveObject = objectCausality.getActivityListLast();
-								// }
-								// if (leastActiveObject !== null) {
-									// log("remove it!!");
-									objectCausality.removeFromActivityList(leastActiveObject);
-									unloadObject(leastActiveObject);
-								// }
+
+								objectCausality.removeFromActivityList(leastActiveObject);
+								unloadObject(leastActiveObject);
 							}
 						});
 					});
@@ -1809,7 +1805,7 @@
 						delete object[property];					
 					}
 				}
-				object.const.initializer = loadObjectInitializer; // TODO: change this to something more generic! 
+				object.const.initializer = loadObjectInitializer;
 				loadedObjects--;
 				
 				tryForgetObject(object);
@@ -2995,7 +2991,7 @@
 				return false;				
 			}
 			
-			if (typeof(object.const.dbId) === 'undefined') {
+			if (typeof(object.const.dbId) === 'undefined' && typeof(object.const.dbImage) === 'undefined') {
 				// Not even persistent
 				return false;
 			} else if (typeof(object.const.isUnloaded) !== 'undefined') {

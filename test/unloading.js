@@ -104,19 +104,30 @@ describe("loading, unloading & unforgottenfication", function () {
 
 		persistent.name = "persistent";
 		persistent.const.name = "persistent"
+		eternity.logActivityList();
 		eternity.flushToDatabase();
+		
 		log("---------------------------- persistent.A = A; ----------------------------------");
 		persistent.A = A;
+		eternity.logActivityList();
 		eternity.flushToDatabase();
+		log(A.const);
 		log("---------------------------- A.persistent = persistent; ----------------------------------");		
+		log("----");
+		eternity.trace.activity = 1;
 		A.persistent = persistent;
-		eternity.flushToDatabase();
+		eternity.logActivityList();
+		// eternity.flushToDatabase();
+		// eternity.logActivityList();
+		log("----");
+		// return;
 		
 		// Exceed the memory limit (3 objects loaded is too much)
 		log("---------------------------- A.B = B; ----------------------------------");
 		
 		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
 		A.B = B;
+		eternity.logActivityList();
 		eternity.flushToDatabase();
 		// log()
 		assert.equal(isLoaded(persistent), false);
@@ -131,10 +142,9 @@ describe("loading, unloading & unforgottenfication", function () {
 		eternity.trace.unforget = 1;
 		eternity.trace.load = 1;
 		// eternity.trace.basic++;
-		log("----");
 		B.C = C;
+		eternity.logActivityList();
 		eternity.flushToDatabase();
-		log("----");
 
 		// eternity.trace.basic--;
 		// log("-----");
@@ -152,10 +162,13 @@ describe("loading, unloading & unforgottenfication", function () {
 		
 		eternity.trace.load = 0;
 		eternity.trace.unforget = 0;
+		eternity.trace.activity = 0;
 		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);
 		log("--------------------------- Touch A -----------------------------------");
 		let dummy = A.name;
+		eternity.logActivityList();
 		eternity.flushToDatabase();
+		return;
 		
 		assert.equal(isLoaded(persistent), false);
         assert.equal(isForgotten(persistent), true);

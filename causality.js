@@ -1461,6 +1461,7 @@
 				if (trace.get > 0) logUngroup();
 				return this.const;
 			} else {
+				log.activity && log("in get handler...");
 				if (configuration.objectActivityList) registerActivity(this);
 				if (typeof(key) !== 'undefined') {
 					let scan = target;
@@ -1586,6 +1587,7 @@
 			}
 			
 			// Manipulate activity list here? why not?
+			log.activity && log("in set handler...");
 			if (configuration.objectActivityList) registerActivity(this);
 			activityListFrozen++;
 			
@@ -2025,6 +2027,7 @@
 			}
 			
 			emitCreationEvent(handler);
+			log.activity && log("in constructor...");
 			if (configuration.objectActivityList) registerActivity(handler);
 			if (--state.inPulse === 0) postPulseCleanup();
 			
@@ -3624,6 +3627,7 @@
 		function pokeObject(object) {
 			let tmpFrozen = activityListFrozen;
 			activityListFrozen = 0;
+			log.activity && log("in poke...");
 			registerActivity(object.const.handler);
 			activityListFrozen = tmpFrozen;
 		}
@@ -3673,13 +3677,17 @@
 		}
 		
 		function registerActivity(handler) {
-			// log("registerActivity");
+			trace.activity && logGroup("registerActivity name=" + handler.target.name);
+			trace.activity && log("activityListFrozen: " + activityListFrozen);
+			trace.activity && trace.set++;
 			if (activityListFrozen === 0 && activityListFirst !== handler ) {
 				// log("here");
 				activityListFrozen++;
 				state.blockingInitialize++;
-				
+				trace.activity && log("activityListFrozen: " + activityListFrozen);
+				trace.activity && log("handler.const: " + handler.const, 1);
 				if (activityListFilter === null || activityListFilter(handler.const.object)) {
+					trace.activity && log("allowed...");
 					// log("here2");
 								
 					if (trace.basic) {
@@ -3712,10 +3720,11 @@
 					if (trace.basic) logActivityList();
 					// logUngroup();
 				}
-				
 				state.blockingInitialize--;
 				activityListFrozen--;
 			}
+			trace.activity && trace.set--;
+			trace.activity && logUngroup();
 		}
 		
 		function removeFromActivityListHandler(handler) {
