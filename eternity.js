@@ -2621,13 +2621,13 @@
 					// log("setup from an empty database...");
 					
 					// Persistent root object
-					persistentDbId = mockMongoDB.saveNewRecord({ name : "Persistent", _eternityIncomingCount : 1});
+					persistentDbId = mockMongoDB.saveNewRecord({ name : "Persistent(dbImage)", _eternityIncomingCount : 1});
 
 					// Update placeholder
-					updateDbId = mockMongoDB.saveNewRecord({ name: "updatePlaceholder", _eternityIncomingCount : 1});   //Allways have it here, even if not in use for compatiblity reasons. 
+					updateDbId = mockMongoDB.saveNewRecord({ name: "UpdatePlaceholder(dbImage)", _eternityIncomingCount : 1});   //Allways have it here, even if not in use for compatiblity reasons. 
 					// NOW
 					// Garbage collection state.
-					collectionDbId = mockMongoDB.saveNewRecord({ name : "garbageCollection", _eternityIncomingCount : 1});
+					collectionDbId = mockMongoDB.saveNewRecord({ name : "GarbageCollection(dbImage)", _eternityIncomingCount : 1});
 					trace.eternity = true;
 					gcState = createImagePlaceholderFromDbId(collectionDbId);
 					trace.eternity = false;

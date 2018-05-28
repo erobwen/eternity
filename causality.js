@@ -1461,7 +1461,7 @@
 				if (trace.get > 0) logUngroup();
 				return this.const;
 			} else {
-				log.activity && log("in get handler...");
+				trace.activity && log("in get handler...");
 				if (configuration.objectActivityList) registerActivity(this);
 				if (typeof(key) !== 'undefined') {
 					let scan = target;
@@ -1587,7 +1587,7 @@
 			}
 			
 			// Manipulate activity list here? why not?
-			log.activity && log("in set handler...");
+			trace.activity && log("in set handler...");
 			if (configuration.objectActivityList) registerActivity(this);
 			activityListFrozen++;
 			
@@ -1962,7 +1962,7 @@
 				incomingReferences : 0, 
 				initializer : initializer,
 				causalityInstance : causalityInstance,
-				name: createdTarget.name,
+				name: transferFromSource ? source.name : createdTarget.name,
 				cacheId : cacheId,
 				forwardsTo : null,
 				target: createdTarget,
@@ -2028,11 +2028,10 @@
 			}
 			
 			emitCreationEvent(handler);
-			log.activity && log("in constructor...");
+			trace.activity && log("in constructor...");
 			if (configuration.objectActivityList) registerActivity(handler);
 			if (--state.inPulse === 0) postPulseCleanup();
 			
-			if (trace.basic > 0) logUngroup();
 			
 			if(!state.blockInitialize && typeof(proxy.initialize) === 'function' ) {
 				if (initialData === null) {
@@ -2053,6 +2052,7 @@
 				}				
 			}
 
+			if (trace.basic > 0) logUngroup();
 			return proxy;
 		}
 
@@ -3637,7 +3637,7 @@
 		function pokeObject(object) {
 			let tmpFrozen = activityListFrozen;
 			activityListFrozen = 0;
-			log.activity && log("in poke...");
+			trace.activity && log("in poke...");
 			registerActivity(object.const.handler);
 			activityListFrozen = tmpFrozen;
 		}
@@ -3687,21 +3687,21 @@
 		}
 		
 		function registerActivity(handler) {
-			trace.activity && logGroup("registerActivity handler.target.name: " + handler.target.name + " [" + configuration.name + "]");
-			trace.activity && log("activityListFrozen: " + activityListFrozen);
+			trace.activity && logGroup("registerActivity handler.const.name: " + handler.const.name + " [" + configuration.name + "]");
+			// trace.activity && log(stacktrace());
+			// trace.activity && log("activityListFrozen: " + activityListFrozen);
 			trace.activity && trace.set++;
 			if (activityListFrozen === 0 && activityListFirst !== handler ) {
 				// log("here");
 				activityListFrozen++;
 				state.blockingInitialize++;
-				trace.activity && log("activityListFrozen: " + activityListFrozen);
-				trace.activity && log("config: " + handler.const.configurationName);
+				// trace.activity && log("activityListFrozen: " + activityListFrozen);
+				// trace.activity && log("config: " + handler.const.configurationName);
 				if (activityListFilter === null || activityListFilter(handler.const.object)) {
-					trace.activity && log("allowed...");
+					trace.activity && log("do register...");
 					// log("here2");
 								
-					if (trace.basic) {
-						// stacktrace();
+					if (trace.activity) {
 						// throw new Error("see ya");
 						log("<<< registerActivity: "  + handler.const.name + " >>>");
 						// log(activityListFilter(handler.const.object));

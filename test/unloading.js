@@ -90,30 +90,43 @@ describe("loading, unloading & unforgottenfication", function () {
 			log(result);
             // return result;
 		}
+		log("---------------------------------------------------------------------------------");
 		// Start building a structure
+		eternity.trace.activity = 1;
+		eternity.trace.basic = 1;
 
 		// Setup a starting point (name in const for easy debugging)
 		let A = create({name: "A"});
-		A.const.name = "A";
+		log("-------------");
+		console.log(A.const.name);
+		// A.const.name = "A";
+		// log("-------------");
 
 		let B = create({name: "B"});
-		B.const.name = "B";
+		log("-------------");
+		// B.const.name = "B";
+		log("-------------");
 
 		let C = create({name: "C"});
-		C.const.name = "C";
+		log("-------------");
+		// C.const.name = "C";
+		log("-------------");
 
-		persistent.name = "persistent";
-		persistent.const.name = "persistent"
+		// persistent.name = "persistent";
+		// persistent.const.name = "Persistent"
+		log("-------------");
 		eternity.logActivityList();
 		eternity.flushToDatabase();
-		
+		return;
 		log("---------------------------- persistent.A = A; ----------------------------------");
+		eternity.logActivityList();
 		persistent.A = A;
 		eternity.logActivityList();
 		eternity.flushToDatabase();
 		// log(A.const);
 		log("---------------------------- A.persistent = persistent; ----------------------------------");		
 		log("----");
+		eternity.logActivityList();
 		A.persistent = persistent;
 		eternity.logActivityList();
 		// eternity.flushToDatabase();
@@ -125,6 +138,7 @@ describe("loading, unloading & unforgottenfication", function () {
 		log("---------------------------- A.B = B; ----------------------------------");
 		
 		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
+		eternity.logActivityList();
 		A.B = B;
 		eternity.logActivityList();
 		eternity.flushToDatabase();
@@ -138,12 +152,12 @@ describe("loading, unloading & unforgottenfication", function () {
 		
 		// Exceed the memory limit again, persistent and A no longer has any incoming references and will be forgeted
 		log("--------------------------- B.C = C; -----------------------------------");
-		// eternity.trace.basic++;
-		eternity.logActivityList();
 		B.C = C;
 		eternity.logActivityList();
 		eternity.flushToDatabase();
+		eternity.logActivityList();
 
+		// eternity.trace.basic++;
 		// eternity.trace.basic--;
 		// log("-----");
 		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);
@@ -160,19 +174,10 @@ describe("loading, unloading & unforgottenfication", function () {
 		
 		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);
 		log("--------------------------- Touch A.. -----------------------------------");
-		eternity.logActivityList();
-		// eternity.trace.activity = 1;
-		// eternity.trace.basic = 1;
-		// eternity.trace.unforget = 1;
-		// eternity.trace.load = 1;
 		let dummy = A.name;
-		// eternity.trace.activity = 0;
-		// eternity.trace.basic = 0;
-		// eternity.trace.unforget = 0;
-		// eternity.trace.load = 0;
 		eternity.logActivityList();
 		eternity.flushToDatabase();
-		return;
+		eternity.logActivityList();
 		
 		assert.equal(isLoaded(persistent), false);
         assert.equal(isForgotten(persistent), true);
@@ -189,6 +194,7 @@ describe("loading, unloading & unforgottenfication", function () {
 		
 		log("--------------------------- Touch persistent -----------------------------------");
 		let persistentA = persistent.A;
+		eternity.logActivityList();
 		eternity.flushToDatabase();
 		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);
 		
@@ -222,15 +228,26 @@ describe("loading, unloading & unforgottenfication", function () {
 		// log(A.persistent);
 		// log(A.persistent.const);
 		// log(persistent.const);
+		
 		assert.equal(A.persistent.const === persistent.const, true);
 		log("--------------------------- Touch B -----------------------------------");
 		dummy = B.name;
+		eternity.logActivityList();
 		log("--------------------------- Touch C -----------------------------------");
-		eternity.trace.basic++;
+		// eternity.trace.basic++;
 		dummy = C.name;
+		return;
+		eternity.logActivityList();
 		log("----------------");
+		eternity.trace.basic = 1;
+		eternity.trace.unforget = 1;
+		eternity.trace.load = 1;
 		eternity.flushToDatabase();
-		eternity.trace.basic--;
+		eternity.trace.activity = 0;
+		eternity.trace.basic = 0;
+		eternity.trace.unforget = 0;
+		eternity.trace.load = 0;
+		// eternity.trace.basic--;
 		log("----------------------------------");
 		
 		// Persistent becomes a unforgotten
