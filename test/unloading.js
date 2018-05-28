@@ -111,10 +111,9 @@ describe("loading, unloading & unforgottenfication", function () {
 		persistent.A = A;
 		eternity.logActivityList();
 		eternity.flushToDatabase();
-		log(A.const);
+		// log(A.const);
 		log("---------------------------- A.persistent = persistent; ----------------------------------");		
 		log("----");
-		eternity.trace.activity = 1;
 		A.persistent = persistent;
 		eternity.logActivityList();
 		// eternity.flushToDatabase();
@@ -139,9 +138,8 @@ describe("loading, unloading & unforgottenfication", function () {
 		
 		// Exceed the memory limit again, persistent and A no longer has any incoming references and will be forgeted
 		log("--------------------------- B.C = C; -----------------------------------");
-		eternity.trace.unforget = 1;
-		eternity.trace.load = 1;
 		// eternity.trace.basic++;
+		eternity.logActivityList();
 		B.C = C;
 		eternity.logActivityList();
 		eternity.flushToDatabase();
@@ -160,12 +158,18 @@ describe("loading, unloading & unforgottenfication", function () {
 		
 		assert.equal(isLoaded(C), true);
 		
-		eternity.trace.load = 0;
-		eternity.trace.unforget = 0;
-		eternity.trace.activity = 0;
 		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);
-		log("--------------------------- Touch A -----------------------------------");
+		log("--------------------------- Touch A.. -----------------------------------");
+		eternity.logActivityList();
+		// eternity.trace.activity = 1;
+		// eternity.trace.basic = 1;
+		// eternity.trace.unforget = 1;
+		// eternity.trace.load = 1;
 		let dummy = A.name;
+		// eternity.trace.activity = 0;
+		// eternity.trace.basic = 0;
+		// eternity.trace.unforget = 0;
+		// eternity.trace.load = 0;
 		eternity.logActivityList();
 		eternity.flushToDatabase();
 		return;
@@ -240,6 +244,7 @@ describe("loading, unloading & unforgottenfication", function () {
 		assert.equal(isForgotten(A), true);
 		// assert.equal(isUnforgotten(A), true);
 		// log(unforgottenLevel(A));
+		eternity.logActivityList();
 
 		assert.equal(isLoaded(B), true);
 		assert.equal(isForgotten(B), false);
@@ -251,7 +256,9 @@ describe("loading, unloading & unforgottenfication", function () {
 		assert.equal(isUnforgotten(C), true);
 		
 		// log("--------------------------- Touch A -----------------------------------");
+		eternity.logActivityList();
 		dummy = A.name;
+		eternity.logActivityList();
 		eternity.flushToDatabase();
 		
 		// Persistent becomes a unforgotten

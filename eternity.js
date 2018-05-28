@@ -355,7 +355,7 @@
 
 		function createEmptyDbImage(object, potentialParentImage, potentialParentProperty) {
 			let dbImage = createDbImageConnectedWithObject(object);
-			dbImage.const.name = object.const.name + "(dbImage.)";
+			dbImage.const.name = object.const.name + "(dbImage)";
 			imageCausality.state.incomingStructuresDisabled--;
 			dbImage[eternityTag + "Persistent"] = true;
 			dbImage[eternityTag + "Parent"] = potentialParentImage;
@@ -378,12 +378,13 @@
 		}
 		
 		function createDbImageConnectedWithObject(object, contents) {
+			trace.load && log("createDbImageConnectedWithObject....");
 			if (typeof(contents) === 'undefined') {
 				contents = {};
 			}
 			let dbImage = imageCausality.create(contents); // Only Object image here... 
 			if (!imageCausality.isObject(dbImage)) throw new Error("WTF!");
-			
+			trace.load && log(dbImage.const.configurationName);
 			imageIdToImageMap[dbImage.const.id] = dbImage;
 			connectObjectWithDbImage(object, dbImage);
 			return dbImage;		
@@ -412,6 +413,7 @@
 				pinImage(dbImage);
 				object.const.dbImage = dbImage;
 				dbImage.const.name = object.const.name + "(dbImage..)";
+				dbImage.const.name = object.const.name + "(dbImage)";
 				dbImage.const.correspondingObject = object;
 				fillDbImageFromCorrespondingObject(object);
 			}	
@@ -445,32 +447,32 @@
 		 *   has been disabled!!!
 		 *-----------------------------------------------*/
 		 
-		function increaseLoadedIncomingMacroReferenceCounters(dbImage, property) {
-			let incomingRelationStructure = dbImage[property];
-			if (imageCausality.isObject(incomingRelationStructure) && incomingRelationStructure.isIncomingRelationStructure) {
-				// Increase counter 
-				if (typeof(incomingRelationStructure.const.loadedIncomingMacroReferenceCount) === 'undefined') {
-					incomingRelationStructure.const.loadedIncomingMacroReferenceCount = 0;
-				}
-				incomingRelationStructure.const.loadedIncomingMacroReferenceCount++;
+		// function increaseLoadedIncomingMacroReferenceCounters(dbImage, property) {
+			// let incomingRelationStructure = dbImage[property];
+			// if (imageCausality.isObject(incomingRelationStructure) && incomingRelationStructure.isIncomingRelationStructure) {
+				// // Increase counter 
+				// if (typeof(incomingRelationStructure.const.loadedIncomingMacroReferenceCount) === 'undefined') {
+					// incomingRelationStructure.const.loadedIncomingMacroReferenceCount = 0;
+				// }
+				// incomingRelationStructure.const.loadedIncomingMacroReferenceCount++;
 				
-				// Increase counter 
-				let nextStructure = incomingRelationStructure;
-				if (typeof(nextStructure.parent) !== 'undefined') {
-					if (typeof(nextStructure.const.loadedIncomingMacroReferenceCount) === 'undefined') {
-						nextStructure.const.loadedIncomingMacroReferenceCount = 0;
-					}
-					nextStructure.const.loadedIncomingMacroReferenceCount++;
-					nextStructure = nextStructure.incomingStructures;
-				}
+				// // Increase counter 
+				// let nextStructure = incomingRelationStructure;
+				// if (typeof(nextStructure.parent) !== 'undefined') {
+					// if (typeof(nextStructure.const.loadedIncomingMacroReferenceCount) === 'undefined') {
+						// nextStructure.const.loadedIncomingMacroReferenceCount = 0;
+					// }
+					// nextStructure.const.loadedIncomingMacroReferenceCount++;
+					// nextStructure = nextStructure.incomingStructures;
+				// }
 				
-				// Increase counter 
-				if (typeof(nextStructure.const.loadedIncomingMacroReferenceCount) === 'undefined') {
-					nextStructure.const.loadedIncomingMacroReferenceCount = 0;
-				}
-				nextStructure.const.loadedIncomingMacroReferenceCount++;
-			}
-		}
+				// // Increase counter 
+				// if (typeof(nextStructure.const.loadedIncomingMacroReferenceCount) === 'undefined') {
+					// nextStructure.const.loadedIncomingMacroReferenceCount = 0;
+				// }
+				// nextStructure.const.loadedIncomingMacroReferenceCount++;
+			// }
+		// }
 		
 		
 		// function decreaseLoadedIncomingMacroReferenceCounters(dbImage, property) {
@@ -828,9 +830,9 @@
 						if (event.type === 'creation') {
 							// log("PINGPINGPINGPINGPINGPINGPINGPING")
 							// Maintain image structure
-							for (let property in dbImage) {
-								increaseLoadedIncomingMacroReferenceCounters(dbImage, property);
-							}
+							// for (let property in dbImage) {
+								// increaseLoadedIncomingMacroReferenceCounters(dbImage, property);
+							// }
 							
 							// Serialized image creation, with temporary db ids. 
 							let tmpDbId = getTmpDbId(dbImage);
@@ -850,7 +852,7 @@
 								
 							if (event.type === 'set') {
 								// Maintain image structure
-								increaseLoadedIncomingMacroReferenceCounters(dbImage, event.property);
+								// increaseLoadedIncomingMacroReferenceCounters(dbImage, event.property);
 								// decreaseLoadedIncomingMacroReferenceCounters(dbImage, event.); // TODO: Decrease counters here? Get the previousIncomingStructure... 
 								
 								// Serialized value with temporary db ids. 
@@ -1414,6 +1416,7 @@
 		}
 		
 		function imageFromDbIdInitializer(dbImage) {
+			trace.load && log("imageFromDbIdInitializer");
 			loadFromDbIdToImage(dbImage);
 			// if (dbImage.const.dbId === 1)
 				// dbImage.foo.bar;
@@ -1434,7 +1437,7 @@
 			let placeholder = objectCausality.create(createTarget(peekAtRecord(dbImage.const.dbId)._eternityObjectClass));
 			connectObjectWithDbImage(placeholder, dbImage);
 			placeholder.const.dbId = dbImage.const.dbId;
-			placeholder.const.name = dbImage.const.name + "(object...)"; // TODO: remove? 
+			placeholder.const.name = dbImage.const.name + "(object)"; // TODO: remove? 
 			placeholder.const.initializer = objectFromImageInitializer;
 			return placeholder;
 		}
@@ -1475,7 +1478,8 @@
 		function createObjectPlaceholderFromDbId(dbId) {
 			let placeholder = objectCausality.create(peekAtRecord(dbId)._eternityObjectClass);
 			placeholder.const.dbId = dbId;
-			placeholder.const.name = peekAtRecord(dbId).name;
+			let storedName = peekAtRecord(dbId).name;
+			placeholder.const.name = storedName.substring(0, storedName.length - 9); //"(dbImage)"
 			// log("createObjectPlaceholderFromDbId: " + dbId + ", " + placeholder.const.name);
 			placeholder.const.initializer = objectFromIdInitializer;
 			return placeholder;
@@ -1565,7 +1569,7 @@
 					// log(value);
 					property = imageCausality.transformPossibleIdExpression(property, dbIdToImageId);
 					// increaseImageIncomingLoadedCounter(value);
-					increaseLoadedIncomingMacroReferenceCounters(dbImage, property);
+					// increaseLoadedIncomingMacroReferenceCounters(dbImage, property);
 					dbImage[property] = value;
 					// if (property !== 'A') imageCausality.endTrace();
 					// log("loadFromDbIdToImage: " + dbId + " property: " + property + "...finished assigning");
@@ -1634,7 +1638,8 @@
 			// logGroup();
 			// log(dbImage);
 			// log(object);
-			object.const.name = dbImage.const.name; // TODO remove debugg
+			let dbImageName = dbImage.const.name; 
+			object.const.name = dbImageName.substring(0, dbImageName.length - 9);; // TODO remove debugg
 			for (let property in dbImage) {
 				if (property !== 'incoming' && !property.startsWith(eternityTag)) {
 					// log("load property: " + property);
@@ -1958,6 +1963,7 @@
 							// }
 							// if (leastActiveObject !== null) {
 								// log("remove it!!");
+							trace.load && log("unload image " + leastActiveImage.const.name);
 							imageCausality.removeFromActivityList(leastActiveImage);
 							unloadImage(leastActiveImage);
 							// }
@@ -2903,8 +2909,8 @@
 			
 		// Image causality
 		// let imageCausality = requireUncached("causalityjs_advanced");
-		let imageCausality = require("./causality.js")({ 
-			name : 'imageCausality' + (typeof(configuration.name) !== 'undefined') ? configuration.name : "",
+		let imageCausalityConfiguration = { 
+			name : "imageCausality_" + ((typeof(configuration.name) !== 'undefined') ? configuration.name : ""),
 			recordPulseEvents : true, 
 			objectActivityList : true,
 			hideIncoming : false,
@@ -2914,7 +2920,8 @@
 			incomingReferenceCounters : true, 
 			incomingStructuresAsCausalityObjects : true, // Is this static or non static objects? 
 			blockInitializeForIncomingReferenceCounters: true,
-		});
+		}
+		let imageCausality = require("./causality.js")(imageCausalityConfiguration);
 		imageCausality.addPostPulseAction(postImagePulseAction);
 		// imageCausality.addRemovedLastIncomingRelationCallback(function(dbImage) {
 			// //unload image first if not previously unloaded?
@@ -2966,7 +2973,7 @@
 		// log("Assigning causality");
 		Object.assign(objectCausalityConfiguration, configuration.causalityConfiguration);
 		Object.assign(objectCausalityConfiguration, {
-			name: 'objectCausality' + (typeof(configuration.name) !== 'undefined') ? configuration.name : "",
+			name: "objectCausality_" + ((typeof(configuration.name) !== 'undefined') ? configuration.name : ""),
 			recordPulseEvents : true,
 			objectActivityList : true,
 			incomingReferenceCounters : true, 
@@ -3012,6 +3019,7 @@
 		let instance = {};
 		Object.assign(instance, objectCausality);
 		Object.assign(instance, {
+			configuration : configuration,
 			objectCausality : objectCausality, 
 			imageCausality : imageCausality,
 			setPostPulseActionBeforeStorage : setPostPulseActionBeforeStorage,

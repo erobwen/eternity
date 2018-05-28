@@ -1957,10 +1957,11 @@
 			let proxy = new Proxy(createdTarget, handler);
 			
 			handler.const = {
+				configurationName : configuration.name,
+				id: id,
 				incomingReferences : 0, 
 				initializer : initializer,
 				causalityInstance : causalityInstance,
-				id: id,
 				name: createdTarget.name,
 				cacheId : cacheId,
 				forwardsTo : null,
@@ -2092,9 +2093,18 @@
 		 *
 		 **********************************/
 		 
+		function assertInRightInstance(object) {
+			state.blockingInitialize++;
+			if (configuration.name !== object.const.configurationName) {
+				throw new Error("wrong object!");
+			}
+			state.blockingInitialize--;
+		} 
+		
 		function ensureInitialized(handler, target) {
 			if (handler.const.initializer !== null && state.blockingInitialize === 0) {
-				trace.load && log("initialize...");
+				assertInRightInstance(handler.const.object);
+				trace.load && log(configuration.name + ".initialize...");
 				if (trace.basic > 0) { log("initializing..."); logGroup() }
 				let initializer = handler.const.initializer;
 				handler.const.initializer = null;
@@ -3677,7 +3687,7 @@
 		}
 		
 		function registerActivity(handler) {
-			trace.activity && logGroup("registerActivity name=" + handler.target.name);
+			trace.activity && logGroup("registerActivity handler.target.name: " + handler.target.name + " [" + configuration.name + "]");
 			trace.activity && log("activityListFrozen: " + activityListFrozen);
 			trace.activity && trace.set++;
 			if (activityListFrozen === 0 && activityListFirst !== handler ) {
@@ -3685,7 +3695,7 @@
 				activityListFrozen++;
 				state.blockingInitialize++;
 				trace.activity && log("activityListFrozen: " + activityListFrozen);
-				trace.activity && log("handler.const: " + handler.const, 1);
+				trace.activity && log("config: " + handler.const.configurationName);
 				if (activityListFilter === null || activityListFilter(handler.const.object)) {
 					trace.activity && log("allowed...");
 					// log("here2");
