@@ -163,6 +163,7 @@ describe("loading, unloading & unforgottenfication", function () {
 		eternity.trace.unforget = 1;
 		eternity.trace.load = 1;
 		B.C = C;
+		eternity.logActivityList();
 		eternity.flushToDatabase();
 		eternity.logActivityList();
 		log("done...");

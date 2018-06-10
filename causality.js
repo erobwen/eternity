@@ -53,6 +53,8 @@
 			refreshingRepeater : false,
 			refreshingAllDirtyRepeaters : false,
 			
+			activityListFrozen : 0,
+			
 			cachedCallsCount : 0, // Mostly for testing... 
 						
 			inActiveRecording : false,
@@ -1589,7 +1591,7 @@
 			// Manipulate activity list here? why not?
 			trace.activity && log("in set handler...");
 			if (configuration.objectActivityList) registerActivity(this);
-			activityListFrozen++;
+			state.activityListFrozen++;
 			
 			// Pulse start
 			state.inPulse++;
@@ -1644,7 +1646,7 @@
 			if (--state.observerNotificationPostponed === 0) proceedWithPostponedNotifications();
 			if (--state.inPulse === 0) postPulseCleanup();
 			if (trace.set > 0) logUngroup();
-			activityListFrozen--;
+			state.activityListFrozen--;
 			return true;
 		}
 
@@ -3640,7 +3642,7 @@
 		}
 		
 		function ensureInActivityList(object) {
-			activityListFrozen++;
+			state.activityListFrozen++;
 			state.blockingInitialize++;
 			trace.activity && logGroup("ensureInActivityList object.const.name: " + object.const.name + " [" + configuration.name + "]");
 			let handler = object.const.handler;
@@ -3657,28 +3659,33 @@
 				activityListLast = handler;
 			}
 			logUngroup();
-			activityListFrozen--;
+			state.activityListFrozen--;
 			state.blockingInitialize--;
 		}
 		
 		function pokeObject(object) {
-			let tmpFrozen = activityListFrozen;
-			activityListFrozen = 0;
+			let tmpFrozen = state.activityListFrozen;
+			state.activityListFrozen = 0;
 			trace.activity && log("in poke...");
 			registerActivity(object.const.handler);
-			activityListFrozen = tmpFrozen;
+			state.activityListFrozen = tmpFrozen;
 		}
 
 		function removeFromActivityList(proxy) {
-			if (trace.basic) log("<<< removeFromActivityList : "  + proxy.const.name + " >>>");
+			// log("<<< removeFromActivityList : "  + proxy.const.name + " >>>");
+			state.activityListFrozen++;
+			state.blockingInitialize++;
+			// if (trace.basic) 
+			log("<<< removeFromActivityList : "  + proxy.const.name + " >>>");
 			removeFromActivityListHandler(proxy.const.handler);
+			state.blockingInitialize--;
+			state.activityListFrozen--;
 		}
 		
-		let activityListFrozen = 0;
 		function freezeActivityList(action) {
-			activityListFrozen++;
+			state.activityListFrozen++;
 			action();
-			activityListFrozen--;
+			state.activityListFrozen--;
 		}
 		
 		function stacktrace() { 
@@ -3690,7 +3697,7 @@
 		}
 		
 		function logActivityList() {
-			activityListFrozen++;
+			state.activityListFrozen++;
 			state.blockingInitialize++;
 		
 			let current = activityListFirst;
@@ -3710,19 +3717,19 @@
 			log(result + "]");
 			
 			state.blockingInitialize--;
-			activityListFrozen--;
+			state.activityListFrozen--;
 		}
 		
 		function registerActivity(handler) {
 			trace.activity && logGroup("registerActivity handler.const.name: " + handler.const.name + " [" + configuration.name + "]");
 			// trace.activity && log(stacktrace());
-			// trace.activity && log("activityListFrozen: " + activityListFrozen);
+			// trace.activity && log("state.activityListFrozen: " + state.activityListFrozen);
 			trace.activity && trace.set++;
-			if (activityListFrozen === 0 && activityListFirst !== handler ) {
+			if (state.activityListFrozen === 0 && activityListFirst !== handler ) {
 				// log("here");
-				activityListFrozen++;
+				state.activityListFrozen++;
 				state.blockingInitialize++;
-				// trace.activity && log("activityListFrozen: " + activityListFrozen);
+				// trace.activity && log("state.activityListFrozen: " + state.activityListFrozen);
 				// trace.activity && log("config: " + handler.const.configurationName);
 				if (activityListFilter === null || activityListFilter(handler.const.object)) {
 					trace.activity && log("do register...");
@@ -3759,7 +3766,7 @@
 					// logUngroup();
 				}
 				state.blockingInitialize--;
-				activityListFrozen--;
+				state.activityListFrozen--;
 			}
 			trace.activity && trace.set--;
 			trace.activity && logUngroup();

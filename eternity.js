@@ -408,6 +408,7 @@
 			// log("foo");
 			if (typeof(object.const.dbImage) === 'undefined') {
 				let dbImage = createEmptyDbImage(object, potentialParentImage, potentialParentProperty);
+				objectCausality.state.activityListFrozen++;
 				pinImage(dbImage); //TODO: remove... ?
 				objectCausality.ensureInActivityList(object);
 				object.const.dbImage = dbImage;
@@ -415,6 +416,7 @@
 				dbImage.const.name = object.const.name + "(dbImage)";
 				dbImage.const.correspondingObject = object;
 				fillDbImageFromCorrespondingObject(object);
+				objectCausality.state.activityListFrozen--;
 			}
 		}
 		
@@ -1291,9 +1293,9 @@
 				dbIdToDbImageMap[dbId] = dbImage;
 				
 				// Ensure newly saved object in activity list
-				if (typeof(dbImage.const.correspondingObject) !== 'undefined') {
-					objectCausality.ensureInActivityList(dbImage.const.correspondingObject);
-				}
+				// if (typeof(dbImage.const.correspondingObject) !== 'undefined') {
+					// objectCausality.ensureInActivityList(dbImage.const.correspondingObject);
+				// }
 			}
 			
 			// Finish, clean up transaction
@@ -1787,7 +1789,9 @@
 								trace.load && log("unload....");
 
 								objectCausality.removeFromActivityList(leastActiveObject);
+								trace.load && log("...");
 								unloadObject(leastActiveObject);
+								trace.load && log("...");
 							}
 						});
 					});
@@ -1799,8 +1803,11 @@
 		}
 		
 		function unloadObject(object) {
-			trace.load && log("unloadObject id=" + object.const.id + ", name=" + object.const.target.name);
-			objectCausality.freezeActivityList(function() {				
+			// trace.load && log("unloadObject id=" + object.const.id + ", name=" + object.const.target.name);
+			// trace.load && logInfo("unloadObject", object, "const.id", "const.target.name");
+			
+			objectCausality.freezeActivityList(function() {
+				objectCausality.state.blockingInitialize++;
 				trace.load && logGroup("unloadObject " + object.const.name);
 				if (objectCausality.state.emitEventPaused === 0) throw new Error("Expecting no events here!");
 				
@@ -1816,6 +1823,7 @@
 				tryForgetObject(object);
 
 				trace.load && logUngroup();
+				objectCausality.state.blockingInitialize--;
 			});
 		}
 		
