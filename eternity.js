@@ -159,8 +159,6 @@
 						pin(event.object);
 					}
 				});
-				// flushToImages();
-				// unloadAndForgetObjects();			
 			}
 		}
 		
@@ -229,7 +227,7 @@
 		}
 
 		
-		function transferChangesToImage(events) {
+		function transferChangesToImage(events) {  // TODO... what if objects has changed... do we need to rewrite this code to use only event information... 
 			if (trace.eternity) {
 				log("transferChangesToImage");
 				logGroup();
@@ -289,7 +287,7 @@
 			}
 		}
 		
-		function setPropertyOfImageAndFloodCreateNewImages(object, property, objectValue) {
+		function setPropertyOfImageAndFloodCreateNewImages(object, property, objectValue) { // TODO... what if objects has changed... do we need to rewrite this code to use only event information... 
 			// log("setPropertyOfImage: " + property + " = ...");
 			if (trace.eternity) {
 				log(objectCausality.state);
@@ -410,13 +408,14 @@
 			// log("foo");
 			if (typeof(object.const.dbImage) === 'undefined') {
 				let dbImage = createEmptyDbImage(object, potentialParentImage, potentialParentProperty);
-				pinImage(dbImage);
+				pinImage(dbImage); //TODO: remove... ?
+				objectCausality.ensureInActivityList(object);
 				object.const.dbImage = dbImage;
 				dbImage.const.name = object.const.name + "(dbImage..)";
 				dbImage.const.name = object.const.name + "(dbImage)";
 				dbImage.const.correspondingObject = object;
 				fillDbImageFromCorrespondingObject(object);
-			}	
+			}
 		}
 		
 		function fillDbImageFromCorrespondingObject(object) {
@@ -1291,9 +1290,9 @@
 				dbImage.const.serializedMongoDbId = imageCausality.idExpression(dbId);
 				dbIdToDbImageMap[dbId] = dbImage;
 				
-				// Poke newly saved object 
-				if (typeof(dbImage.const.correspondingObject) !== 'undefined') {					
-					objectCausality.pokeObject(dbImage.const.correspondingObject);
+				// Ensure newly saved object in activity list
+				if (typeof(dbImage.const.correspondingObject) !== 'undefined') {
+					objectCausality.ensureInActivityList(dbImage.const.correspondingObject);
 				}
 			}
 			
@@ -1673,6 +1672,7 @@
 				}
 				// log(object);
 			}
+			delete object.const.isUnloaded;
 			loadedObjects++;
 			// log(object);
 			// logUngroup();
@@ -1851,6 +1851,7 @@
 					let isUnloaded = typeof(object.const.initializer) === 'function'
 					let hasNoIncoming = object.const.incomingReferencesCount === 0;
 					trace.load && log("is unloaded: " + isUnloaded);
+					trace.load && log("is unloaded2: " + object.const.isUnloaded);
 					trace.load && log("has no incoming: " + hasNoIncoming + " (count=" + object.const.incomingReferencesCount + ")");
 					trace.load && log("is persistently stored: " + isPersistentlyStored);
 					
@@ -2530,10 +2531,20 @@
 					
 					// Make sure that object beeing destroyed is loaded, so that no data is lost. Dissconnect from image, decrease loaded objects count.
 					objectCausality.pokeObject(toDestroy.const.correspondingObject);
+		
 					delete toDestroy.const.correspondingObject.const.dbImage;
 					delete toDestroy.const.correspondingObject.const.dbId;
 					delete toDestroy.const.correspondingObject;
 					loadedObjects--;
+
+					for(let property in toDestroy) {
+						if(property !== 'incoming' && property !== '_eternityIncomingCount' && property !== 'id') {
+							// log(property);
+							// objectCausality.state.emitEventPaused++; // Pause events to DB... but how to premit events in other directions?... hmmm.. send it through the object layer... with destruction signal...? 
+							delete toDestroy[property]; 
+							// objectCausality.state.emitEventPaused--;
+						}
+					}
 				
 					for(let property in toDestroy) {
 						if(property !== 'incoming' && property !== '_eternityIncomingCount' && property !== 'id') {

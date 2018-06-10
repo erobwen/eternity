@@ -90,72 +90,84 @@ describe("loading, unloading & unforgottenfication", function () {
 			log(result);
             // return result;
 		}
+		
+		function logState()  {
+			// eternity.logActivityList();
+			log("isLoaded(persistent): " + isLoaded(persistent));
+			log("isForgotten(persistent): " + isForgotten(persistent));
+			log("isLoaded(A): " + isLoaded(A));
+			log("isForgotten(A): " + isForgotten(A));
+			log("isLoaded(B): " + isLoaded(B));
+			log("isForgotten(B): " + isForgotten(B));
+			log("isLoaded(C): " + isLoaded(C));
+			log("isForgotten(C): " + isForgotten(C));
+		}
+		
 		log("---------------------------------------------------------------------------------");
 		// Start building a structure
-		eternity.trace.activity = 1;
-		eternity.trace.basic = 1;
 
 		// Setup a starting point (name in const for easy debugging)
 		let A = create({name: "A"});
-		log("-------------");
-		console.log(A.const.name);
+		// log("-------------");
+		// console.log(A.const.name);
 		// A.const.name = "A";
 		// log("-------------");
 
 		let B = create({name: "B"});
-		log("-------------");
+		// log("-------------");
 		// B.const.name = "B";
-		log("-------------");
+		// log("-------------");
 
 		let C = create({name: "C"});
-		log("-------------");
+		// log("-------------");
 		// C.const.name = "C";
-		log("-------------");
+		// log("-------------");
 
 		// persistent.name = "persistent";
 		// persistent.const.name = "Persistent"
 		log("-------------");
-		eternity.logActivityList();
 		eternity.flushToDatabase();
-		return;
+		eternity.logActivityList();
+		// return;
 		log("---------------------------- persistent.A = A; ----------------------------------");
-		eternity.logActivityList();
 		persistent.A = A;
-		eternity.logActivityList();
 		eternity.flushToDatabase();
+		eternity.logActivityList();
 		// log(A.const);
 		log("---------------------------- A.persistent = persistent; ----------------------------------");		
-		log("----");
-		eternity.logActivityList();
 		A.persistent = persistent;
+		eternity.flushToDatabase();
 		eternity.logActivityList();
-		// eternity.flushToDatabase();
-		// eternity.logActivityList();
-		log("----");
-		// return;
 		
 		// Exceed the memory limit (3 objects loaded is too much)
 		log("---------------------------- A.B = B; ----------------------------------");
-		
-		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
-		eternity.logActivityList();
 		A.B = B;
-		eternity.logActivityList();
 		eternity.flushToDatabase();
+		eternity.logActivityList();
+		// eternity.trace.activity = 0;
+		// eternity.trace.basic = 0;
+		// eternity.trace.unforget = 0;
+		// eternity.trace.load = 0;
 		// log()
-		assert.equal(isLoaded(persistent), false);
-        assert.equal(isForgotten(persistent), false);
+		assert.equal(isLoaded(persistent), true);
 		
 		assert.equal(isLoaded(A), true);
 		
-		assert.equal(isLoaded(B), true);
+		assert.equal(isLoaded(B), false);
+        assert.equal(isForgotten(B), false);
 		
 		// Exceed the memory limit again, persistent and A no longer has any incoming references and will be forgeted
 		log("--------------------------- B.C = C; -----------------------------------");
+		eternity.trace.activity = 1;
+		eternity.trace.basic = 1;
+		eternity.trace.unforget = 1;
+		eternity.trace.load = 1;
 		B.C = C;
-		eternity.logActivityList();
 		eternity.flushToDatabase();
 		eternity.logActivityList();
+		log("done...");
+		logState();
+		return;
 
 		// eternity.trace.basic++;
 		// eternity.trace.basic--;
@@ -172,6 +184,7 @@ describe("loading, unloading & unforgottenfication", function () {
 		
 		assert.equal(isLoaded(C), true);
 		
+		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
 		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);
 		log("--------------------------- Touch A.. -----------------------------------");
 		let dummy = A.name;
@@ -239,14 +252,7 @@ describe("loading, unloading & unforgottenfication", function () {
 		return;
 		eternity.logActivityList();
 		log("----------------");
-		eternity.trace.basic = 1;
-		eternity.trace.unforget = 1;
-		eternity.trace.load = 1;
 		eternity.flushToDatabase();
-		eternity.trace.activity = 0;
-		eternity.trace.basic = 0;
-		eternity.trace.unforget = 0;
-		eternity.trace.load = 0;
 		// eternity.trace.basic--;
 		log("----------------------------------");
 		

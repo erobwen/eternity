@@ -1461,7 +1461,7 @@
 				if (trace.get > 0) logUngroup();
 				return this.const;
 			} else {
-				trace.activity && log("in get handler...");
+				trace.activity && log("getHandlerObject: " + key);
 				if (configuration.objectActivityList) registerActivity(this);
 				if (typeof(key) !== 'undefined') {
 					let scan = target;
@@ -3618,6 +3618,11 @@
 			activityListFilter = filter;
 		}
 		
+		function inActivityList(object) {
+			let handler = object.const.handler;
+			return (typeof(handler.inActivityList) !== 'undefined') && handler.inActivityList;			
+		}
+		
 		function getActivityListFirst() {
 			return (activityListFirst !== null) ? activityListFirst.const.object : null;
 		}
@@ -3632,6 +3637,28 @@
 
 		function getActivityListNext(object) {
 			return object.const.handler.activityListNext;
+		}
+		
+		function ensureInActivityList(object) {
+			activityListFrozen++;
+			state.blockingInitialize++;
+			trace.activity && logGroup("ensureInActivityList object.const.name: " + object.const.name + " [" + configuration.name + "]");
+			let handler = object.const.handler;
+			if (typeof(handler.inActivityList) === 'undefined') {
+				// Add last
+				handler.inActivityList = true;
+				handler.activityListNext = null;
+				if (activityListLast !== null) {
+					activityListLast.activityListNext = handler;
+					handler.activityListPrevious = activityListLast;
+				} else {
+					activityListFirst = handler;
+				}
+				activityListLast = handler;
+			}
+			logUngroup();
+			activityListFrozen--;
+			state.blockingInitialize--;
 		}
 		
 		function pokeObject(object) {
@@ -3718,6 +3745,7 @@
 					removeFromActivityListHandler(handler);
 
 					// Add first
+					handler.inActivityList = true;
 					handler.activityListPrevious = null;
 					if (activityListFirst !== null) {
 						activityListFirst.activityListPrevious = handler;
@@ -3751,6 +3779,7 @@
 			if (activityListFirst === handler) {
 				activityListFirst = handler.activityListNext;
 			}
+			delete handler.inActivityList;
 			handler.activityListNext = null;
 			handler.activityListPrevious = null;
 		}
@@ -3880,6 +3909,7 @@
 			getActivityListNext : getActivityListNext,
 			getActivityListPrevious : getActivityListPrevious,
 			pokeObject : pokeObject,
+			ensureInActivityList : ensureInActivityList,
 			removeFromActivityList : removeFromActivityList
 		};
 		Object.assign(causalityInstance, languageExtensions);
