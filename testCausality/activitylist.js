@@ -1,9 +1,17 @@
 const assert = require('assert');
 // const requireUncached = require('require-uncached');
 
-let causality = require('../causality')({objectActivityList : true, useIncomingStructures: true, incomingReferenceCounters : true});
+let causality = require('../causality')({
+	name: "causality.js",
+	objectActivityList : true, 
+	useIncomingStructures: true, 
+	incomingReferenceCounters : true
+});
+let log = causality.log;
+let trace = causality.activateTraceGroup;
+let stopTrace = causality.clearTrace;
 let create = causality.create;
-
+// causality.logTraceGroups();
 // let incoming = require('../incoming');
 
 // let x = create();
@@ -28,10 +36,18 @@ describe("Activity list", function(){
 		let x = create({name: "x"});
 		let y = create({name: "y"});
 		let z = create({name: "z"});
-
+		// log(x);
+		// trace("all");
+		// log("---------------------------------------");
 		x.fooX = 3;
 		y.fooY = 31;
 		z.fumZ = 3;
+	
+		// log("---------------------------------------");
+		// log(causality.getActivityListFirst());
+		
+		// stopTrace(); return; //---------------------------
+		
 		assert.equal("z", causality.getActivityListFirst().name);
 
 		x.f = 3;

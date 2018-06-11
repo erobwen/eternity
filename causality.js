@@ -11,21 +11,10 @@
 	let objectlog = require('./objectlog.js');
 	
 	function createCausalityInstance(configuration) {
-		// objectlog.log("createCausalityInstance: " + configuration.name);
-		// objectlog.group();
-		// objectlog.log(configuration,5);
-		// objectlog.groupEnd();
 		
-		// Tracing per instance 
-		let trace = { 
-			basic : 0, 
-			incoming: 0,
-			set: 0,
-			get: 0,
-			refCount : 0,
-			pulse : 0,
-			event : 0
-		};
+		/*-----------------------------------------------
+		 *          State
+		 *-----------------------------------------------*/
 		
 		// Class registry
 		let classRegistry =  {};
@@ -92,22 +81,110 @@
 		 *  Debugging
 		 *
 		 ***************************************************************/
-		 
-		 // Debugging
-		function log(entity, pattern) {
+
+		// objectlog.log("createCausalityInstance: " + configuration.name);
+		// objectlog.group();
+		// objectlog.log(configuration,5);
+		// objectlog.groupEnd();
+		
+		/*-----------------------------------------------
+		 *          Trace setup
+		 *-----------------------------------------------*/
+
+		// Tracing per instance 
+		let trace = {};
+		
+		let traceGroups = {
+			all : null
+		};
+		
+		function initializeTrace() {
+			for(let group in traceGroups) {
+				trace[group] = 0;
+			} 
+		}
+		
+		function isSubGroupOrSameGroup(child, potentialAncestor) {
+			let currentGroup = child;
+			do {
+				result = (currentGroup === potentialAncestor);
+				if (typeof(traceGroups[currentGroup]) === 'undefined') 
+					throw new Error("No parent for trace group: " + currentGroup);
+				currentGroup = traceGroups[currentGroup];
+			} while(currentGroup !== null && !result);
+			return result;
+		}
+		
+		function activateTraceGroup(activatedGroup) {
+			objectlog.log("activateTraceGroup: " + activatedGroup);
+			for(let group in traceGroups) {
+				if (isSubGroupOrSameGroup(group, activatedGroup))
+					trace[group]++;
+			}
+			objectlog.log(trace);
+		}
+		
+		function clearTraceGroup(activatedGroup) {
+			objectlog.log("clearTraceGroup: " + activatedGroup);
+			for(let group in traceGroups) {
+				if (isSubGroupOrSameGroup(group, activatedGroup))
+					trace[group]--;
+			}
+			objectlog.log(trace);
+		}
+				
+		function clearTrace() {
+			initializeTrace();
+		}
+
+		function logTraceGroups() {
+			let traceGroupObjects = {};
+			for(group in traceGroups) {
+				traceGroupObjects[group] = {};
+			}
+			for(group in traceGroups) {
+				let parent = traceGroups[group];
+				if (parent !== null)
+					traceGroupObjects[parent][group] = traceGroupObjects[group];
+			}
+			let root = {};
+			for(group in traceGroupObjects) {
+				let parent = traceGroups[group];
+				if (parent === null) {
+					root[group] = traceGroupObjects[group];
+				}
+			}
+			objectlog.log(root, 10);
+		}
+		
+		/*-----------------------------------------------
+		 *          Logging
+		 *-----------------------------------------------*/
+		
+		function beforeLogging() {
 			state.recordingPaused++;
-			updateContextState();
-			objectlog.log(entity, pattern);
+			state.activityListFrozen++;
+			state.blockingInitialize++;
+			updateContextState();			
+		}
+		
+		function afterLogging() {
 			state.recordingPaused--;	
-			updateContextState();
+			state.activityListFrozen--;
+			state.blockingInitialize--;
+			updateContextState();			
+		}
+		
+		function log(entity, pattern) {
+			beforeLogging();
+			objectlog.log(entity, pattern);
+			afterLogging();
 		}
 		
 		function logGroup(entity, pattern) {
-			state.recordingPaused++;
-			updateContextState();
+			beforeLogging();
 			objectlog.group(entity, pattern);
-			state.recordingPaused--;
-			updateContextState();
+			afterLogging();
 		} 
 		
 		function logUngroup() {
@@ -115,15 +192,59 @@
 		} 
 	
 		function logToString(entity, pattern) {
-			state.recordingPaused++;
-			updateContextState();
+			beforeLogging();
 			let result = objectlog.logToString(entity, pattern);
-			state.recordingPaused--;
-			updateContextState();
+			afterLogging();
 			return result;
 		}
 		
+		function extract(entity, path) {
+			beforeLogging();
+			let result = entity;
+			let parts = path.split(".");
+			for (const part of parts) {
+				result = result[part.toString()];
+			}
+			afterLogging();
+			return result;
+		}
 		
+		function valueToString(value) {
+			if (isObject(value)) {
+				return "object:" + value.const.id;
+			} else if (typeof(value) !== 'object'){
+				return value;
+			} else {
+				return value;
+			}
+		}
+		
+		function objectDigest(object) {
+			beforeLogging();
+			let result; 
+			if (isObject(object)) {
+				let name = "undefined";
+				if (typeof(object.const.target.name) !== 'undefined') {
+					name = object.const.target.name;
+				} else if (typeof(object.const.name) !== 'undefined') {
+					name = object.const.name;
+				}
+				result = "[" + getClassName(object) + "." + name + "(" + object.const.id + ")]"; 
+			} else if(object === null) {
+				result = "[null]";
+			} else if(typeof(object) === 'undefined') {
+				result = "[undefined]";
+			} else {
+				result = typeof(object);
+			}
+			afterLogging();
+			return result;
+		} 
+
+		function getClassName(object) {
+			return Object.getPrototypeOf(object).constructor.name
+		}
+
 		/***************************************************************
 		 *
 		 *  Id format
@@ -356,6 +477,7 @@
 		/**
 		 * Traverse the incoming relation structure
 		 */
+		 traceGroups["get"] = null; // This is not under all, since it is too verbose!
 		function getReferredObject(referredItem) {
 			trace.get && logGroup("getReferredObject");
 			if (typeof(referredItem) === 'object' && referredItem !== null) {
@@ -380,6 +502,7 @@
 			return newArray;
 		}
 		
+		traceGroups.incoming = "all";
 		function getSingleIncomingReference(object, property, filter) {
 			trace.incoming && log("getSingleIncomingReference");
 			let result = null;
@@ -518,12 +641,12 @@
 			while (typeof(objectProxy.indexParent) !==  'undefined') {
 				referringRelation = objectProxy.indexParentRelation;
 				objectProxy = objectProxy.indexParent;				
-				if (trace.incoming) {
-					log("Get refering object... one step:");
-					log(referringRelation);
-					log(objectProxy);
-					log("...");
-				}
+				// if (trace.incoming) { // Safe trace?
+					// log("Get refering object... one step:");
+					// log(referringRelation);
+					// log(objectProxy);
+					// log("...");
+				// }
 			}
 			referringRelation = "property:" + referringRelation;
 			// trace.incoming && log("referringRelation : " + referringRelation);
@@ -541,11 +664,11 @@
 
 			// Setup structure to new value
 			if (isObject(value)) {
-				if (trace.basic) log("really creating incoming structure");
+				trace.incoming && log("really creating incoming structure");
 				
 				let referencedValue = createAndAddReverseReferenceToIncomingStructure(objectProxy, objectProxy.const.id, referringRelation, value);
-				if (trace.basic) log(referringRelation);
-				if (trace.basic) log(getIncoming(value));
+				trace.incoming && log(referringRelation);
+				// trace.incoming && log(getIncoming(value)); // Not safe log!
 				
 				if (getIncoming(value) && getIncoming(value)[referringRelation].observers) {
 					notifyChangeObservers(getIncoming(value)[referringRelation].observers);
@@ -725,8 +848,9 @@
 			return typeof(entity) === 'object' && entity !== null && typeof(entity.isReferencesChunk) !== 'undefined';
 		}
 		
+		traceGroups.incomingStructure = "incoming";
 		function tryRemoveIncomingStructure(structure) {
-			trace.incoming && log("tryRemoveIncomingStructure");
+			trace.incomingStructure && log("tryRemoveIncomingStructure");
 			if (structure.isList && structure.first === null && structure.last === null) {
 				let tryRemoveParent = null;
 				
@@ -735,17 +859,17 @@
 				}
 				
 				if (typeof(structure.isListElement) !== 'undefined') {
-					trace.incoming && log("ListElement");
+					trace.incomingStructure && log("ListElement");
 					// log(structure, 1);
 					if (structure.parent.first === structure) {						
-						trace.incoming && log("HERE!!!!!");
+						trace.incomingStructure && log("HERE!!!!!");
 						structure.parent.first = structure.next;
-						trace.incoming && log(structure.parent.first);
+						trace.incomingStructure && log(extract(structure, "parent.first"));
 					}
 					if (structure.parent.last === structure) {
-						trace.incoming && log("HERE TOOO!!!!!");
+						trace.incomingStructure && log("HERE TOOO!!!!!");
 						structure.parent.last = structure.previous;
-						trace.incoming && log(structure.parent.first);
+						trace.incomingStructure && log(extract(structure, "parent.first"));
 					}
 					if (structure.next !== null) {
 						structure.next.previous = structure.previous;
@@ -761,7 +885,7 @@
 					// log(structure.parent, 1);
 					// log(structure.parent.first === structure);
 					if (structure.parent.first === null && structure.parent.last === null) {
-						trace.incoming && log("parent was emptied!!!");
+						trace.incomingStructure && log("parent was emptied!!!");
 						tryRemoveParent = structure.parent;
 					}
 					if (typeof(structure.isIncomingPropertyStructure) !== 'undefined') {
@@ -769,12 +893,12 @@
 					}					
 					structure.parent = null;
 				} else if (typeof(structure.isIncomingStructureRoot) !== 'undefined') {
-					trace.incoming && log("IncomingStructureRoot");
+					trace.incomingStructure && log("IncomingStructureRoot");
 					let referredObject = structure.referredObject;
 					deleteIncoming(referredObject);
 					delete structure.referredObject;
 				} else if (typeof(structure.isSpecifier) !== 'undefined') {
-					trace.incoming && log("Specifier");
+					trace.incomingStructure && log("Specifier");
 					tryRemoveParent = structure.parent;
 					let referredObject = structure.referredObject;
 					delete structure.parent[structure.specifierName];
@@ -793,8 +917,8 @@
 		* Structure helpers
 		*/				
 		function removeReverseReference(refererId, referencesChunk) {
-			trace.incoming && log("removeReverseReference");
-			if (trace.incoming) {
+			trace.incomingStructure && log("removeReverseReference");
+			if (trace.incomingStructure) {
 				logGroup("removeReverseReference");
 				// log(refererId);
 				// log(referencesChunk, 3);
@@ -803,11 +927,11 @@
 			delete referencesChunkContents[idExpression(refererId)];
 			referencesChunk.contentsCounter--;
 			if (referencesChunk.contentsCounter === 0) {
-				trace.incoming && log("hit zero!");
+				trace.incomingStructure && log("hit zero!");
 				// delete referencesChunk.contents;
 				tryRemoveIncomingStructure(referencesChunk);
 			}
-			trace.incoming && logUngroup();
+			trace.incomingStructure && logUngroup();
 		}
 		
 		
@@ -910,6 +1034,7 @@
 		 *
 		 ***************************************************************/
 
+		 traceGroups.refCount = "incoming"; 
 		function checkIfNoMoreReferences(object) {
 			if (object.const.incomingReferencesCount === 0 && removedLastIncomingRelationCallback) {
 				trace.refCount && log("removed last reference... ");
@@ -1439,10 +1564,12 @@
 		 *  Object Handlers
 		 *
 		 ***************************************************************/
-		
+		 
+		traceGroups.register = "all";
+		traceGroups.notifyChange = "all";
 		function getHandlerObject(target, key) {
 			if (trace.get > 0) {
-				logGroup("getHandlerObject: "  + this.const.name + "." + key);
+				logGroup("getHandlerObject: "  + extract(this, "const.name") + "." + key);
 			}
 			key = key.toString();
 			ensureInitialized(this, target);
@@ -1463,7 +1590,7 @@
 				if (trace.get > 0) logUngroup();
 				return this.const;
 			} else {
-				trace.activity && log("getHandlerObject: " + key);
+				trace.get && log("getHandlerObject... " + key);
 				if (configuration.objectActivityList) registerActivity(this);
 				if (typeof(key) !== 'undefined') {
 					let scan = target;
@@ -1479,7 +1606,7 @@
 					let keyInTarget = key in target;
 					if (state.inActiveRecording) {
 						// if (keyInTarget) {
-							// trace.register && log("registerChangeObserver: " + this.const.id + "." + key);
+							trace.register && log("registerChangeObserver: " + extract(this, "const.id") + "." + key);
 							registerChangeObserver(getSpecifier(getSpecifier(this.const, "_propertyObservers"), key));
 						// } else {
 							// // trace.register && log("registerChangeObserver: " + this.const.id + "." + key);
@@ -1499,37 +1626,19 @@
 			}
 		}
 				
-		function valueToString(value) {
-			if (isObject(value)) {
-				return "object:" + value.const.id;
-			} else if (typeof(value) !== 'object'){
-				return value;
-			} else {
-				return value;
-			}
-		}
 		
-		function objectDigest(object) {
-			state.recordingPaused++;
-			updateContextState();
-			let result = "[" + getClassName(object) + "." + object.const.id + "]"; // TODO: add name if any... 
-			state.recordingPaused--;
-			updateContextState();
-			return result;
-		} 
-
-		function getClassName(object) {
-			return Object.getPrototypeOf(object).constructor.name
-		}
-
-		
+		traceGroups.set = "all";	
 		function setHandlerObject(target, key, value) {
 			// log("setHandlerObject" + key);
 			if (configuration.reactiveStructuresAsCausalityObjects && key === '_cachedCalls') throw new Error("Should not be happening!");
 			
 			// Ensure initialized
 			if (trace.set > 0) {
-				logGroup("setHandlerObject: " + objectDigest(this.const.object) + "." + key + " = " + valueToString(value));
+				let object = extract(this, "const.object");
+				log(object);
+				let digest = objectDigest(object)
+				log(digest);
+				logGroup("setHandlerObject: " + digest + "." + key + " = " + valueToString(value));
 				log(value);
 				// throw new Error("What the actual fuck, I mean jesuz..!!!");
 			}
@@ -1589,7 +1698,7 @@
 			}
 			
 			// Manipulate activity list here? why not?
-			trace.activity && log("in set handler...");
+			trace.activity && log("in set handler..." + key);
 			if (configuration.objectActivityList) registerActivity(this);
 			state.activityListFrozen++;
 			
@@ -1612,7 +1721,7 @@
 			
 			// Update incoming reference counters
 			if (configuration.incomingReferenceCounters){
-				trace.basic && log("use incoming reference counters...");
+				trace.refCount && log("use incoming reference counters...");
 				if (configuration.incomingStructuresAsCausalityObjects) {
 					increaseIncomingCounter(valueOrIncomingStructure);					
 					decreaseIncomingCounter(previousValueOrIncomingStructure);
@@ -1827,9 +1936,10 @@
 			nextId = 0;
 		}
 		
-		
+		traceGroups.create = "all";
+		traceGroups.reCreate = "create";
 		function create(source, cacheIdOrInitData) { // #maincreate
-			if (trace.basic > 0) {
+			if (trace.create > 0) {
 				log("create, target type: " + typeof(source));
 				logGroup();
 			}
@@ -2054,7 +2164,7 @@
 				}				
 			}
 
-			if (trace.basic > 0) logUngroup();
+			if (trace.create > 0) logUngroup();
 			return proxy;
 		}
 
@@ -2103,16 +2213,15 @@
 			state.blockingInitialize--;
 		} 
 		
+		traceGroups.initialize = "all";
 		function ensureInitialized(handler, target) {
 			if (handler.const.initializer !== null && state.blockingInitialize === 0) {
 				assertInRightInstance(handler.const.object);
-				trace.load && log(configuration.name + ".initialize...");
-				if (trace.basic > 0) { log("initializing..."); logGroup() }
+				trace.initialize && logGroup("initializing..."); 
 				let initializer = handler.const.initializer;
 				handler.const.initializer = null;
 				initializer(handler.const.object);
-				trace.load && log("done...");
-				if (trace.basic > 0) logUngroup();
+				trace.initialize && logUngroup();
 			}
 		}
 		
@@ -2178,6 +2287,7 @@
 			}			
 		}
 		
+		traceGroups.context = "all";
 		function removeChildContexts(context) {
 			// delete context.parent; // do not remove parent reference!
 			
@@ -2310,7 +2420,8 @@
 		 *
 		 *  Upon change do
 		 **********************************/
-		
+		 
+		traceGroups.pulse = "all";
 		function pulse(action) {
 			// if (state.noPulse) throw new Error("There should not be any pulse!");
 			trace.pulse && logGroup("pulse (" + configuration.name + ")");
@@ -2510,7 +2621,9 @@
 				emitEvent(handler, {type: 'delete', property: key, oldValue: previousValue});
 			}
 		}
-
+		
+		
+		traceGroups.event = "all";
 		function emitEvent(handler, event) {
 			// if (event.type === "set" && typeof(event.value) === 'undefined') throw new Error("WTF WTF");
 			if (trace.event) {
@@ -2762,12 +2875,12 @@
 		let lastObserverToNotifyChange = null;
 		
 		function proceedWithPostponedNotifications() {
-			trace.set && logGroup("proceedWithPostponedNotifications");
-			trace.set && log("state.observerNotificationPostponed: " + state.observerNotificationPostponed);
+			trace.notifyChange && logGroup("proceedWithPostponedNotifications");
+			trace.notifyChange && log("state.observerNotificationPostponed: " + state.observerNotificationPostponed);
 			if (state.observerNotificationPostponed === 0) {
-				trace.set && log(nextObserverToNotifyChange);
+				trace.notifyChange && log(nextObserverToNotifyChange);
 				while (nextObserverToNotifyChange !== null) {
-					trace.set && log("found an observer to notify...")
+					trace.notifyChange && log("found an observer to notify...")
 					let recorder = nextObserverToNotifyChange;
 					nextObserverToNotifyChange = nextObserverToNotifyChange.nextToNotify;
 					if (nextObserverToNotifyChange === null) lastObserverToNotifyChange = null;
@@ -2776,7 +2889,7 @@
 					// });
 				}
 			}
-			trace.set && logUngroup();
+			trace.notifyChange && logUngroup();
 		}
 
 		function nullifyObserverNotification(callback) {
@@ -2789,8 +2902,8 @@
 		// Recorders is a map from id => recorder
 		// A bit like "for all incoming"...
 		function notifyChangeObservers(observers) {
-			trace.set && log("notifyChangeObservers...");
-			trace.set && log("state.observerNotificationNullified: " + state.observerNotificationNullified);
+			trace.notifyChange && log("notifyChangeObservers...");
+			trace.notifyChange && log("state.observerNotificationNullified: " + state.observerNotificationNullified);
 			if (typeof(observers.isChunkListHead) !== 'undefined') {
 				if (state.observerNotificationNullified > 0) {
 					return;
@@ -2798,7 +2911,7 @@
 
 				let contents = observers.contents;
 				for (id in contents) {
-					// trace.set && log("notifying a change observer!!!");
+					// trace.notifyChange && log("notifying a change observer!!!");
 					notifyChangeObserver(contents[id]);
 				}
 
@@ -2816,22 +2929,22 @@
 		}
 
 		function notifyChangeObserver(observer) {
-			trace.set && logGroup("notifyChangeObserver");
-			trace.set && log(observer);
+			trace.notifyChange && logGroup("notifyChangeObserver");
+			trace.notifyChange && log(observer);
 			// if (observer != state.context) {
 			if (observer !== state.activeRecording) {
-				trace.set && log("not writing to itself...");
+				trace.notifyChange && log("not writing to itself...");
 				if (typeof(observer.remove) === 'function') {
-					trace.set && log("removing observer	...");
+					trace.notifyChange && log("removing observer	...");
 					observer.remove(); // Cannot be any more dirty than it already is!					
 				}
-				trace.set && log("state.observerNotificationPostponed: " + state.observerNotificationPostponed);
+				trace.notifyChange && log("state.observerNotificationPostponed: " + state.observerNotificationPostponed);
 				if (state.observerNotificationPostponed > 0) {
 					if (lastObserverToNotifyChange !== null) {
-						trace.set && log("Add last...");
+						trace.notifyChange && log("Add last...");
 						lastObserverToNotifyChange.nextToNotify = observer;
 					} else {
-						trace.set && log("Add first and last...");
+						trace.notifyChange && log("Add first and last...");
 						nextObserverToNotifyChange = observer;
 					}
 					lastObserverToNotifyChange = observer;
@@ -2841,9 +2954,9 @@
 					// });
 				}
 			} else {
-				trace.set && log("observer same as microcontext, do not notify self!!!");
+				trace.notifyChange && log("observer same as microcontext, do not notify self!!!");
 			}
-			trace.set && logUngroup();
+			trace.notifyChange && logUngroup();
 		}
 
 
@@ -3611,10 +3724,11 @@
 		 *   Object activity list
 		 *
 		 ************************************************************************/
-		 
+		
 		let activityListFirst = null; 
 		let activityListLast = null; 
 		let activityListFilter = null;
+		traceGroups.activity = "all";
 		
 		function setActivityListFilter(filter) {
 			activityListFilter = filter;
@@ -3675,7 +3789,7 @@
 			// log("<<< removeFromActivityList : "  + proxy.const.name + " >>>");
 			state.activityListFrozen++;
 			state.blockingInitialize++;
-			// if (trace.basic) 
+			// if (trace.activity) 
 			log("<<< removeFromActivityList : "  + proxy.const.name + " >>>");
 			removeFromActivityListHandler(proxy.const.handler);
 			state.blockingInitialize--;
@@ -3719,29 +3833,24 @@
 			state.blockingInitialize--;
 			state.activityListFrozen--;
 		}
-		
+				
+		traceGroups.registerActivity = "activity";
 		function registerActivity(handler) {
-			trace.activity && logGroup("registerActivity handler.const.name: " + handler.const.name + " [" + configuration.name + "]");
-			// trace.activity && log(stacktrace());
-			// trace.activity && log("state.activityListFrozen: " + state.activityListFrozen);
-			trace.activity && trace.set++;
+			trace.registerActivity && log("registerActivity handler.const.name: " + handler.const.name);
+
+			state.blockingInitialize++;			
+			trace.registerActivity && trace.set++;
+			
 			if (state.activityListFrozen === 0 && activityListFirst !== handler ) {
-				// log("here");
 				state.activityListFrozen++;
-				state.blockingInitialize++;
-				// trace.activity && log("state.activityListFrozen: " + state.activityListFrozen);
-				// trace.activity && log("config: " + handler.const.configurationName);
+				trace.registerActivity && log("maybe...");
 				if (activityListFilter === null || activityListFilter(handler.const.object)) {
-					trace.activity && log("do register...");
-					// log("here2");
+					trace.registerActivity && log("do register...");
 								
-					if (trace.activity) {
-						// throw new Error("see ya");
+					if (trace.registerActivity) {
 						log("<<< registerActivity: "  + handler.const.name + " >>>");
-						// log(activityListFilter(handler.const.object));
 					}
-					// logGroup();
-					// log(handler.target);
+
 					// Init if not initialized
 					if (typeof(handler.activityListNext) === 'undefined') {
 						handler.activityListNext = null;
@@ -3762,14 +3871,22 @@
 					}
 					activityListFirst = handler;				
 					
-					if (trace.basic) logActivityList();
+					if (trace.registerActivity) logActivityList();
 					// logUngroup();
+				} else {
+					if (trace.registerActivity) log("Rejected by filter...");				
 				}
-				state.blockingInitialize--;
 				state.activityListFrozen--;
+			} else {
+				if (trace.registerActivity) {
+					if (state.activityListFrozen) log("Activity list frozen: " + state.activityListFrozen);				
+					if (activityListFirst === handler) log("Already first in list");
+				}
 			}
-			trace.activity && trace.set--;
-			trace.activity && logUngroup();
+			trace.registerActivity && trace.set--;
+			trace.registerActivity && logUngroup();
+			
+			state.blockingInitialize--;
 		}
 		
 		function removeFromActivityListHandler(handler) {
@@ -3808,6 +3925,7 @@
 		 *
 		 ************************************************************************/
 
+		initializeTrace();
 		
 		// Language extensions
 		let languageExtensions = {
@@ -3855,16 +3973,27 @@
 		
 		// Debugging and testing
 		let debuggingAndTesting = {
+			logTraceGroups : logTraceGroups,
+			activateTraceGroup : activateTraceGroup,
+			clearTraceGroup : clearTraceGroup,
+			clearTrace : clearTrace,
+			
+			beforeLogging : beforeLogging,
+			afterLogging : afterLogging,
+			
 			log : log, 
 			logGroup : logGroup, 
 			logUngroup : logUngroup,
 			logToString : logToString,
+			
 			observeAll : observeAll,
+			
 			cachedCallCount : cachedCallCount,
 			clearRepeaterLists : clearRepeaterLists,
 			resetObjectIds : resetObjectIds,
+			
 			getInPulse : getInPulse,
-			trace : trace
+			
 		}
 			
 		/**
@@ -3981,10 +4110,7 @@
 		
 		// Create configuration signature
 		let configuration = sortedKeys(defaultConfiguration);
-		let signature = JSON.stringify(configuration);
-		// log("================= REQUEST: ==========");
-		// log(signature);
-		
+		let signature = JSON.stringify(configuration);		
 		if (typeof(configurationToSystemMap[signature]) === 'undefined') {
 			configurationToSystemMap[signature] = createCausalityInstance(configuration);
 		}
