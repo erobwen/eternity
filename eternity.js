@@ -1218,10 +1218,10 @@
 		
 		 
 		function twoPhaseComit() {
-			// while(!oneStepTwoPhaseCommit()) {}
-			// pendingUpdate = null;
-			// if (configuration.twoPhaseComit) mockMongoDB.updateRecord(updateDbId, { name: "updatePlaceholder", _eternityIncomingCount : 1 });
-			// return;
+			while(!oneStepTwoPhaseCommit()) {}
+			pendingUpdate = null;
+			if (configuration.twoPhaseComit) mockMongoDB.updateRecord(updateDbId, { name: "updatePlaceholder", _eternityIncomingCount : 1 });
+			return;
 
 			// log("twoPhaseComit:");
 			// logGroup();
