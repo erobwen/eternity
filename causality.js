@@ -2091,10 +2091,12 @@
 		 
 		function ensureInitialized(handler, target) {
 			if (handler.const.initializer !== null && state.blockingInitialize === 0) {
+				trace.load && log("initialize...");
 				if (trace.basic > 0) { log("initializing..."); logGroup() }
 				let initializer = handler.const.initializer;
 				handler.const.initializer = null;
 				initializer(handler.const.object);
+				trace.load && log("done...");
 				if (trace.basic > 0) logUngroup();
 			}
 		}
