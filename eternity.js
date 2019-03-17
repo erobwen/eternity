@@ -2530,35 +2530,31 @@
 				// Destroy those left in the destruction list. 
 				if (!isEmptyList(gcState, destructionZone)) {
 					// log("<<<<                 >>>>>");
-					trace.gc && log("<<<< Destroy ......  >>>>>");
-					// log("<<<<                 >>>>>");
+					trace.gc && log("<<<< Destroy ......  >>>>>");					
+					let toDestroyImage = removeFirstFromList(gcState, destructionZone);
+					let object = toDestroyImage.const.correspondingObject;
 					
-					// When i2 is unpersited:
-					// first load from i2 to o2 to make sure no info is lost.
-					// o1 ->  o2  ->  o3
-					//  |      x      |
-					// i1 ->  i2 -x-> i3
-					
-					let toDestroy = removeFirstFromList(gcState, destructionZone);
-					
-					// Make sure that object beeing destroyed is loaded, so that no data is lost. Dissconnect from image, decrease loaded objects count.
-					objectCausality.pokeObject(toDestroy.const.correspondingObject);
-					delete toDestroy.const.correspondingObject.const.dbImage;
-					delete toDestroy.const.correspondingObject.const.dbId;
-					delete toDestroy.const.correspondingObject;
+					delete toDestroyImage.const.correspondingObject.const.dbImage;
+					delete toDestroyImage.const.correspondingObject.const.dbId;
+					delete toDestroyImage.const.correspondingObject;
 					loadedObjects--;
 				
-					for(let property in toDestroy) {
+					// The destroyed image should be cleaned up automatically as incoming references to it should be going down to 0 eventually (there is no spanning tree and all siblings are getting destroyed)
+					for(let property in toDestroyImage) {
 						if(property !== 'incoming' && property !== '_eternityIncomingCount' && property !== 'id') {
 							// log(property);
 							imageCausality.state.incomingStructuresDisabled++; // Activate macro events.
-							delete toDestroy[property]; 
+							delete toDestroyImage[property]; 
 							imageCausality.state.incomingStructuresDisabled--;
 						}
 					}
+          
+          for(let property in object) {
+						if(property !== 'incoming' && property !== 'observers') {
+							delete object[property]; 
+						}
+					}
 					
-					// The destroyed image should be cleaned up automatically as incoming references to it should be going down to 0 eventually (there is no spanning tree and all siblings are getting destroyed)
-
 					return false;
 				}
 				
@@ -2941,46 +2937,6 @@
     // });
 
 		imageCausality.addPostPulseAction(postImagePulseAction);
-		// imageCausality.addRemovedLastIncomingRelationCallback(function(dbImage) {
-			// //unload image first if not previously unloaded?
-			// // log(dbImage.const.isObjectImage);
-			// // log(dbImage.const.dbId);
-			// if (!dbImage.const.isObjectImage) {
-				// if (!imageCausality.isIncomingStructure(dbImage)) {
-					// // log("forgetting spree");
-					// if (forgetImageIfDissconnectedAndNonReferred(dbImage)) {
-						// deallocateInDatabase(dbImage);
-						// // TODO: check if this part of iteration, move iteration if so... 
-					// }
-				// }
-				// // TODO:
-				// // else {
-					// // if (forgetImageIfDissconnectedAndNonReferred(dbImage)) {
-						// // deallocateInDatabase(dbImage);
-						// // // TODO: check if this part of iteration, move iteration if so... 
-					// // }
-				// // }
-			// } else {
-				// if (inList(deallocationZone, dbImage)) {
-					// removeFirstFromList(gcState, deallocationZone, dbImage);
-					// // removeFromList(gcState, deallocationZone, dbImage);
-				// // if (typeof(dbImage._eternityDismanteled) !== 'undefined' && dbImage._eternityDismanteled === true) {
-					// unpersistObjectOfImage(dbImage);
-				// }
-			// }
-		// });
-		
-		// function unpersistObjectOfImage(dbImage) {
-			// // Dissconnect from object and deallocate.
-			// delete dbImage.const.correspondingObject.const.dbImage;
-			// objectCausality.removeFromActivityList(dbImage.const.correspondingObject);
-			// delete dbImage.const.correspondingObject;
-
-			// if (forgetImageIfDissconnectedAndNonReferred(dbImage)) {						
-				// deallocateInDatabase(dbImage);
-			// }			
-		// }
-
 
 		/*-----------------------------------------------
 		 *           Setup object causality
