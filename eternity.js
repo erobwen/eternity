@@ -899,10 +899,20 @@
 						// Find image to deallocate:
 						if (imageCausality.isObject(event.oldValue) && event.oldValue._eternityIncomingCount === 0) {
 							if (typeof(event.oldValue.const.dbId) !== 'undefined') {
+                let toDestroyImage = event.oldValue;
 								let dbId = event.oldValue.const.dbId;
 
+                // Decouple from any object 
+                if (typeof(toDestroyImage.const.correspondingObject) !== "undefined") {
+                  let correspondingObject = toDestroyImage.const.correspondingObject;
+                  delete correspondingObject.const.dbImage;
+                  delete correspondingObject.const.dbId;
+                  delete toDestroyImage.const.correspondingObject;
+                  loadedObjects--;
+                }
+                              
+                // Target for destruction in update
 								compiledUpdate.imageDeallocations[dbId] = true;
-
 								if (typeof(compiledUpdate.imageUpdates[dbId])) {
 									delete compiledUpdate.imageUpdates[dbId];
 								}					
@@ -2340,7 +2350,7 @@
 					let referer = contents[id];
 					// log("Try reconnect with: " + referer.const.name);
 					if ((typeof(referer._eternityParent) !== 'undefined' 
-						&& !inList(unstableZone, referer) 
+						&& !inList(unstableZone, referer) // Consider: Do we need to check more zones?
 						&& !inList(destructionZone, referer)) 
 						|| referer === instance.persistent.const.dbImage) { // && !inList(destructionZone, referer) && !inList(unstableZone, referer)
 						// log("Connecting!!!!");
@@ -2533,22 +2543,7 @@
 					trace.gc && log("<<<< Destroy ......  >>>>>");					
 					let toDestroyImage = removeFirstFromList(gcState, destructionZone);
 					let object = toDestroyImage.const.correspondingObject;
-					
-					delete toDestroyImage.const.correspondingObject.const.dbImage;
-					delete toDestroyImage.const.correspondingObject.const.dbId;
-					delete toDestroyImage.const.correspondingObject;
-					loadedObjects--;
-				
-					// The destroyed image should be cleaned up automatically as incoming references to it should be going down to 0 eventually (there is no spanning tree and all siblings are getting destroyed)
-					for(let property in toDestroyImage) {
-						if(property !== 'incoming' && property !== '_eternityIncomingCount' && property !== 'id') {
-							// log(property);
-							imageCausality.state.incomingStructuresDisabled++; // Activate macro events.
-							delete toDestroyImage[property]; 
-							imageCausality.state.incomingStructuresDisabled--;
-						}
-					}
-          
+					          
           for(let property in object) {
 						if(property !== 'incoming' && property !== 'observers') {
 							delete object[property]; 

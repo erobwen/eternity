@@ -45,7 +45,7 @@ describe("basics", function () {
 		assert.equal(true, typeof(persistent.foo) === 'undefined');
 	});
 	
-    it('should save persistent globals', function () {
+  it('should save persistent globals', function () {
 		// log("=============================");
 		let A = create({name : 'A'});
 		persistent.A = A;
@@ -61,7 +61,7 @@ describe("basics", function () {
 		clearDatabaseAndClearMemory();
 	});
 	
-    it('should save refered objects recursivley', function () {
+  it('should save refered objects recursivley', function () {
 		// log("=============================");
 		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);
 		

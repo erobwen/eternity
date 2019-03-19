@@ -36,6 +36,7 @@ describe("garbage-collection", function () {
 		eternity.flushToDatabase();
 		// log(eternity.mockMongoDB.getAllRecordsParsed(), 10);
 		assert.equal(typeof(a.const.dbImage) !== 'undefined', true);
+		logToFile(eternity.mockMongoDB.getAllRecordsParsed(), 10, "./databaseDump.json");
 		// eternity.trace.flush = 0;
 		
 		eternity.flushToDatabase();
@@ -64,21 +65,20 @@ describe("garbage-collection", function () {
 		// log("3");
 		eternity.oneStepCollection();
 		eternity.flushToDatabase();
-		logToFile(eternity.mockMongoDB.getAllRecordsParsed(), 10, "./databaseDump.json");
 		
 		// log("4");
 		// eternity.trace.refc = true;
 		eternity.oneStepCollection();
 		eternity.flushToDatabase();
 		// log("----------------------------------------")
-		// eternity.trace.flush = 1;
-		// eternity.trace.eternity = true;
 		// log("5");
 		// log("5");
 		eternity.oneStepCollection();		
 		eternity.flushToDatabase();
 		
 		// log("6");
+		// eternity.trace.eternity = true;
+		eternity.trace.flush = 1;
 		eternity.oneStepCollection();
 		eternity.flushToDatabase();
 		// eternity.trace.eternity = false;
