@@ -436,132 +436,8 @@
 				// return entity;
 			// }
 		// } 
-		
 
-		/*-----------------------------------------------
-		 *           DB Image counters
-		 *
-		 *   OBS! these functions assume incoming relations 
-		 *   has been disabled!!!
-		 *-----------------------------------------------*/
-		 
-		function increaseLoadedIncomingMacroReferenceCounters(dbImage, property) {
-			let incomingRelationStructure = dbImage[property];
-			if (imageCausality.isObject(incomingRelationStructure) && incomingRelationStructure.isIncomingRelationStructure) {
-				// Increase counter 
-				if (typeof(incomingRelationStructure.const.loadedIncomingMacroReferenceCount) === 'undefined') {
-					incomingRelationStructure.const.loadedIncomingMacroReferenceCount = 0;
-				}
-				incomingRelationStructure.const.loadedIncomingMacroReferenceCount++;
-				
-				// Increase counter 
-				let nextStructure = incomingRelationStructure;
-				if (typeof(nextStructure.parent) !== 'undefined') {
-					if (typeof(nextStructure.const.loadedIncomingMacroReferenceCount) === 'undefined') {
-						nextStructure.const.loadedIncomingMacroReferenceCount = 0;
-					}
-					nextStructure.const.loadedIncomingMacroReferenceCount++;
-					nextStructure = nextStructure.incomingStructures;
-				}
-				
-				// Increase counter 
-				if (typeof(nextStructure.const.loadedIncomingMacroReferenceCount) === 'undefined') {
-					nextStructure.const.loadedIncomingMacroReferenceCount = 0;
-				}
-				nextStructure.const.loadedIncomingMacroReferenceCount++;
-			}
-		}
-		
-		
-		// function decreaseLoadedIncomingMacroReferenceCounters(dbImage, property) {
-			// let value = dbImage[property];
-			// if (imageCausality.isObject(value) && value.isIncomingRelationStructure) {
-				// let currentIncomingStructure = value;
-				// let nextIncomingStructure;
-				// if (typeof(value.parent) !== 'undefined') {
-					// nextIncomingStructure = currentIncomingStructure.parent
-				// } else {
-					// nextIncomingStructure = currentIncomingStructure.incomingStructures;
-				// }
-	
-				// // Possibly unload incoming structure
-				// currentIncomingStructure.const.loadedIncomingMacroReferenceCount--;
-				// if (currentIncomingStructure.const.loadedIncomingMacroReferenceCount === 0) {
-					// unloadImage(currentIncomingStructure);
-				// }
-				
-				// // Incoming structures or root incoming structure
-				// currentIncomingStructure = nextIncomingStructure;
-				// let referedDbImage;
-				// if (imageCausality.isIncomingStructure(currentIncomingStructure)) {
-					// // We were at the root incoming structure, proceed to the main incoming structure
-					// nextIncomingStructure = currentIncomingStructure.incomingStructures;
-				// } else {
-					// // Reached the object
-					// referedDbImage = currentIncomingStructure.referencedObject;
-					// nextIncomingStructure = null;
-				// }
-				
-				// // Possibly unload incoming structure
-				// currentIncomingStructure.const.loadedIncomingMacroReferenceCount--;
-				// if (currentIncomingStructure.const.loadedIncomingMacroReferenceCount === 0) {
-					// unloadImage(currentIncomingStructure);
-				// }
-				
-				
-				// if (nextIncomingStructure !== null) {
-					// currentIncomingStructure = nextIncomingStructure;
-					
-					// // Reached the object
-					// referedDbImage = currentIncomingStructure.referencedObject;
-					// nextIncomingStructure = null;
-
-					// // Possibly unload incoming structure
-					// currentIncomingStructure.const.loadedIncomingMacroReferenceCount--;
-					// if (currentIncomingStructure.const.loadedIncomingMacroReferenceCount === 0) {
-						// unloadImage(currentIncomingStructure);
-					// }
-				// }
-				
-				// // // What to do with the object... forget if unloaded?
-				// // imageCausality.blockInitialize(function() {
-					// // referedDbImage.const.loadedIncomingMacroReferenceCount--;
-					// // // Idea: perhaps referedDbImage.const.incomingCount could be used.... as it is not persistent...
-					// // if (referedDbImage.const.loadedIncomingMacroReferenceCount === 0) {
-						// // // if (referedDbImage.const.correspondingObject.const.)
-						// // // unloadImage(referedDbImage);
-						// // // if there are no incoming relations on the object also, forget both... 
-					// // } 					
-				// // });
-			// }			
-		// }
-		
-		// function increaseImageIncomingLoadedCounter(entity) {
-			// imageCausality.blockInitialize(function() {
-				// if (imageCausality.isObject(entity)) {
-					// if (typeof(entity.const.incomingLoadedMicroCounter) === 'undefined') {
-						// entity.const.incomingLoadedMicroCounter = 0;
-					// }
-					// entity.const.incomingLoadedMicroCounter++;
-				// }
-			// });
-		// }
-
-		// function decreaseImageIncomingLoadedCounter(entity) {
-			// imageCausality.blockInitialize(function() {
-				// if (imageCausality.isObject(entity)) {
-					// if (typeof(entity.const.incomingLoadedMicroCounter) === 'undefined') {
-						// entity.const.incomingLoadedMicroCounter = 0;
-					// }
-					// entity.const.incomingLoadedMicroCounter--;
-					// if (entity.const.incomingLoadedMicroCounter === 0 && entity.const.initializer !== null) {
-						// forgetDbImage(entity);
-					// }
-				// }				
-			// });
-		// }
-
-
+    
 		/*-----------------------------------------------
 		 *           Post DB image pulse events
 		 *-----------------------------------------------*/
@@ -825,13 +701,7 @@
 						let tmpDbId = typeof(dbImage.const.tmpDbId) !== 'undefined' ? dbImage.const.tmpDbId : null;
 						
 						// if (dbId === null && tmpDbId === null) {
-						if (event.type === 'creation') {
-							// log("PINGPINGPINGPINGPINGPINGPINGPING")
-							// Maintain image structure
-							for (let property in dbImage) {
-								increaseLoadedIncomingMacroReferenceCounters(dbImage, property);
-							}
-							
+						if (event.type === 'creation') {							
 							// Serialized image creation, with temporary db ids. 
 							let tmpDbId = getTmpDbId(dbImage);
 							compiledUpdate.imageCreations[tmpDbId] = serializeDbImage(dbImage);
@@ -848,11 +718,7 @@
 							}
 							let imageUpdates = compiledUpdate.imageUpdates[key];								
 								
-							if (event.type === 'set') {
-								// Maintain image structure
-								increaseLoadedIncomingMacroReferenceCounters(dbImage, event.property);
-								// decreaseLoadedIncomingMacroReferenceCounters(dbImage, event.); // TODO: Decrease counters here? Get the previousIncomingStructure... 
-								
+							if (event.type === 'set') {								
 								// Serialized value with temporary db ids. 
 								let value = convertReferencesToDbIdsOrTemporaryIds(event.value);
 								let property = event.property;
@@ -864,9 +730,6 @@
 									delete imageUpdates["_eternityDeletedKeys"][event.property];
 								} 
 							} else if (event.type === 'delete') {
-								// Maintain image structure
-								// decreaseLoadedIncomingMacroReferenceCounters(dbImage, event.); // TODO: Decrease counters here?
-								
 								// Get deleted keys 
 								if (typeof(imageUpdates["_eternityDeletedKeys"]) === 'undefined') {
 									imageUpdates["_eternityDeletedKeys"] = {};
@@ -922,61 +785,7 @@
 						}
 					}
 				});
-			});
-								
-					// if (event.type === 'set' && event.property === eternityTag + "_to_deallocate") {
-						// if (typeof(event.object.const.dbId) !== 'undefined') {
-							// let dbId = event.object.const.dbId;
-							
-							// compiledUpdate.imageDeallocations[dbId] = true;
-
-							// if (typeof(compiledUpdate.imageUpdates[dbId])) {
-								// delete compiledUpdate.imageUpdates[dbId];
-							// }						
-						// } else if (typeof(event.object.const.tmpDbId) !== 'undefined') {
-							// let tmpDbId = event.object.const.tmpDbId;
-							
-							// if (typeof(compiledUpdate.imageCreations[tmpDbId])) {
-								// delete compiledUpdate.imageCreations[tmpDbId];
-							// } else {
-								// compiledUpdate.imageDeallocations[tmpDbId] = true;
-							// }
-							
-							// if (typeof(compiledUpdate.imageUpdates[tmpDbId])) {
-								// delete compiledUpdate.imageUpdates[tmpDbId];
-							// }
-						// }
-						
-					// }
-				// });
-				
-				// // Find all deallocations. TODO remove this chunk of code!!! 
-				// events.forEach(function(event) {
-					// if (event.type === 'set' && event.property === eternityTag + "_to_deallocate") {
-						// if (typeof(event.object.const.dbId) !== 'undefined') {
-							// let dbId = event.object.const.dbId;
-							
-							// compiledUpdate.imageDeallocations[dbId] = true;
-
-							// if (typeof(compiledUpdate.imageUpdates[dbId])) {
-								// delete compiledUpdate.imageUpdates[dbId];
-							// }						
-						// } else if (typeof(event.object.const.tmpDbId) !== 'undefined') {
-							// let tmpDbId = event.object.const.tmpDbId;
-							
-							// if (typeof(compiledUpdate.imageCreations[tmpDbId])) {
-								// delete compiledUpdate.imageCreations[tmpDbId];
-							// } else {
-								// compiledUpdate.imageDeallocations[tmpDbId] = true;
-							// }
-							
-							// if (typeof(compiledUpdate.imageUpdates[tmpDbId])) {
-								// delete compiledUpdate.imageUpdates[tmpDbId];
-							// }
-						// }
-						
-					// }
-				// });
+			});				
 
 			trace.eternity && logUngroup();
 			return compiledUpdate;
@@ -1567,27 +1376,11 @@
 					// log("value loaded to image:");
 					// log(value);
 					property = imageCausality.transformPossibleIdExpression(property, dbIdToImageId);
-					// increaseImageIncomingLoadedCounter(value);
-					increaseLoadedIncomingMacroReferenceCounters(dbImage, property);
 					dbImage[property] = value;
 					// if (property !== 'A') imageCausality.endTrace();
 					// log("loadFromDbIdToImage: " + dbId + " property: " + property + "...finished assigning");
 					// printKeys(dbImage);
 				}
-				// if (property === "_eternityIncoming") {
-					// let recordValue = dbRecord["_eternityIncoming"];
-					// // log(dbRecord);
-					// let value = loadDbValue(recordValue);
-					
-					// // log(dbRecord);
-					// // log("loadFromDbIdToImage: " + dbId + " property: " + property + "...assigning");
-					// // if (property !== 'A') imageCausality.startTrace();
-					// // log("value loaded to image:");
-					// // log(value);
-					// // increaseImageIncomingLoadedCounter(value);
-					// increaseLoadedIncomingMacroReferenceCounters(dbImage, "_eternityIncoming");
-					// dbImage.incoming = value; // TODO: Consider, do we need to merge here? Is it possible another incoming is created that is not loaded?... prob. not... 
-				// }
 			}
 			dbImage.const.name = dbRecord.name; // TODO remove debugg
 
@@ -2008,8 +1801,6 @@
 					for (let property in dbImage) {
 						// Incoming should be unloaded here also, since it can be recovered.
 						let value = dbImage[property];
-						// decreaseLoadedIncomingMacroReferenceCounters(dbImage, property);
-						// decreaseImageIncomingLoadedCounter(value);
 						delete dbImage[property]; 
 						// TODO: check if value has incoming counters of zero?... no... 
 					}
@@ -2285,7 +2076,6 @@
 			
 			// Destruction zone
 			initializeList(gcState, destructionZone);	
-			initializeList(gcState, deallocationZone);	
 		}
 		
 		function addUnstableOrigin(pendingUnstableImage) {
@@ -2409,18 +2199,6 @@
 					return false;
 				}
 				
-				// // Move to next zone expansion TODO: what is this???? ... forgotten comment out?
-				// if (isEmptyList(gcState, unexpandedUnstableZone) && !isEmptyList(gcState, nextUnexpandedUnstableZone)) {
-					// log("<<<<                                    >>>>>");
-					// log("<<<< Move to nextUnexpandedUnstableZone >>>>>");
-					// log("<<<<                                    >>>>>");
-					// let first = getFirstOfList(gcState, nextUnexpandedUnstableZone);
-					// let last = getLastOfList(gcState, nextUnexpandedUnstableZone);
-					// detatchAllListElements(gcState, nextUnexpandedUnstableZone);
-					// replaceEntireList(gcState, unexpandedUnstableZone, first, last);
-					// return false;
-				// }
-				
 				// Expand unstable zone
 				if (!isEmptyList(gcState, unexpandedUnstableZone)) {
 					// log("<<<<                        >>>>>");
@@ -2537,7 +2315,7 @@
 					}
 				}
 				
-				// Destroy those left in the destruction list. 
+				// Destroy those left in the destruction list. (no need to deallocate, they will deallocate naturally when they have no incoming left)
 				if (!isEmptyList(gcState, destructionZone)) {
 					// log("<<<<                 >>>>>");
 					trace.gc && log("<<<< Destroy ......  >>>>>");					
@@ -2552,21 +2330,6 @@
 					
 					return false;
 				}
-				
-				// // Destroy those left in the destruction list. 
-				// if (!isEmptyList(gcState, deallocationZone)) {
-					// // log("<<<<                    >>>>>");
-					// // log("<<<< Deallocate ......  >>>>>");
-					// // log("<<<<                    >>>>>");
-					
-					// let toDeallocate = removeFirstFromList(gcState, deallocationZone);
-					// // Make sure that object beeing destroyed is loaded.
-					// deallocateInDatabase(toDeallocate);
-					
-					// loadedObjects--;
-					// return false;
-				// }
-				
 				
 							
 				// Start a new zone.
