@@ -802,7 +802,7 @@
 			referencesChunk.contentsCounter--;
 			if (referencesChunk.contentsCounter === 0) {
 				trace.incoming && log("hit zero!");
-				// delete referencesChunk.contents;
+				delete referencesChunk.contents;
 				tryRemoveIncomingStructure(referencesChunk);
 			}
 			trace.incoming && logUngroup();
@@ -887,6 +887,13 @@
 			}
 
 			// Add repeater on object beeing observed, if not already added before
+      if (typeof(finalIncomingStructure.contents) === 'undefined') {
+        finalIncomingStructure.contents = {};
+				if (configuration.incomingStructuresAsCausalityObjects) {
+					finalIncomingStructure.contents = create(finalIncomingStructure.contents);
+        }
+      }
+      
 			let incomingStructureContents = finalIncomingStructure.contents;
 			if (typeof(incomingStructureContents[refererId]) === 'undefined') {
 				// log("here increasing counter... ");
@@ -2091,10 +2098,12 @@
 		 
 		function ensureInitialized(handler, target) {
 			if (handler.const.initializer !== null && state.blockingInitialize === 0) {
+				trace.load && log("initialize...");
 				if (trace.basic > 0) { log("initializing..."); logGroup() }
 				let initializer = handler.const.initializer;
 				handler.const.initializer = null;
 				initializer(handler.const.object);
+				trace.load && log("done...");
 				if (trace.basic > 0) logUngroup();
 			}
 		}

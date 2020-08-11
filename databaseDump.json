@@ -21,26 +21,12 @@
     _eternityPendingForChildReattatchmentFirst : null, 
     _eternityPendingForChildReattatchmentLast : null, 
     _eternityPendingForChildReattatchmentCounter : 0, 
-    _eternityDestructionZoneFirst : "_id_3_di_", 
-    _eternityDestructionZoneLast : "_id_3_di_", 
-    _eternityDestructionZoneCounter : 1, 
-    _eternityDeallocationZoneFirst : null, 
-    _eternityDeallocationZoneLast : null, 
-    _eternityDeallocationZoneCounter : 0
-  }, 
-  {
-    id : "_id_3_di_", 
-    _eternityPersistent : true, 
-    _eternityObjectClass : "Object", 
-    _eternityImageClass : "Object", 
-    _eternityIsObjectImage : true, 
-    name : "a", 
-    _eternityIncomingCount : 2, 
-    _eternityDestructionZoneMember : true, 
-    _eternityDestructionZonePrevious : null, 
-    _eternityDestructionZoneNext : null
+    _eternityDestructionZoneFirst : null, 
+    _eternityDestructionZoneLast : null, 
+    _eternityDestructionZoneCounter : 0
   }, 
   "[deallocated]", 
   "[deallocated]", 
-  {id : "_id_6_di_", _eternityImageClass : "Object", _eternityIncomingCount : 1}
+  "[deallocated]", 
+  "[deallocated]"
 ]

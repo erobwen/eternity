@@ -23,8 +23,8 @@ describe("loading, unloading & unforgottenfication", function () {
 			let result;
 			eternity.blockInitialize(function() {
 				eternity.freezeActivityList(function() {
-					// log(object.const.initializer);
-					result = object.const.initializer === null;
+					result = typeof(object.const.isUnloaded) === 'undefined'; // log(object.const.initializer);
+					// result = object.const.initializer === null;
 					// log(object.name + " isLoaded: " + result);
 				});
 			});
@@ -77,14 +77,20 @@ describe("loading, unloading & unforgottenfication", function () {
                 eternity.freezeActivityList(function() {
 					let current = object;
 					while(current !== null) {
-						result += (typeof(current.nonForwardConst.isUnforgotten) !== 'undefined') ? 'unforgotten,': '';
-						current = current.nonForwardConst.forwardsTo;
+						if (current.nonForwardConst.isUnforgotten) {
+							result += 'unforgotten(id=' + current.nonForwardConst.id + ", name=" + current.nonForwardConst.target.name + "), ";
+							current = current.nonForwardConst.forwardsTo;		
+						} else {
+							result += 'object(id=' + current.const.id + ", name= " + current.name + ")";
+							current = null;
+						}
 					}
                 });
             });
 			log(result);
             // return result;
 		}
+		// Start building a structure
 
 		// Setup a starting point (name in const for easy debugging)
 		let A = create({name: "A"});
@@ -96,20 +102,23 @@ describe("loading, unloading & unforgottenfication", function () {
 		let C = create({name: "C"});
 		C.const.name = "C";
 
-		// Start building a structure
 		persistent.name = "persistent";
 		persistent.const.name = "persistent"
-		// log("---------------------------- persistent.A = A; ----------------------------------");
+		eternity.flushToDatabase();
+		log("---------------------------- persistent.A = A; ----------------------------------");
 		persistent.A = A;
-		// log("---------------------------- A.persistent = persistent; ----------------------------------");		
+		eternity.flushToDatabase();
+		log("---------------------------- A.persistent = persistent; ----------------------------------");		
 		A.persistent = persistent;
+		eternity.flushToDatabase();
 		
 		// Exceed the memory limit (3 objects loaded is too much)
-		// log("---------------------------- A.B = B; ----------------------------------");
+		log("---------------------------- A.B = B; ----------------------------------");
 		
 		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
 		A.B = B;
 		eternity.flushToDatabase();
+		// log()
 		assert.equal(isLoaded(persistent), false);
         assert.equal(isForgotten(persistent), false);
 		
@@ -118,10 +127,14 @@ describe("loading, unloading & unforgottenfication", function () {
 		assert.equal(isLoaded(B), true);
 		
 		// Exceed the memory limit again, persistent and A no longer has any incoming references and will be forgeted
-		// log("--------------------------- B.C = C; -----------------------------------");
+		log("--------------------------- B.C = C; -----------------------------------");
+		eternity.trace.unforget = 1;
+		eternity.trace.load = 1;
 		// eternity.trace.basic++;
+		log("----");
 		B.C = C;
 		eternity.flushToDatabase();
+		log("----");
 
 		// eternity.trace.basic--;
 		// log("-----");
@@ -137,8 +150,10 @@ describe("loading, unloading & unforgottenfication", function () {
 		
 		assert.equal(isLoaded(C), true);
 		
+		eternity.trace.load = 0;
+		eternity.trace.unforget = 0;
 		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);
-		// log("--------------------------- Touch A -----------------------------------");
+		log("--------------------------- Touch A -----------------------------------");
 		let dummy = A.name;
 		eternity.flushToDatabase();
 		
@@ -155,7 +170,7 @@ describe("loading, unloading & unforgottenfication", function () {
 		assert.equal(isLoaded(C), true);
 		
 		
-		// log("--------------------------- Touch persistent -----------------------------------");
+		log("--------------------------- Touch persistent -----------------------------------");
 		let persistentA = persistent.A;
 		eternity.flushToDatabase();
 		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);
@@ -178,9 +193,11 @@ describe("loading, unloading & unforgottenfication", function () {
 		assert.equal(A === persistent.A, false);  // Equality without const does not work anymore, becuase one of them is a unforgotten. 
 		// log(A.name);
 		// log(persistent.A.name);
-		// logUnforgotten(A);
-		// logUnforgotten(persistent);
+		logUnforgotten(A);
+		logUnforgotten(persistent);
+		logUnforgotten(persistent.A);
 		// log("-----------------------------------------")
+		assert.equal(A.name === persistent.A.name, true);
 		assert.equal(A.const === persistent.A.const, true);
 		
 		// Persistent is also a unforgotten, but A.persistent refers to its non-unforgotten version. 
@@ -189,14 +206,15 @@ describe("loading, unloading & unforgottenfication", function () {
 		// log(A.persistent.const);
 		// log(persistent.const);
 		assert.equal(A.persistent.const === persistent.const, true);
-		// log("--------------------------- Touch B -----------------------------------");
+		log("--------------------------- Touch B -----------------------------------");
 		dummy = B.name;
-		// log("--------------------------- Touch C -----------------------------------");
-		// eternity.trace.basic++;
+		log("--------------------------- Touch C -----------------------------------");
+		eternity.trace.basic++;
 		dummy = C.name;
+		log("----------------");
 		eternity.flushToDatabase();
-		// eternity.trace.basic--;
-		// log("----------------------------------");
+		eternity.trace.basic--;
+		log("----------------------------------");
 		
 		// Persistent becomes a unforgotten
 		assert.equal(isLoaded(persistent), false);
