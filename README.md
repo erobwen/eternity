@@ -4,16 +4,18 @@ Reactive object-database technology.
 
 ## Reactive database
 
-Eternity is offering a new way to access data in your database. Traditionally, this is done by queries and updates, but in a reactive database the writing and reading from the database is (almost) completley transparent to the application. 
+Eternity is offering a new way to access data in your database. Traditionally, this is done by queries and updates, but in a reactive database the writing and reading from the database is almost transparent to the application. 
 
 ### Writing
 This means that an object that resides on the database, will be automatically updated when its counterpart in memory is changed. 
 
 ### Reading
-In addition, objects will be loaded/unloaded transparently as they are accessed by the application. Eternity keeps a list of the least recently accessed objects, and in order to free up memory, objects at the top of the list will be automatically unloaded.
+In addition, objects will be loaded by a special selector command, for example `myObject.load("forEdit", action)`. When action runs, the object will be loaded according to the "forEdit" selector. A selector defines the refered objects that needs to be loaded in conjunction with myObject, and can be completley user defined. Eternity keeps a list of the least recently accessed objects, and in order to free up memory, objects at the top of the list will be automatically unloaded.
 
 ### Persistent Garbage Collection
-In addition, the set of objects saved in the database will be determined by the objects transitivley refered to by a very specific "persistent node". This also means that eternity has a built in garbage-collector that will automatically remove objects from the database if they no longer can be reached by the persistent node.    
+In addition, the set of objects saved in the database will be determined by the objects transitivley refered to by a very specific "persistent node". This also means that eternity has a built in garbage-collector that will automatically remove objects from the database if they no longer can be reached by the persistent node. 
+
+The garbage collection uses a "flamefront" algorithm to remove unused data from the database.
 
 ## Example
 
@@ -36,9 +38,13 @@ The objects of eternity appear as normal javascript objects. The only difference
 
 ## Reactive databases compared to conventional databases, summary
 
+* Loaded data is connected in a contionous data structure instead of isolated data records.
+
 * subscribe/notify instead of query/result
 
-* transparent loading/saving (memory as a cache for the database) vs explicit loading/saving
+* transparent saving (memory as a cache for the database) vs explicit saving
+
+* loading using selectors instead of load requests.
 
 * Indexes as application managed objects as opposed to built in (DB managed) and global for each table.
 
@@ -49,24 +55,12 @@ The objects of eternity appear as normal javascript objects. The only difference
 This is an image of the reference anatomy in eternity. The system is based on the following premises: 
 
 1. If an object is loaded, then it is fully loaded. This is to create a sensible object synchronization between database, server memory and client memory. 
+
 2. As a consequence of 1,an object needs to be of reasonable size. An object cannot have million keys, and an array cannot have millions element. 
-3. However, we can and should allow unlimited incoming references to any given object. These can be iterated asynchronously in conjunction with observing changes in incoming references. 
-4. In the database, all incoming references are stored with a back-reference. This is in order to: 
-* to make the asynchronous iteration possible.
-* Make incremental persistent garbage collection possible
-5. The important thing about index structures, is that they do not have any incoming references inbetween them, and incoming references point past the index structure.
 
-So, out of these requirements, a reference anatomy is derrived as the following picutre shows:
+3. In the current version, there should be a limit to the incoming references to each object.
 
-![Alt text](/documents/reference_anatomy.png?raw=true "Reference Anatomy")
-
-The reference structure has some similarity with the synapses of neural network. 
-
-Sometimes certain parts of this model can be left out, for example, there might not be a need for an index.
-
-From left to right we search, from rigth to left we enumerate (potentially asynchronously). 
-
-From left to right we find objects of the right quality. From right to left we find objects of quantity.
+4. In the database, all incoming references are stored with a back-reference. This is in order to make incremental persistent garbage collection possible
 
 
 ## Indexes
