@@ -2416,7 +2416,7 @@
 		
 		
 		// Note: causality.persistent is replace after an unload... 
-		function unloadAllAndClearMemory() {
+		function unloadAll() {
 			flushToDatabase();
 			objectCausality.resetObjectIds();
 			imageCausality.resetObjectIds();
@@ -2425,10 +2425,10 @@
 			setupDatabase();
 		}
 		
-		function clearDatabaseAndClearMemory() {
+		function unloadAllAndClearDatabase() {
 			flushToDatabase();
 			mockMongoDB.clearDatabase();
-			unloadAllAndClearMemory();
+			unloadAll();
 		}
 		
 		/*-----------------------------------------------
@@ -2759,8 +2759,8 @@
 			imageCausality : imageCausality,
 			setPostPulseActionBeforeStorage : setPostPulseActionBeforeStorage,
 			mockMongoDB : mockMongoDB,
-			unloadAllAndClearMemory : unloadAllAndClearMemory,
-			clearDatabaseAndClearMemory : clearDatabaseAndClearMemory,
+			unloadAll : unloadAll,
+			unloadAllAndClearDatabase : unloadAllAndClearDatabase,
 			forAllPersistentIncomingNow : forAllPersistentIncomingNow,
 			createAction : createAction,
 			collectAll : collectAll,

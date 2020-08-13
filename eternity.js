@@ -1,12 +1,9 @@
-import getWorld from causalityjs
-
+import { getWorld as getCausalityWorld } from  "causalityjs";
 import { argumentsToArray, configSignature, mergeInto } from "./lib/utility.js";
 import { objectlog } from "./lib/objectlog.js";
-const defaultObjectlog = objectlog;
-import { createCachingFunction } from "./lib/caching.js";
-import { defaultDependencyInterfaceCreator } from "./lib/defaultDependencyInterface.js";
+import { createDatabase } from "./mockMongoDB.js";
 
-const mockMongoDB = require("./mockMongoDB.js")(JSON.stringify(configuration)); 
+const defaultObjectlog = objectlog;
 
 const defaultConfiguration = {
   maxNumberOfLoadedObjects : 10000,
@@ -17,17 +14,55 @@ const defaultConfiguration = {
     
 function createWorld(configuration) {
   const world = {};
-  let objectWorld = getWorld({});
-  let imageWorld = getWorld({});
+  const mockMongoDB = createDatabase(JSON.stringify(configuration)); 
+  const objectWorld = getCausalityWorld({});
+  const imageWorld = getCausalityWorld({});
+  
+  let persistentDbId;
+  let updateDbId;
+  let collectionDbId;
 
-  let peekedAtDbRecords = {};
+  const state = {
+    peekedAtDbRecords: {},
+    dbIdToDbImageMap: {},
+    recordingImageChanges: true,
+  }
+
+  function flushToDatabase() {
+    trace.flush && log("flushToDatabase: " + pendingObjectChanges.length);
+    trace.flush && log(pendingObjectChanges, 3);
+    if (pendingObjectChanges.length > 0) {
+      while (pendingObjectChanges.length > 0) {
+        pushToDatabase();
+      }
+    } else {        
+      flushImageToDatabase();     
+    }
+    unloadAndForgetObjects();
+  }
+    
+  // Note: causality.persistent is replace after an unload... 
+  async function unloadAll() {
+    flushToDatabase();
+    objectWorld.state.nextObjectId = 1;
+    imageWorld.state.nextObjectId = 1;
+    delete world.persistent;
+    state.dbIdToDbImageMap = {};
+    setupDatabase();
+  }
+    
+  async function unloadAllAndClearDatabase() {
+    flushToDatabase();
+    mockMongoDB.clearDatabase();
+    unloadAll();
+  }
 
   async function peekAtRecord(dbId) {
     // flushToDatabase(); TODO... really have here??
-    if (typeof(peekedAtDbRecords[dbId]) === 'undefined') {
-      peekedAtDbRecords[dbId] = await mockMongoDB.getRecord(dbId);
+    if (typeof(state.peekedAtDbRecords[dbId]) === 'undefined') {
+      state.peekedAtDbRecords[dbId] = await mockMongoDB.getRecord(dbId);
     }
-    return peekedAtDbRecords[dbId];
+    return state.peekedAtDbRecords[dbId];
   }
 
   async function createObjectPlaceholderFromDbId(dbId) {
@@ -39,55 +74,67 @@ function createWorld(configuration) {
     return placeholder;
   }
 
-  function unloadAllAndClearMemory() {
-    // flushToDatabase();
-    objectWorld.state.nextObjectId = 1;
-    imageWorld.state.nextObjectId = 1;
-    delete world.persistent;
-    dbIdToDbImageMap = {};
-    setupDatabase();
+  async function createImagePlaceholderFromDbId(dbId) {
+    // log("NOT HERESSSSS!");
+    // log("createImagePlaceholderFromDbId: " + dbId);
+    let placeholder;
+    state.recordingImageChanges = false; 
+    // imageWorld.state.emitEventPaused++;
+    // imageWorld.pulse(function() { // Pulse here to make sure that dbId is set before post image pulse comence.
+      let record = peekAtRecord(dbId);
+      // console.log(typeof(record._eternityImageClass) !== 'undefined' ? record._eternityImageClass : 'Object');
+      placeholder = imageWorld.create(typeof(record._eternityImageClass) !== 'undefined' ? record._eternityImageClass : 'Object');
+      placeholder.const.isObjectImage = typeof(record._eternityIsObjectImage) !== 'undefined' ? record._eternityIsObjectImage : false;
+      placeholder.const.loadedIncomingReferenceCount = 0;
+      placeholder.const.dbId = dbId;
+      placeholder.const.serializedMongoDbId = imageWorld.idExpression(dbId);
+      imageIdToImageMap[placeholder.const.id] = placeholder;
+      placeholder.const.initializer = imageFromDbIdInitializer;
+    // });
+    // imageWorld.state.emitEventPaused--;
+    state.recordingImageChanges = false; 
+    return placeholder;
   }
-    
 
   async function setupDatabase() {
-    // log("setupDatabase");
-    imageWorld.pulse(function() {         
+    // // log("setupDatabase");
+    // imageWorld.pulse(function() {         
 
-      // Clear peek at cache
-      peekedAtDbRecords = {};
+    // Clear peek at cache
+    state.peekedAtDbRecords = {};
+    
+    // if (typeof(world.persistent) === 'undefined') {
+    if (mockMongoDB.getRecordsCount() === 0) {
+      // Initialize empty database
+      [persistentDbId, updateDbId, collectionDbId] = 
+        await Promise.all([
+          mockMongoDB.saveNewRecord({ name : "Persistent", _eternityIncomingCount : 42}),
+          mockMongoDB.saveNewRecord({ name: "updatePlaceholder", _eternityIncomingCount : 42}),
+          mockMongoDB.saveNewRecord({ name : "garbageCollection", _eternityIncomingCount : 42})]);
+
+      gcState = createImagePlaceholderFromDbId(collectionDbId);
+      initializeGcState(gcState);
+    } else {
+      // Reconnect existing database
+      persistentDbId = 0;
+      updateDbId = 1;
+      collectionDbId = 2;
       
-      // if (typeof(world.persistent) === 'undefined') {
-      if (mockMongoDB.getRecordsCount() === 0) {
-        // log("setup from an empty database...");
-        
-        // Persistent root object
-        persistentDbId = await mockMongoDB.saveNewRecord({ name : "Persistent", _eternityIncomingCount : 1});
-
-        // Update placeholder
-        updateDbId = await mockMongoDB.saveNewRecord({ name: "updatePlaceholder", _eternityIncomingCount : 1});
-        // NOW
-        // Garbage collection state.
-        collectionDbId = await mockMongoDB.saveNewRecord({ name : "garbageCollection", _eternityIncomingCount : 1});
-        gcState = createImagePlaceholderFromDbId(collectionDbId);
-        // throw new Error("foo");
-        initializeGcState(gcState);
-      } else {
-        // // Setup ids for basics.
-        // let counter = 0;
-        // persistentDbId = counter++;
-        // if (configuration.twoPhaseComit) updateDbId = counter++;
-        // collectionDbId = counter++;
-        
-        // gcState = createImagePlaceholderFromDbId(collectionDbId);
-      }
-      world.persistent = await createObjectPlaceholderFromDbId(persistentDbId);
-    });
-    return world.persistent;
+      gcState = createImagePlaceholderFromDbId(collectionDbId);
+    }
+    world.persistent = await createObjectPlaceholderFromDbId(persistentDbId);
   }
 
-  world.setupDatabase = setupDatabase;
+  Object.assign(world, {
+    setupDatabase,
+    unloadAll, 
+    unloadAllAndClearDatabase, 
+    ...objectWorld
+  });
   return world;
 }
+
+const worlds = {};
 
 export function getWorld(configuration) {
   if(!configuration) configuration = {};

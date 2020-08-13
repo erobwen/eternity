@@ -33,13 +33,13 @@ let logUngroup = objectlog.exit;
 // Tests based on mobx test/array.js
 describe("incoming", function () {
 	
-	function unloadAllAndClearMemory() {
-		eternity.unloadAllAndClearMemory();
+	function unloadAll() {
+		eternity.unloadAll();
 		persistent = eternity.persistent;
 	}
 	
-	function clearDatabaseAndClearMemory() {
-		eternity.clearDatabaseAndClearMemory();
+	function unloadAllAndClearDatabase() {
+		eternity.unloadAllAndClearDatabase();
 		persistent = eternity.persistent;
 	}
 	
@@ -56,7 +56,7 @@ describe("incoming", function () {
 	
 		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
 
-		unloadAllAndClearMemory();
+		unloadAll();
 		// log("==================== CLEAR MEMORY ==========================");
 		
 		referers = [];
@@ -67,7 +67,7 @@ describe("incoming", function () {
 		assert.equal(persistent.A, referers[0]);		
 		assert.equal(persistent.B, referers[1]);		
 		assert.equal(persistent.C, referers[2]);
-		clearDatabaseAndClearMemory();		
+		unloadAllAndClearDatabase();		
 	});	
 	
 	
@@ -84,7 +84,7 @@ describe("incoming", function () {
 	
 		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
 
-		unloadAllAndClearMemory();
+		unloadAll();
 		// log("==================== CLEAR MEMORY ==========================");
 		
 		referers = [];
@@ -102,7 +102,7 @@ describe("incoming", function () {
 		assert.equal(persistent.A, referers[0]);		
 		assert.equal(persistent.B, referers[1]);		
 		assert.equal(persistent.C, referers[2]);		
-		clearDatabaseAndClearMemory();		
+		unloadAllAndClearDatabase();		
 	});
 	
 	
@@ -122,7 +122,7 @@ describe("incoming", function () {
 
 		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
 
-		unloadAllAndClearMemory();
+		unloadAll();
 		// log("==================== CLEAR MEMORY ==========================");
 		
 		
@@ -132,6 +132,6 @@ describe("incoming", function () {
 		assert.equal(persistent.A, collector.keep[0]);		
 		assert.equal(persistent.B, collector.keep[1]);		
 		assert.equal(persistent.C, collector.keep[2]);		
-		clearDatabaseAndClearMemory();		
+		unloadAllAndClearDatabase();		
 	});
 });

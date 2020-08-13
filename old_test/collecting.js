@@ -15,13 +15,13 @@ let logToFile = eternity.logToFile;
 // Tests based on mobx test/array.js
 describe("garbage-collection", function () {
 
-	function unloadAllAndClearMemory() {
-		eternity.unloadAllAndClearMemory();
+	function unloadAll() {
+		eternity.unloadAll();
 		persistent = eternity.persistent;
 	}
 	
-	function clearDatabaseAndClearMemory() {
-		eternity.clearDatabaseAndClearMemory();
+	function unloadAllAndClearDatabase() {
+		eternity.unloadAllAndClearDatabase();
 		persistent = eternity.persistent;
 	}
 	
@@ -153,7 +153,7 @@ describe("garbage-collection", function () {
 		
 		// // Unload all and clear locals
 		// a = b = c = d = e = null;
-		// unloadAllAndClearMemory();
+		// unloadAll();
 		
 		// // Check still persistent
 		// assert.equal(typeof(persistent.d.const.dbImage) !== 'undefined', true);
