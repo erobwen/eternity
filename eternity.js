@@ -9,24 +9,38 @@ const defaultConfiguration = {
   maxNumberOfLoadedObjects : 10000,
   // twoPhaseComit : true,
   causalityConfiguration : {},
-  allowPlainObjectReferences : true
+  allowPlainObjectReferences : true,
+  classRegistry: {}
 }
     
 function createWorld(configuration) {
+  const state = {
+    imageEvents: [],
+    peekedAtDbRecords: {},
+    dbIdToDbImageMap: {},
+    imageIdToImageMap: {},
+    recordingImageChanges: true,
+  }
+
   const world = {};
   const mockMongoDB = createDatabase(JSON.stringify(configuration)); 
   const objectWorld = getCausalityWorld({});
-  const imageWorld = getCausalityWorld({});
+  const imageWorld = getCausalityWorld({
+    onEventGlobal: event => {
+      state.imageEvents.push(event);
+    }
+    onReadGlobal: (handler, target) => {
+      // handler.meta
+      // handler.target
+      // handler.proxy
+      
+    }
+  });
   
   let persistentDbId;
   let updateDbId;
   let collectionDbId;
 
-  const state = {
-    peekedAtDbRecords: {},
-    dbIdToDbImageMap: {},
-    recordingImageChanges: true,
-  }
 
   function flushToDatabase() {
     trace.flush && log("flushToDatabase: " + pendingObjectChanges.length);
@@ -74,24 +88,51 @@ function createWorld(configuration) {
     return placeholder;
   }
 
+
+  function createImage(source, buildId) {
+    let createdTarget;
+    if (typeof(source) === 'undefined') {
+        // Create from nothing
+        createdTarget = {};
+    } else if (typeof(source) === 'function') {
+      // Create from initializer
+      initializer = source; 
+      createdTarget = {};
+    } else if (typeof(source) === 'string') {
+      // Create from a string
+      if (source === 'Array') {
+        createdTarget = []; // On Node.js this is different from Object.create(eval("Array").prototype) for some reason... 
+      } else if (source === 'Object') {
+        createdTarget = {}; // Just in case of similar situations to above for some Javascript interpretors... 
+      } else {
+        let classOrPrototype = configuration.classRegistry[source];
+        if (typeof(classOrPrototype) !== 'function') {
+          throw new Error("No class found: " +  createdTarget);
+        }
+        createdTarget = new configuration.classRegistry[createdTarget]();
+      }
+    }
+    return imageWorld.create(createdTarget, buildId);
+  }
+
+  function idExpression(dbId) {
+    return "_db_id_" + dbId
+  }
+
   async function createImagePlaceholderFromDbId(dbId) {
-    // log("NOT HERESSSSS!");
-    // log("createImagePlaceholderFromDbId: " + dbId);
     let placeholder;
     state.recordingImageChanges = false; 
-    // imageWorld.state.emitEventPaused++;
-    // imageWorld.pulse(function() { // Pulse here to make sure that dbId is set before post image pulse comence.
-      let record = peekAtRecord(dbId);
-      // console.log(typeof(record._eternityImageClass) !== 'undefined' ? record._eternityImageClass : 'Object');
-      placeholder = imageWorld.create(typeof(record._eternityImageClass) !== 'undefined' ? record._eternityImageClass : 'Object');
-      placeholder.const.isObjectImage = typeof(record._eternityIsObjectImage) !== 'undefined' ? record._eternityIsObjectImage : false;
-      placeholder.const.loadedIncomingReferenceCount = 0;
-      placeholder.const.dbId = dbId;
-      placeholder.const.serializedMongoDbId = imageWorld.idExpression(dbId);
-      imageIdToImageMap[placeholder.const.id] = placeholder;
-      placeholder.const.initializer = imageFromDbIdInitializer;
-    // });
-    // imageWorld.state.emitEventPaused--;
+    let record = peekAtRecord(dbId);
+
+    placeholder = createImage(typeof(record._eternityImageClass) !== 'undefined' ? record._eternityImageClass : 'Object'); // Note: generates an event
+
+    placeholder.causality.isObjectImage = typeof(record._eternityIsObjectImage) !== 'undefined' ? record._eternityIsObjectImage : false;
+    placeholder.causality.loadedIncomingReferenceCount = 0;
+    placeholder.causality.dbId = dbId;
+    placeholder.causality.serializedMongoDbId = idExpression(dbId);
+    state.imageIdToImageMap[placeholder.causality.id] = placeholder;
+    // placeholder.causality.initializer = imageFromDbIdInitializer; onReadGlobal
+
     state.recordingImageChanges = false; 
     return placeholder;
   }
