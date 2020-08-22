@@ -2,6 +2,7 @@ import { getWorld as getCausalityWorld } from  "causalityjs";
 import { argumentsToArray, configSignature, mergeInto } from "./lib/utility.js";
 import { objectlog } from "./lib/objectlog.js";
 import { createDatabase } from "./mockMongoDB.js";
+import { createActivityList } from "./lib/activityList.js";
 
 const defaultObjectlog = objectlog;
 
@@ -18,29 +19,69 @@ function createWorld(configuration) {
     imageEvents: [],
     peekedAtDbRecords: {},
     dbIdToDbImageMap: {},
-    imageIdToImageMap: {},
+    imageIdToImageMap: {}, 
     recordingImageChanges: true,
+
+    persistentDbId: null,
+    updateDbId: null,
+    collectionDbId: null,
+    gcState: null,
   }
 
   const world = {};
   const mockMongoDB = createDatabase(JSON.stringify(configuration)); 
   const objectWorld = getCausalityWorld({});
+
+  state.activityList = createActivityList((object) => {
+    if (typeof(object.causality.isUnforgotten) !== 'undefined') {
+      return false; 
+    }
+    
+    if (typeof(object.causality.dbImage) === 'undefined') {
+      return false;       
+    }
+    return true;
+    // Consider?: Add and remove to activity list as we persist/unpersist this object.... ??? 
+  });
+
   const imageWorld = getCausalityWorld({
     onEventGlobal: event => {
       state.imageEvents.push(event);
-    }
+    },
+    onWriteGlobal: (handler, target) => {
+      ensureInitialized(handler); 
+      return true; 
+    },
     onReadGlobal: (handler, target) => {
+      ensureInitialized(handler); 
+      return true;
       // handler.meta
       // handler.target
       // handler.proxy
-      
     }
   });
   
-  let persistentDbId;
-  let updateDbId;
-  let collectionDbId;
 
+  function getMeta
+
+
+  /************************************************************************
+   *
+   *   Initializer
+   *
+   ************************************************************************/
+
+  function ensureInitialized(handler) {
+    if (handler.meta.initializer) {
+      const initializer = handler.meta.initializer;
+      delete handler.meta.initializer;
+      initializer(handler.proxy);
+    }
+  }
+
+  /****************************************************
+  *
+  ***************************************************/
 
   function flushToDatabase() {
     trace.flush && log("flushToDatabase: " + pendingObjectChanges.length);
@@ -145,25 +186,28 @@ function createWorld(configuration) {
     state.peekedAtDbRecords = {};
     
     // if (typeof(world.persistent) === 'undefined') {
-    if (mockMongoDB.getRecordsCount() === 0) {
+    if ((await mockMongoDB.getRecordsCount()) === 0) {
       // Initialize empty database
-      [persistentDbId, updateDbId, collectionDbId] = 
+      [state.persistentDbId, state.updateDbId, state.collectionDbId] = 
         await Promise.all([
           mockMongoDB.saveNewRecord({ name : "Persistent", _eternityIncomingCount : 42}),
           mockMongoDB.saveNewRecord({ name: "updatePlaceholder", _eternityIncomingCount : 42}),
           mockMongoDB.saveNewRecord({ name : "garbageCollection", _eternityIncomingCount : 42})]);
 
-      gcState = createImagePlaceholderFromDbId(collectionDbId);
+      console.log(state.persistentDbId)
+      console.log(state.updateDbId)
+      console.log(state.collectionDbId)
+      state.gcState = createImagePlaceholderFromDbId(state.collectionDbId);
       initializeGcState(gcState);
     } else {
       // Reconnect existing database
-      persistentDbId = 0;
-      updateDbId = 1;
-      collectionDbId = 2;
+      state.persistentDbId = 0;
+      state.updateDbId = 1;
+      state.collectionDbId = 2;
       
-      gcState = createImagePlaceholderFromDbId(collectionDbId);
+      state.gcState = createImagePlaceholderFromDbId(state.collectionDbId);
     }
-    world.persistent = await createObjectPlaceholderFromDbId(persistentDbId);
+    world.persistent = await createObjectPlaceholderFromDbId(state.persistentDbId);
   }
 
   Object.assign(world, {
