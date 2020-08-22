@@ -45,20 +45,23 @@ function createWorld(configuration) {
   });
 
   const imageWorld = getCausalityWorld({
-    onEventGlobal: event => {
-      state.imageEvents.push(event);
-    },
+
     onWriteGlobal: (handler, target) => {
-      ensureInitialized(handler); 
+      ensureInitialized(handler);
+      state.activityList.registerActivity(handler.meta)
       return true; 
     },
     onReadGlobal: (handler, target) => {
       ensureInitialized(handler); 
+      state.activityList.registerActivity(handler.meta)
       return true;
       // handler.meta
       // handler.target
       // handler.proxy
-    }
+    }, 
+    onEventGlobal: event => {
+      state.imageEvents.push(event);
+    },
   });
   
 
