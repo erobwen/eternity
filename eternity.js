@@ -2,7 +2,9 @@ import { getWorld as getCausalityWorld } from  "causalityjs";
 import { argumentsToArray, configSignature, mergeInto } from "./lib/utility.js";
 import { objectlog } from "./lib/objectlog.js";
 import { createDatabase } from "./mockMongoDB.js";
-import { createActivityList } from "./lib/activityList.js";
+import { setupActivityList } from "./lib/activityList.js";
+import { setupGC } from "./lib/gc.js";
+
 
 const defaultObjectlog = objectlog;
 
@@ -16,6 +18,7 @@ const defaultConfiguration = {
     
 function createWorld(configuration) {
   const state = {
+    objectEvents: [],
     imageEvents: [],
     peekedAtDbRecords: {},
     dbIdToDbImageMap: {},
@@ -25,26 +28,25 @@ function createWorld(configuration) {
     persistentDbId: null,
     updateDbId: null,
     collectionDbId: null,
-    gcState: null,
+    gcStateImage: null,
+    gc: null, 
+
+    activityList: setupActivityList((object) => {
+      if (typeof(object.causality.isUnforgotten) !== 'undefined') {
+        return false; 
+      }
+      
+      if (typeof(object.causality.dbImage) === 'undefined') {
+        return false;       
+      }
+      return true;
+      // Consider?: Add and remove to activity list as we persist/unpersist this object.... ??? 
+    })
   }
 
   const world = {};
   const mockMongoDB = createDatabase(JSON.stringify(configuration)); 
-  const objectWorld = getCausalityWorld({});
-
-  state.activityList = createActivityList((object) => {
-    if (typeof(object.causality.isUnforgotten) !== 'undefined') {
-      return false; 
-    }
-    
-    if (typeof(object.causality.dbImage) === 'undefined') {
-      return false;       
-    }
-    return true;
-    // Consider?: Add and remove to activity list as we persist/unpersist this object.... ??? 
-  });
-
-  const imageWorld = getCausalityWorld({
+  const objectWorld = getCausalityWorld({
 
     onWriteGlobal: (handler, target) => {
       ensureInitialized(handler);
@@ -60,13 +62,23 @@ function createWorld(configuration) {
       // handler.proxy
     }, 
     onEventGlobal: event => {
+      state.objectEvents.push(event);
+    },
+  });
+
+  const imageWorld = getCausalityWorld({
+
+    onWriteGlobal: (handler, target) => {
+      return true; 
+    },
+    onReadGlobal: (handler, target) => {
+      return true; 
+    }, 
+    onEventGlobal: event => {
       state.imageEvents.push(event);
     },
   });
   
-
-  function getMeta
-
 
   /************************************************************************
    *
@@ -125,10 +137,10 @@ function createWorld(configuration) {
 
   async function createObjectPlaceholderFromDbId(dbId) {
     let placeholder = objectWorld.create(await peekAtRecord(dbId)._eternityObjectClass);
-    placeholder.const.dbId = dbId;
-    placeholder.const.name = peekAtRecord(dbId).name;
-    // log("createObjectPlaceholderFromDbId: " + dbId + ", " + placeholder.const.name);
-    placeholder.const.initializer = objectFromIdInitializer;
+    placeholder.causality.dbId = dbId;
+    placeholder.causality.name = peekAtRecord(dbId).name;
+    // log("createObjectPlaceholderFromDbId: " + dbId + ", " + placeholder.causality.name);
+    placeholder.causality.initializer = objectFromIdInitializer;
     return placeholder;
   }
 
@@ -200,15 +212,17 @@ function createWorld(configuration) {
       console.log(state.persistentDbId)
       console.log(state.updateDbId)
       console.log(state.collectionDbId)
-      state.gcState = createImagePlaceholderFromDbId(state.collectionDbId);
-      initializeGcState(gcState);
+      state.gcStateImage = createImagePlaceholderFromDbId(state.collectionDbId);
+      state.gc = setupGC(state.gcStateImage);
+      state.gc.initializeGcState();
     } else {
       // Reconnect existing database
       state.persistentDbId = 0;
       state.updateDbId = 1;
       state.collectionDbId = 2;
       
-      state.gcState = createImagePlaceholderFromDbId(state.collectionDbId);
+      state.gcStateImage = createImagePlaceholderFromDbId(state.collectionDbId);
+      state.gc = setupGC(state.gcStateImage);
     }
     world.persistent = await createObjectPlaceholderFromDbId(state.persistentDbId);
   }
