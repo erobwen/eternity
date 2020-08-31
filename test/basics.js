@@ -3,8 +3,8 @@ require = require("esm")(module);
 const assert = require('assert');
 const world = require('../eternity.js').getWorld({name: "basics.js"});
 let persistent;
+const log = console.log;
 // const { create, load } = world;
-// const log = console.log.bind(console);
 
 // 'use strict';
 // require = require("esm")(module);
@@ -27,12 +27,12 @@ before(async () => {
 describe("basics", function() {
   
   async function unloadAll() {
-    world.unloadAll();
+    await world.unloadAll();
     persistent = world.persistent;
   }
   
   async function unloadAllAndClearDatabase() {
-    world.unloadAllAndClearDatabase();
+    await world.unloadAllAndClearDatabase();
     persistent = world.persistent;
   }
   
@@ -43,7 +43,8 @@ describe("basics", function() {
 
     console.log("foobar2")
     await unloadAll();
-    
+    log("after unload all...");
+    log( )
     assert.equal(42, persistent.foo);   
     console.log("foobar3")
     

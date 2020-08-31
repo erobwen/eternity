@@ -82,8 +82,26 @@ function createWorld(configuration) {
     return createdTarget; 
   }
 
-  function idExpression(dbId) {
-    return "_db_id_" + dbId
+
+  /****************************************************
+  *   Database encoding/decoding
+  ***************************************************/
+
+  function encodeDbReference(dbId, className, imageClassName, incoming) {
+    return "_db_id:" + dbId + ":" + className + ":" + imageClassName;
+  }
+
+  function isDbReference(string) {
+    return string.startsWith("_db_id_");
+  }
+
+  function decodeDbReference(reference) {
+    const fragments = reference.split(":");
+    return {
+      dbId: fragments[1],
+      className: fragments[2],
+      imageClassName: fragments[3]
+    };
   }
 
   /****************************************************
@@ -121,62 +139,6 @@ function createWorld(configuration) {
     },
   });
 
-  function getObject(dbId, className, imageClassName) {
-    state.ignoreEvents++;
-    const image = getImage(dbId, className, imageClassName);
-    if (!image[meta].object) {
-      const object = objectWorld.create(createTargetWithClass(className));
-      object[meta].incomingReferenceCount = null; // We only know after load
-      object[meta].loadedIncomingReferenceCount = 0;
-
-      // Connect with image
-      image[meta].object = object; 
-      object[meta].image = image;
-    }
-    image[meta].object[meta].loadedIncomingReferenceCount++;
-    state.ignoreEvents--;
-    log("getObject:");
-    log(image[meta].object);
-    return image[meta].object;
-  }
-
-  function getImage(dbId, className, imageClassName) {
-    state.ignoreEvents++;
-    if (typeof(state.dbIdToImageMap[dbId]) === 'undefined') {
-      const image = objectWorld.create(createTargetWithClass(className));
-      image[meta].dbId = dbId;
-      image[meta].serializedDbId = idExpression(dbId);
-      image[meta].incomingReferenceCount = null; // We only know after load
-      image[meta].loadedIncomingReferenceCount = 0;
-      image.loaded = false;
-      state.dbIdToImageMap[dbId] = image;
-    }
-    const image = state.dbIdToImageMap[dbId];
-    image[meta].loadedIncomingReferenceCount++;
-    state.ignoreEvents--;
-    return state.dbIdToImageMap[dbId];
-  }
-  
-
-  /****************************************************
-  *  Clearing
-  ***************************************************/
-  
-  async function unloadAll() {
-    // Flush to database?
-    objectWorld.state.nextObjectId = 1;
-    imageWorld.state.nextObjectId = 1;
-    delete world.persistent;   // Note: causality.persistent is replace after an unload... 
-    state.dbIdToImageMap = {};
-    await setupDatabase();
-  }
-    
-  async function unloadAllAndClearDatabase() {
-    // Flush to database?
-    mockMongoDB.clearDatabase();
-    await unloadAll();
-  }
-
 
   /****************************************************
   *  Setup database
@@ -205,16 +167,147 @@ function createWorld(configuration) {
     }
     log("setting persistent");
     world.persistent = getObject(state.persistentDbId, "Object", "Object");
-    // await loadAndPin(world.persistent); // Pin persistent! 
+    await loadAndPin(world.persistent); // Pin persistent! 
   }
 
 
   /****************************************************
-  *  Main load interface
+  *  Get persistent objects
   ***************************************************/
 
-  // loadAndPin(), whileLoaded(), unpin() 
+  function createObject(className, image) {
+    const object = objectWorld.create(createTargetWithClass(className));
+      object[meta].incomingReferenceCount = null; // We only know after load
+      object[meta].loadedIncomingReferenceCount = 0;
+      object[meta].pins = 0;
+      object[meta].target.loaded = false;
 
+      // Connect with image
+      image[meta].object = object; 
+      object[meta].image = image;
+  }
+
+  function getObject(dbId, className, imageClassName) {
+    state.ignoreEvents++;
+    const image = getImage(dbId, className, imageClassName);
+    if (!image[meta].object) {
+      createObject(className, image);
+    }
+    image[meta].object[meta].loadedIncomingReferenceCount++;
+    state.ignoreEvents--;
+    log("getObject:");
+    log(image[meta].object);
+    return image[meta].object;
+  }
+
+  function getImage(dbId, className, imageClassName) {
+    state.ignoreEvents++;
+    if (typeof(state.dbIdToImageMap[dbId]) === 'undefined') {
+      const image = objectWorld.create(createTargetWithClass(className));
+      image[meta].dbId = dbId;
+      image[meta].serializedDbId = encodeDbReference(dbId, className, imageClassName);
+      image[meta].incomingReferenceCount = null; // We only know after load
+      image[meta].loadedIncomingReferenceCount = 0;
+      image[meta].objectClassName = className;
+
+      state.dbIdToImageMap[dbId] = image;
+    }
+    const image = state.dbIdToImageMap[dbId];
+    image[meta].loadedIncomingReferenceCount++;
+    state.ignoreEvents--;
+    return state.dbIdToImageMap[dbId];
+  }
+  
+    /****************************************************
+  *  Loading objects
+  ***************************************************/
+
+  async function loadImage(image) {
+    const record = await mockMongoDB.getRecord(image[meta].dbId);
+    const imageTarget = image[meta].target;
+    for (let property in record) {
+      const value = record[property];
+      if (property !== "id") {      
+        if (typeof(value) === "string" && isDbReference(value)) {
+          const reference = decodeDbReference(value);
+          imageTarget[property] = getImage(reference.dbId, reference.className, reference.imageClassName);
+        } else {
+          imageTarget[property] = value;
+        }      
+      }
+    }
+  }
+
+  async function loadObject(object) {
+    function imageValueToObjectValue(imageValue) {
+      if (typeof(imageValue) === "object" && imageValue[meta]) {
+        if (!imageValue[meta].object) {
+          createObject(imageValue[meta].objectClassName, imageValue);
+        }
+        return imageValue[meta].object;
+      } else {
+        return imageValue;
+      }
+    }
+
+    const image = object[meta].image;
+    if (image) {
+      await loadImage(image);
+      const imageTarget = image[meta].target;
+      const objectTarget = object[meta].target;
+      for (let property in imageTarget) {
+        if (!property.startsWith("_incoming_") && property !== "loaded") {
+          objectTarget[property] = imageValueToObjectValue(imageTarget[property])
+        }
+      }
+    } else {
+      throw new Error("Cannot load non-persistent object");
+    }
+
+    object.loaded = true; // Possibly Trigger reactions.
+  }
+
+  async function loadAndPin(object) {
+    if (object[meta].image) {
+      await loadObject(object);
+      object[meta].pins++;
+    }  else {
+      throw new Error("Cannot load and pin non-persistent object");
+    }
+  }
+
+  async function whileLoaded(object, action) {
+    await loadAndPin(object);
+    action()
+    unpin(object);
+  }
+
+  async function unpin(object) {
+    // TODO: Register activity here instead of using onReadGlobal... 
+    object[meta].pins--;
+  } 
+
+
+  /****************************************************
+  *  Clearing
+  ***************************************************/
+  
+  async function unloadAll() {
+    // Flush to database?
+    await flushToDatabase();
+    objectWorld.state.nextObjectId = 1;
+    imageWorld.state.nextObjectId = 1;
+    delete world.persistent;   // Note: causality.persistent is replace after an unload... 
+    state.dbIdToImageMap = {};
+    await setupDatabase();
+  }
+    
+  async function unloadAllAndClearDatabase() {
+    // Flush to database?
+    await flushToDatabase();
+    mockMongoDB.clearDatabase();
+    await unloadAll();
+  }
 
 
   /****************************************************
