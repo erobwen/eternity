@@ -2,7 +2,8 @@
 require = require("esm")(module);
 const assert = require('assert');
 const world = require('../eternity.js').getWorld({name: "basics.js"});
-const { create, load } = world;
+let persistent;
+// const { create, load } = world;
 // const log = console.log.bind(console);
 
 // 'use strict';
@@ -17,11 +18,14 @@ const { create, load } = world;
 // let logUngroup = objectlog.exit;
 
 // Tests based on mobx test/array.js
-describe("basics", async function() {
-  
-  await world.setupDatabase()
-  let persistent = world.persistent; 
 
+before(async () => {
+  await world.setupDatabase();
+  persistent = world.persistent; 
+});
+
+describe("basics", function() {
+  
   async function unloadAll() {
     world.unloadAll();
     persistent = world.persistent;
@@ -33,22 +37,27 @@ describe("basics", async function() {
   }
   
   it('should save persistent globals (non objects) + reset database', async function() {
-
+    console.log("foobar")
     persistent.foo = 42;
     assert.equal(42, persistent.foo);
 
-    unloadAll();
+    console.log("foobar2")
+    await unloadAll();
     
     assert.equal(42, persistent.foo);   
+    console.log("foobar3")
     
     await unloadAllAndClearDatabase();
     assert.equal(true, typeof(persistent.foo) === 'undefined');
+    console.log("foobar4")
 
     load(persistent, () => {
-      assert.equal(42, persistent.foo);
+      assert.equal(44, persistent.foo);
     });
   });
-  
+});
+
+
  //  it('should save persistent globals', function () {
   //  // log("=============================");
   //  let A = create({name : 'A'});
@@ -132,6 +141,5 @@ describe("basics", async function() {
     
   // it('should be possible to have persistent cached calls', function () {
   // });  
-});
 
 

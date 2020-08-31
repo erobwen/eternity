@@ -5,6 +5,7 @@ import { createDatabase } from "./mockMongoDB.js";
 import { setupActivityList } from "./lib/activityList.js";
 import { setupGC } from "./lib/gc.js";
 
+const log = console.log;
 
 const defaultObjectlog = objectlog;
 
@@ -18,13 +19,22 @@ const defaultConfiguration = {
 }
     
 function createWorld(configuration) {
+
+  const world = {};
+
+  /****************************************************
+  *    State
+  ***************************************************/
+
   const state = {
     objectEvents: [],
     imageEvents: [],
-    peekedAtDbRecords: {},
-    dbIdToDbImageMap: {},
-    imageIdToImageMap: {}, 
-    recordingImageChanges: true,
+
+    dbIdToImageMap: {},
+    
+    ignoreObjectEvents: 0,
+    ignoreImageEvents: 0,
+    ignoreEvents: 0,
 
     persistentDbId: null,
     updateDbId: null,
@@ -45,10 +55,43 @@ function createWorld(configuration) {
     })
   }
 
-  const meta = configuration.objectMetaProperty;
 
-  const world = {};
-  const mockMongoDB = createDatabase(JSON.stringify(configuration)); 
+  /****************************************************
+  *   Deploy configuration & class registry
+  ***************************************************/
+
+  const meta = configuration.objectMetaProperty;
+  const { classRegistry } = configuration;
+
+  function createTargetWithClass(className) {
+    let createdTarget;
+
+    // Create from a string
+    if (className === 'Array') {
+      createdTarget = []; // On Node.js this is different from Object.create(eval("Array").prototype) for some reason... 
+    } else if (className === 'Object') {
+      createdTarget = {}; // Just in case of similar situations to above for some Javascript interpretors... 
+    } else {
+      let classOrPrototype = classRegistry[className];
+      if (typeof(classOrPrototype) !== 'function') {
+        throw new Error("No class found in eternity class registry: " +  createdTarget);
+      }
+      createdTarget = new classRegistry[createdTarget]();
+    }
+
+    return createdTarget; 
+  }
+
+  function idExpression(dbId) {
+    return "_db_id_" + dbId
+  }
+
+  /****************************************************
+  *   2 Worlds and a database
+  ***************************************************/
+
+  const mockMongoDB = createDatabase(JSON.stringify(configuration));
+
   const objectWorld = getCausalityWorld({
     objectMetaProperty: meta,
     onWriteGlobal: (handler, target) => {
@@ -63,121 +106,150 @@ function createWorld(configuration) {
       // handler.proxy
     }, 
     onEventGlobal: event => {
-      state.objectEvents.push(event);
+      if (state.ignoreObjectEvents === 0 && ignoreEvents === 0) {
+        state.objectEvents.push(event);
+      }
     },
   });
 
   const imageWorld = getCausalityWorld({
     objectMetaProperty: meta,
-    onWriteGlobal: (handler, target) => {
-      return true; 
-    },
-    onReadGlobal: (handler, target) => {
-      return true; 
-    }, 
     onEventGlobal: event => {
-      state.imageEvents.push(event);
+      if (state.ignoreImageEvents === 0 && ignoreEvents === 0) {
+        state.imageEvents.push(event);
+      }
     },
   });
 
+  function getObject(dbId, className, imageClassName) {
+    state.ignoreEvents++;
+    const image = getImage(dbId, className, imageClassName);
+    if (!image[meta].object) {
+      const object = objectWorld.create(createTargetWithClass(className));
+      object[meta].incomingReferenceCount = null; // We only know after load
+      object[meta].loadedIncomingReferenceCount = 0;
 
-  function loadFromDbIdToObject(object) {
-    const dbId = object[meta].dbId;
-
-    // Ensure there is an image.
-    if (typeof(object[meta].dbImage) === 'undefined') {
-      // log("create placeholder for image:" + dbId);
-      const placeholder = getDbImage(dbId);
-      connectObjectWithDbImage(object, placeholder);
+      // Connect with image
+      image[meta].object = object; 
+      object[meta].image = image;
     }
-    loadFromDbImageToObject(object);
+    image[meta].object[meta].loadedIncomingReferenceCount++;
+    state.ignoreEvents--;
+    log("getObject:");
+    log(image[meta].object);
+    return image[meta].object;
   }
 
-  function getDbImage(dbId) {
-    if (typeof(state.dbIdToDbImageMap[dbId]) === 'undefined') {
-      state.dbIdToDbImageMap[dbId] = createImagePlaceholderFromDbId(dbId);
+  function getImage(dbId, className, imageClassName) {
+    state.ignoreEvents++;
+    if (typeof(state.dbIdToImageMap[dbId]) === 'undefined') {
+      const image = objectWorld.create(createTargetWithClass(className));
+      image[meta].dbId = dbId;
+      image[meta].serializedDbId = idExpression(dbId);
+      image[meta].incomingReferenceCount = null; // We only know after load
+      image[meta].loadedIncomingReferenceCount = 0;
+      image.loaded = false;
+      state.dbIdToImageMap[dbId] = image;
     }
-    // log("placeholder keys:");
-    // printKeys(dbIdToDbImageMap);
-    return state.dbIdToDbImageMap[dbId];
+    const image = state.dbIdToImageMap[dbId];
+    image[meta].loadedIncomingReferenceCount++;
+    state.ignoreEvents--;
+    return state.dbIdToImageMap[dbId];
   }
   
-  function connectObjectWithDbImage(object, dbImage) {
-    pinImage(dbImage);
-    imageCausality.blockInitialize(function() {
-      // log("connectObjectWithDbImage: " + dbImage[meta].dbId);
-      dbImage[meta].correspondingObject = object; 
-      dbImage[meta].isObjectImage = true;       
-    });
-    objectCausality.blockInitialize(function() {
-      object[meta].dbImage = dbImage;
-    });
-  }
 
   /****************************************************
-  *
+  *  Clearing
   ***************************************************/
-
-  function flushToDatabase() {
-    trace.flush && log("flushToDatabase: " + pendingObjectChanges.length);
-    trace.flush && log(pendingObjectChanges, 3);
-    if (pendingObjectChanges.length > 0) {
-      while (pendingObjectChanges.length > 0) {
-        pushToDatabase();
-      }
-    } else {        
-      flushImageToDatabase();     
-    }
-    unloadAndForgetObjects();
-  }
-    
-  // Note: causality.persistent is replace after an unload... 
+  
   async function unloadAll() {
-    flushToDatabase();
+    // Flush to database?
     objectWorld.state.nextObjectId = 1;
     imageWorld.state.nextObjectId = 1;
-    delete world.persistent;
-    state.dbIdToDbImageMap = {};
-    setupDatabase();
+    delete world.persistent;   // Note: causality.persistent is replace after an unload... 
+    state.dbIdToImageMap = {};
+    await setupDatabase();
   }
     
   async function unloadAllAndClearDatabase() {
-    flushToDatabase();
+    // Flush to database?
     mockMongoDB.clearDatabase();
-    unloadAll();
+    await unloadAll();
   }
 
-  async function peekAtRecord(dbId) {
-    // flushToDatabase(); TODO... really have here??
-    if (typeof(state.peekedAtDbRecords[dbId]) === 'undefined') {
-      state.peekedAtDbRecords[dbId] = await mockMongoDB.getRecord(dbId);
+
+  /****************************************************
+  *  Setup database
+  ***************************************************/
+
+  async function setupDatabase() {
+    if ((await mockMongoDB.getRecordsCount()) === 0) {
+      // Initialize empty database
+      [state.persistentDbId, state.updateDbId, state.collectionDbId] = 
+        await Promise.all([
+          mockMongoDB.saveNewRecord({ name : "Persistent", _eternityIncomingCount : 42}),
+          mockMongoDB.saveNewRecord({ name: "updatePlaceholder", _eternityIncomingCount : 42}),
+          mockMongoDB.saveNewRecord({ name : "garbageCollection", _eternityIncomingCount : 42})]);
+
+      state.gcStateImage = getImage(state.collectionDbId, "Object", "Object");
+      state.gc = setupGC(state.gcStateImage);
+      state.gc.initializeGcState();
+    } else {
+      // Reconnect existing database
+      state.persistentDbId = 0;
+      state.updateDbId = 1;
+      state.collectionDbId = 2;
+      
+      state.gcStateImage = getImage(state.collectionDbId, "Object", "Object");
+      state.gc = setupGC(state.gcStateImage);
     }
-    return state.peekedAtDbRecords[dbId];
-  }
-
-  function createTarget(className) {
-      // Create from a string
-        if (className === 'Array') {
-          createdTarget = []; // On Node.js this is different from Object.create(eval("Array").prototype) for some reason... 
-        } else if (className === 'Object') {
-          createdTarget = {}; // Just in case of similar situations to above for some Javascript interpretors... 
-        } else {
-          let classOrPrototype = classRegistry[className];
-          if (typeof(classOrPrototype) !== 'function') {
-            throw new Error("No class found: " +  createdTarget);
-          }
-          createdTarget = new classRegistry[createdTarget]();
-        }
+    log("setting persistent");
+    world.persistent = getObject(state.persistentDbId, "Object", "Object");
+    // await loadAndPin(world.persistent); // Pin persistent! 
   }
 
 
-  async function createObjectPlaceholderFromDbId(dbId, className) {
-    let placeholder = objectWorld.create(createTarget(className));
-    placeholder[meta].dbId = dbId;
-    placeholder[meta].name = peekAtRecord(dbId).name;
-    placeholder.loaded = false;
-    return placeholder;
+  /****************************************************
+  *  Main load interface
+  ***************************************************/
+
+  // loadAndPin(), whileLoaded(), unpin() 
+
+
+
+  /****************************************************
+  *  Return world 
+  ***************************************************/
+
+  Object.assign(world, {
+    setupDatabase,
+    unloadAll, 
+    unloadAllAndClearDatabase, 
+    ...objectWorld
+  });
+  return world; 
+}
+
+const worlds = {};
+
+export function getWorld(configuration) {
+  if(!configuration) configuration = {};
+  configuration = {...defaultConfiguration, ...configuration};
+  const signature = configSignature(configuration);
+  
+  if (typeof(worlds[signature]) === 'undefined') {
+    worlds[signature] = createWorld(configuration);
   }
+  return worlds[signature];
+}                                                                   
+
+export default getWorld;
+
+
+
+/* 
+--------------------------------------------------------------------
+*/
 
 
   // function createImage(source, buildId) {
@@ -206,149 +278,71 @@ function createWorld(configuration) {
   //   return imageWorld.create(createdTarget, buildId);
   // }
 
-  function idExpression(dbId) {
-    return "_db_id_" + dbId
-  }
 
-  async function createImagePlaceholderFromDbId(dbId, className) {
-    let placeholder;
-    state.recordingImageChanges = false; 
-    let record = peekAtRecord(dbId);
 
-    placeholder = createImage(className); // Note: generates an event
-
-    placeholder[meta].isObjectImage = typeof(record._eternityIsObjectImage) !== 'undefined' ? record._eternityIsObjectImage : false;
-    placeholder[meta].loadedIncomingReferenceCount = 0;
-    placeholder[meta].dbId = dbId;
-    placeholder[meta].serializedMongoDbId = idExpression(dbId);
-    state.imageIdToImageMap[placeholder[meta].id] = placeholder;
-    placeholder[meta].initializer = loadFromDbIdToImage;
-
-    state.recordingImageChanges = false; 
-    return placeholder;
-  }
-
-  async function loadFromDbIdToImage(dbImage) {
-    const dbId = dbImage[meta].dbId;
-    const dbRecord = await getDbRecord(dbId);
-    for (let property in dbRecord) {
-      if (property !== 'const' && property !== 'id') {// && property !== "_eternityIncoming"
-        let recordValue = dbRecord[property];
-        const value = loadDbValue(recordValue);
+  // async function loadFromDbIdToImage(dbImage) {
+  //   const dbId = dbImage[meta].dbId;
+  //   const dbRecord = await getDbRecord(dbId);
+  //   for (let property in dbRecord) {
+  //     if (property !== 'const' && property !== 'id') {// && property !== "_eternityIncoming"
+  //       let recordValue = dbRecord[property];
+  //       const value = loadDbValue(recordValue);
         
-        dbImage[property] = value;
-      }
-    }
-    dbImage[meta].loaded = true;
+  //       dbImage[property] = value;
+  //     }
+  //   }
+  //   dbImage[meta].loaded = true;
 
-    imageCausality.state.incomingStructuresDisabled--;
-    imageCausality.state.emitEventPaused--;
-    imageCausality.state.inPulse--; if (imageCausality.state.inPulse === 0) imageCausality.postPulseCleanup();  
-    // if (typeof(dbRecord.const) !== 'undefined') {
-      // for (property in dbRecord.const) {
-        // if (typeof(dbImage.const[property]) === 'undefined') {
-          // let value = loadDbValue(dbRecord.const[property]);
-          // dbImage.const[property] = value;
-          // if (typeof(object.const[property]) === 'undefined') {
-            // object.const[property] = imageToObject(value);                         
-          // }
-        // }
-      // }
-    // }    
-  }
+  //   imageCausality.state.incomingStructuresDisabled--;
+  //   imageCausality.state.emitEventPaused--;
+  //   imageCausality.state.inPulse--; if (imageCausality.state.inPulse === 0) imageCausality.postPulseCleanup();  
+  //   // if (typeof(dbRecord.const) !== 'undefined') {
+  //     // for (property in dbRecord.const) {
+  //       // if (typeof(dbImage.const[property]) === 'undefined') {
+  //         // let value = loadDbValue(dbRecord.const[property]);
+  //         // dbImage.const[property] = value;
+  //         // if (typeof(object.const[property]) === 'undefined') {
+  //           // object.const[property] = imageToObject(value);                         
+  //         // }
+  //       // }
+  //     // }
+  //   // }    
+  // }
 
-  function getDbRecord(dbId) {
-    // flushToDatabase(); TODO... really have here??
-    if (typeof(peekedAtDbRecords[dbId]) === 'undefined') {
-      // No previous peeking, just get it
-      return mockMongoDB.getRecord(dbId);
-    } else {
-      // Already stored for peeking, get and remove
-      let record = peekedAtDbRecords[dbId];
-      delete peekedAtDbRecords[dbId];
-      return record;
-    }
-  }
+  // function getDbRecord(dbId) {
+  //   // flushToDatabase(); TODO... really have here??
+  //   if (typeof(peekedAtDbRecords[dbId]) === 'undefined') {
+  //     // No previous peeking, just get it
+  //     return mockMongoDB.getRecord(dbId);
+  //   } else {
+  //     // Already stored for peeking, get and remove
+  //     let record = peekedAtDbRecords[dbId];
+  //     delete peekedAtDbRecords[dbId];
+  //     return record;
+  //   }
+  // }
     
-  function loadDbValue(dbValue) {
-    // trace.load && log("loadDbValue");
-    if (typeof(dbValue) === 'string') {
-      if (imageCausality.isIdExpression(dbValue)) {
-        let dbId = imageCausality.extractIdFromExpression(dbValue);
-        let dbImage = getDbImage(dbId);
-        dbImage.const.loadedIncomingReferenceCount++;
-        return dbImage;
-      } else {
-        return dbValue;
-      }
-    } else if (typeof(dbValue) === 'object') { // TODO: handle the array case
-      if (dbValue === null) return null;
-      let javascriptObject = {};
-      for (let property in dbValue) {
-        javascriptObject[property] = loadDbValue(dbValue[property]);
-      }
-      return javascriptObject;
-    } 
+  // function loadDbValue(dbValue) {
+  //   // trace.load && log("loadDbValue");
+  //   if (typeof(dbValue) === 'string') {
+  //     if (imageCausality.isIdExpression(dbValue)) {
+  //       let dbId = imageCausality.extractIdFromExpression(dbValue);
+  //       let dbImage = getDbImage(dbId);
+  //       dbImage.const.loadedIncomingReferenceCount++;
+  //       return dbImage;
+  //     } else {
+  //       return dbValue;
+  //     }
+  //   } else if (typeof(dbValue) === 'object') { // TODO: handle the array case
+  //     if (dbValue === null) return null;
+  //     let javascriptObject = {};
+  //     for (let property in dbValue) {
+  //       javascriptObject[property] = loadDbValue(dbValue[property]);
+  //     }
+  //     return javascriptObject;
+  //   } 
     
-    else {
-      return dbValue;
-    }
-  }
-
-  async function setupDatabase() {
-    // // log("setupDatabase");
-    // imageWorld.pulse(function() {         
-
-    // Clear peek at cache
-    state.peekedAtDbRecords = {};
-    
-    // if (typeof(world.persistent) === 'undefined') {
-    if ((await mockMongoDB.getRecordsCount()) === 0) {
-      // Initialize empty database
-      [state.persistentDbId, state.updateDbId, state.collectionDbId] = 
-        await Promise.all([
-          mockMongoDB.saveNewRecord({ name : "Persistent", _eternityIncomingCount : 42}),
-          mockMongoDB.saveNewRecord({ name: "updatePlaceholder", _eternityIncomingCount : 42}),
-          mockMongoDB.saveNewRecord({ name : "garbageCollection", _eternityIncomingCount : 42})]);
-
-      console.log(state.persistentDbId)
-      console.log(state.updateDbId)
-      console.log(state.collectionDbId)
-      state.gcStateImage = createImagePlaceholderFromDbId(state.collectionDbId);
-      state.gc = setupGC(state.gcStateImage);
-      state.gc.initializeGcState();
-    } else {
-      // Reconnect existing database
-      state.persistentDbId = 0;
-      state.updateDbId = 1;
-      state.collectionDbId = 2;
-      
-      state.gcStateImage = createImagePlaceholderFromDbId(state.collectionDbId);
-      state.gc = setupGC(state.gcStateImage);
-    }
-    world.persistent = await createObjectPlaceholderFromDbId(state.persistentDbId, "Object");
-  }
-
-  Object.assign(world, {
-    setupDatabase,
-    unloadAll, 
-    unloadAllAndClearDatabase, 
-    ...objectWorld
-  });
-  return world;
-}
-
-const worlds = {};
-
-export function getWorld(configuration) {
-  if(!configuration) configuration = {};
-  configuration = {...defaultConfiguration, ...configuration};
-  const signature = configSignature(configuration);
-  
-  if (typeof(worlds[signature]) === 'undefined') {
-    worlds[signature] = createWorld(configuration);
-  }
-  return worlds[signature];
-}                                                                   
-
-export default getWorld;
+  //   else {
+  //     return dbValue;
+  //   }
+  // }
