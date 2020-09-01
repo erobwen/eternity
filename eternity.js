@@ -23,40 +23,6 @@ function createWorld(configuration) {
   const world = {};
 
   /****************************************************
-  *    State
-  ***************************************************/
-
-  const state = {
-    objectEvents: [],
-    imageEvents: [],
-
-    dbIdToImageMap: {},
-    
-    ignoreObjectEvents: 0,
-    ignoreImageEvents: 0,
-    ignoreEvents: 0,
-
-    persistentDbId: null,
-    updateDbId: null,
-    collectionDbId: null,
-    gcStateImage: null,
-    gc: null, 
-
-    activityList: setupActivityList((object) => {
-      if (typeof(object[meta].isUnforgotten) !== 'undefined') {
-        return false; 
-      }
-      
-      if (typeof(object[meta].dbImage) === 'undefined') {
-        return false;       
-      }
-      return true;
-      // Consider?: Add and remove to activity list as we persist/unpersist this object.... ??? 
-    })
-  }
-
-
-  /****************************************************
   *   Deploy configuration & class registry
   ***************************************************/
 
@@ -82,6 +48,41 @@ function createWorld(configuration) {
     return createdTarget; 
   }
 
+
+  /****************************************************
+  *    State
+  ***************************************************/
+
+  const state = {
+    objectEvents: [],
+    objectEventTransactions: [],
+
+    imageEvents: [],
+
+    dbIdToImageMap: {},
+    
+    ignoreObjectEvents: 0,
+    ignoreImageEvents: 0,
+    ignoreEvents: 0,
+
+    persistentDbId: null,
+    updateDbId: null,
+    collectionDbId: null,
+    gcStateImage: null,
+    gc: null, 
+
+    activityList: setupActivityList(meta, (object) => {
+      if (typeof(object[meta].isUnforgotten) !== 'undefined') {
+        return false; 
+      }
+      
+      if (typeof(object[meta].dbImage) === 'undefined') {
+        return false;       
+      }
+      return true;
+      // Consider?: Add and remove to activity list as we persist/unpersist this object.... ??? 
+    })
+  }
 
   /****************************************************
   *   Database encoding/decoding
@@ -112,18 +113,22 @@ function createWorld(configuration) {
 
   const objectWorld = getCausalityWorld({
     objectMetaProperty: meta,
-    onWriteGlobal: (handler, target) => {
-      state.activityList.registerActivity(handler.meta)
-      return true; 
-    },
-    onReadGlobal: (handler, target) => {
-      state.activityList.registerActivity(handler.meta)
-      return true;
-      // handler.meta
-      // handler.target
-      // handler.proxy
-    }, 
+    // onWriteGlobal: (handler, target) => {
+    //   return true; 
+    // },
+    // onReadGlobal: (handler, target) => {
+    //   return true;
+    //   // handler.meta
+    //   // handler.target
+    //   // handler.proxy
+    // }, 
     onEventGlobal: event => {
+      if (event.type === "set") {
+        if (event.newValue[meta]) event.newValue[meta].incomingReferenceCount++;
+        if (event.oldValue[meta]) event.newValue[meta].incomingReferenceCount--;        
+      }
+
+
       if (state.ignoreObjectEvents === 0 && ignoreEvents === 0) {
         state.objectEvents.push(event);
       }
@@ -166,7 +171,7 @@ function createWorld(configuration) {
       state.gc = setupGC(state.gcStateImage);
     }
     log("setting persistent");
-    world.persistent = getObject(state.persistentDbId, "Object", "Object");
+    world.persistent = getPersistentObject(state.persistentDbId, "Object", "Object");
     await loadAndPin(world.persistent); // Pin persistent! 
   }
 
@@ -175,10 +180,10 @@ function createWorld(configuration) {
   *  Get persistent objects
   ***************************************************/
 
-  function createObject(className, image) {
+  function createObjectForImage(className, image) {
     const object = objectWorld.create(createTargetWithClass(className));
-      object[meta].incomingReferenceCount = null; // We only know after load
-      object[meta].loadedIncomingReferenceCount = 0;
+      object[meta].incomingPersistentReferenceCount = null; // We only know after load
+      object[meta].incomingReferenceCount = 0;
       object[meta].pins = 0;
       object[meta].target.loaded = false;
 
@@ -187,38 +192,41 @@ function createWorld(configuration) {
       object[meta].image = image;
   }
 
-  function getObject(dbId, className, imageClassName) {
+  function getPersistentObject(dbId, className, imageClassName) {
     state.ignoreEvents++;
     const image = getImage(dbId, className, imageClassName);
     if (!image[meta].object) {
-      createObject(className, image);
+      createObjectForImage(className, image);
     }
-    image[meta].object[meta].loadedIncomingReferenceCount++;
     state.ignoreEvents--;
-    log("getObject:");
+    log("getPersistentObject:");
     log(image[meta].object);
     return image[meta].object;
+  }
+
+  let tempDbId = 1;
+  function createImage(dbId, className, imageClassName) {
+    if (!dbId) dbId = "temp_" + tempDbId++; 
+    const image = imageWorld.create(createTargetWithClass(className));
+    image[meta].dbId = dbId;
+    image[meta].serializedDbId = encodeDbReference(dbId, className, imageClassName);
+    image[meta].objectClassName = className;
+    return image;
   }
 
   function getImage(dbId, className, imageClassName) {
     state.ignoreEvents++;
     if (typeof(state.dbIdToImageMap[dbId]) === 'undefined') {
-      const image = objectWorld.create(createTargetWithClass(className));
-      image[meta].dbId = dbId;
-      image[meta].serializedDbId = encodeDbReference(dbId, className, imageClassName);
-      image[meta].incomingReferenceCount = null; // We only know after load
-      image[meta].loadedIncomingReferenceCount = 0;
-      image[meta].objectClassName = className;
-
+      const image = createImage(dbId, className, imageClassName);
       state.dbIdToImageMap[dbId] = image;
     }
     const image = state.dbIdToImageMap[dbId];
-    image[meta].loadedIncomingReferenceCount++;
+    image[meta].incomingReferenceCount++;
     state.ignoreEvents--;
     return state.dbIdToImageMap[dbId];
   }
   
-    /****************************************************
+  /****************************************************
   *  Loading objects
   ***************************************************/
 
@@ -242,7 +250,7 @@ function createWorld(configuration) {
     function imageValueToObjectValue(imageValue) {
       if (typeof(imageValue) === "object" && imageValue[meta]) {
         if (!imageValue[meta].object) {
-          createObject(imageValue[meta].objectClassName, imageValue);
+          createObjectForImage(imageValue[meta].objectClassName, imageValue);
         }
         return imageValue[meta].object;
       } else {
@@ -285,6 +293,7 @@ function createWorld(configuration) {
   async function unpin(object) {
     // TODO: Register activity here instead of using onReadGlobal... 
     object[meta].pins--;
+    state.activityList.registerActivity(object)
   } 
 
 
@@ -309,6 +318,133 @@ function createWorld(configuration) {
     await unloadAll();
   }
 
+
+  /****************************************************
+  *  Transactions
+  ***************************************************/
+
+  function transaction(action) {
+    if (state.objectEvents.length > 0) endTransaction();
+    action();
+    endTransaction();
+  }
+
+  function endTransaction() {
+    pinTransaction(state.objectEvents)
+    state.objectEventTransactions.push(state.objectEvents);
+    state.objectEvents = [];
+  }
+
+  function pinTransaction(transaction) {
+    for (let event of transaction) {
+      event.object[meta].pins++;
+    }
+  }
+
+  /****************************************************
+  *  Pushing transactions to database
+  ***************************************************/
+
+  async function flushToDatabase() {
+    while (state.objectEventTransactions.length > 0) {
+      await pushTransactionToDatabase();
+    }
+  }
+
+  async function pushTransactionToDatabase() {
+    if (state.objectEventTransactions.length > 0) {
+      const transaction = state.objectEventTransactions.shift();
+      pushTransactionToImages(transaction);
+      await pushImageEventsToDatabase(); 
+      unpinTransaction(transaction);      
+    }
+  }
+
+  function unpinTransaction() {
+    for (let event of transaction) {
+      event.object[meta].pins--;
+    }
+  }
+
+  async function pushTransactionToImages(transaction) {
+    for (let event of transaction) {
+      if (typeof(event.object[meta].image) !== 'undefined') {
+        const image = event.object[meta].image;
+
+        if (event.type === 'set') {
+          // markOldValueAsUnstable(image, event);
+            
+          setPropertyOfImageAndFloodCreateNewImages(event.object, event.property, event.value, event.oldValue);
+          }
+        } else if (event.type === 'delete') {
+          //markOldValueAsUnstable(image, event);
+                          
+          delete image[event.property];
+        }
+      }      
+    }
+  }
+
+  async function setPropertyOfImageAndFloodCreateNewImages(objectWithImage, property, value, oldValue) {
+    const image = objectWithImage[meta].image;
+    let imageValue;
+
+    // Unset previous reference to object 
+    if (oldValue[meta]) {
+      if (oldValue[meta].image.gcParent === image) {
+        // TODO: Mark as unstable
+      }
+    }
+
+    // Set new value
+    if (value[meta]) {
+      const referedObject = value;           
+      let  referedImage;
+
+      if (referedObject[meta].image) {
+        referedImage = referedObject[meta].image;
+
+        // TODO: restabilize object/image if unstable
+        // if (unstableOrBeeingForgetedInGcProcess(imageValue)) {
+        //   imageValue._eternityParent = objectWithImage.const.dbImage;
+        //   imageValue._eternityParentProperty = property;
+        //   if (inList(deallocationZone, imageValue)) {
+        //     fillDbImageFromCorrespondingObject(imageValue);               
+        //   }
+        //   addFirstToList(gcState, pendingForChildReattatchment, imageValue);  
+        //   removeFromAllGcLists(imageValue);
+        // }
+
+      } else {
+        createDbImageForObjectRecursive(referedObject);      
+        referedImage = referedObject[meta].image;
+      }
+
+      // Set back reference
+      await whileLoaded(referedObject, () => {
+        referedImage["_incoming_" + property + image[meta].dbId ]
+      });
+
+      imageValue = referedImage;
+    } else {
+      imageValue = value;
+    }
+    image[property] = imageValue;
+  }
+
+  function createDbImageForObjectRecursive(object) {
+    if (object[meta].image) throw new Error("Object already has an image");
+    const className = object.constructor.name;
+    const imageClassName = (object instanceof Array) ? "Array" : "Object"; 
+    const image = createImage(null, className, imageClassName);
+    object[meta].image = image;
+    image[meta].object = object;
+
+    for (let property in object) if (property !== "loaded") {
+      setPropertyOfImageAndFloodCreateNewImages(object, property, object[property]);
+    }
+  }
+    
 
   /****************************************************
   *  Return world 
@@ -421,7 +557,7 @@ export default getWorld;
   //     if (imageCausality.isIdExpression(dbValue)) {
   //       let dbId = imageCausality.extractIdFromExpression(dbValue);
   //       let dbImage = getDbImage(dbId);
-  //       dbImage.const.loadedIncomingReferenceCount++;
+  //       dbImage.const.incomingReferenceCount++;
   //       return dbImage;
   //     } else {
   //       return dbValue;
