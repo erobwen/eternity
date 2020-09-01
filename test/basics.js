@@ -6,6 +6,8 @@ let persistent;
 const log = console.log;
 // const { create, load } = world;
 
+const { endTransaction } = world;
+
 // 'use strict';
 // require = require("esm")(module);
 // const {observable, repeat,trace} = require("../causality.js").getWorld({name: "array-splices", emitEvents: true});
@@ -39,6 +41,7 @@ describe("basics", function() {
   it('should save persistent globals (non objects) + reset database', async function() {
     console.log("foobar")
     persistent.foo = 42;
+    endTransaction();
     assert.equal(42, persistent.foo);
 
     console.log("foobar2")

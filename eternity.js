@@ -72,11 +72,11 @@ function createWorld(configuration) {
     gc: null, 
 
     activityList: setupActivityList(meta, (object) => {
-      if (typeof(object[meta].isUnforgotten) !== 'undefined') {
+      if (object[meta].isUnforgotten) {
         return false; 
       }
       
-      if (typeof(object[meta].dbImage) === 'undefined') {
+      if (!object[meta].image) {
         return false;       
       }
       return true;
@@ -123,16 +123,10 @@ function createWorld(configuration) {
     //   // handler.proxy
     // }, 
     onEventGlobal: event => {
-      if (event.type === "set") {
-        if (event.newValue[meta]) event.newValue[meta].incomingReferenceCount++;
-        if (event.oldValue[meta]) event.newValue[meta].incomingReferenceCount--;        
-      }
-
-
       if (state.ignoreObjectEvents === 0 && ignoreEvents === 0) {
         state.objectEvents.push(event);
       }
-    },
+    }
   });
 
   const imageWorld = getCausalityWorld({
@@ -293,7 +287,7 @@ function createWorld(configuration) {
   async function unpin(object) {
     // TODO: Register activity here instead of using onReadGlobal... 
     object[meta].pins--;
-    state.activityList.registerActivity(object)
+    state.activityList.registerActivity(object);
   } 
 
 
@@ -330,7 +324,13 @@ function createWorld(configuration) {
   }
 
   function endTransaction() {
-    pinTransaction(state.objectEvents)
+    pinTransaction(state.objectEvents);
+    for (let event of state.objectEvents) {
+      if (event.type === "set") {
+        if (event.newValue[meta]) event.newValue[meta].incomingReferenceCount++;
+        if (event.oldValue[meta]) event.newValue[meta].incomingReferenceCount--; // Try to forgett refered object here?       
+      }
+    }
     state.objectEventTransactions.push(state.objectEvents);
     state.objectEvents = [];
   }
@@ -374,8 +374,7 @@ function createWorld(configuration) {
         if (event.type === 'set') {
           // markOldValueAsUnstable(image, event);
             
-          setPropertyOfImageAndFloodCreateNewImages(event.object, event.property, event.value, event.oldValue);
-          }
+          setPropertyOfImageAndFloodCreateNewImages(event.object, event.property, event.newValue, event.oldValue);
         } else if (event.type === 'delete') {
           //markOldValueAsUnstable(image, event);
                           
@@ -451,6 +450,8 @@ function createWorld(configuration) {
   ***************************************************/
 
   Object.assign(world, {
+    transaction, 
+    endTransaction,
     setupDatabase,
     unloadAll, 
     unloadAllAndClearDatabase, 
