@@ -502,7 +502,15 @@ function createWorld(configuration) {
 
       // Set back reference
       await whileLoaded(referedObject, () => {
-        referedImage["incoming:" + image[meta].dbId + ":" +  property] = image;
+        let distinguisher = ""; 
+        while (referedImage["incoming:" + property + distinguisher]) {
+          if (distinguisher === "") {
+            distinguisher = 1;
+          } else {
+            distinguisher++;
+          }
+        }
+        referedImage["incoming:" + property + distinguisher] = image;
       });
 
       imageValue = referedImage;
