@@ -57,6 +57,7 @@ function createWorld(configuration) {
     objectEventTransactions: [],
 
     imageEvents: [],
+    imageCreationEvents: [],
 
     dbIdToImageMap: {},
     
@@ -90,8 +91,8 @@ function createWorld(configuration) {
   *   Database encoding/decoding
   ***************************************************/
 
-  function encodeDbReference(dbId, className, imageClassName, incoming) {
-    return "_db_id:" + dbId + ":" + className + ":" + imageClassName;
+  function encodeDbReference(dbId, objectClassName, imageClassName) {
+    return "_db_id:" + dbId + ":" + objectClassName + ":" + imageClassName;
   }
 
   function isDbReference(string) {
@@ -135,7 +136,11 @@ function createWorld(configuration) {
     objectMetaProperty: meta,
     onEventGlobal: event => {
       if (state.ignoreImageEvents === 0 && ignoreEvents === 0) {
-        state.imageEvents.push(event);
+        if (event.type === "creation") {
+          state.imageCreationEvents.push(event);
+        } else {
+          state.imageEvents.push(event);
+        }
       }
     },
   });
@@ -202,14 +207,22 @@ function createWorld(configuration) {
     return image[meta].object;
   }
 
-  let tempDbId = 1;
-  function createImage(dbId, className, imageClassName) {
-    if (dbId === null) dbId = "temp_" + tempDbId++; 
+  function createImage(dbId, objectClassName, imageClassName) {
     const image = imageWorld.create(createTargetWithClass(className));
-    image[meta].dbId = dbId;
-    image[meta].serializedDbId = encodeDbReference(dbId, className, imageClassName);
-    image[meta].objectClassName = className;
+    image[meta].objectClassName = objectClassName;
+    image[meta].imageClassName = imageClassName;
+
+    if (dbId) {
+      setImageDbId(image, dbId);
+    } 
+
     return image;
+  }
+
+  function setImageDbId(image, dbId) {
+    const metaObject = image[meta];
+    metaObject.dbId = dbId;
+    metaObject.serializedDbId = encodeDbReference(dbId, metaObject.objectClassName, metaObject.imageClassName);
   }
 
   function getImage(dbId, className, imageClassName) {
@@ -333,37 +346,40 @@ function createWorld(configuration) {
   }
 
   function endTransaction() {
+    const objectEvents = state.objectEvents; 
+    state.objectEvents = null; // Force fail if event!
 
     // Keep track of incoming references for all objects. 
-    for (let event of state.objectEvents) {
+    for (let event of objectEvents) {
       if (event.type === "set") {
         if (event.newValue[meta]) event.newValue[meta].incomingReferenceCount++;
         if (event.oldValue[meta]) event.newValue[meta].incomingReferenceCount--; // Try to forgett refered object here?       
       }
     }
 
-    state.objectEventTransactions.push(preProcessTransaction(state.objectEvents));
+    const transaction = preCreateImagesWithSnapshot(objectEvents);
+    state.objectEventTransactions.push(transaction);
     
-    pinTransaction(state.objectEvents); // TODO: pin created images.
-
+    pinTransaction(objectEvents); // TODO: pin created images.
     state.objectEvents = [];
   }
 
-  function preProcessTransaction(transaction) {
+  function preCreateImagesWithSnapshot(objectEvents) {
     // The purpose of this is to 
     // 1. Filter out non persistent events
     // 2. Save image snapshots of newly persisted objects. It has to be done right away, since their state might change later.
 
     const newTransaction = {
-      events: [],
+      objectEvents: [],
       imageCreationEvents: null,
+      imageEvents: null
     } 
 
     if (state.imageEvents.length > 0) throw new Error("Internal Error: Image event buffer should be empty at this stage!");
-    for (let event of transaction) {
+    for (let event of objectEvents) {
       const image = event.object[meta].image; 
       if (image) {
-        newTransaction.events.push(event);
+        newTransaction.objectEvents.push(event);
 
         if (event.type === "set") {
           const referedObject = event.newValue[meta];
@@ -381,9 +397,9 @@ function createWorld(configuration) {
       }
     }
 
-    // Collect all the image creation events, to be used for later. 
-    newTransaction.imageCreationEvents = state.imageEvents;
-    state.imageEvents = [];
+    // Collect all the image creation events, to be used for later. note: mixed with settings of gcParent/gcParentProperty
+    newTransaction.imageCreationEvents = state.imageCrationEvents; state.imageCrationEvents = [];
+    newTransaction.imageEvents = state.imageEvents; state.imageEvents = [];
   }
 
 
@@ -413,8 +429,20 @@ function createWorld(configuration) {
   }
 
   function pinTransaction(transaction) {
-    for (let event of transaction) {
+    for (let event of transaction.objectEvents) {
       pin(event.object);
+    } 
+    for (let event of transaction.imageCreationEvents) {
+      pin(event.object[meta].object);
+    }
+  }
+
+  function unpinTransaction() {
+    for (let event of transaction.objectEvents) {
+      unpin(event.object);
+    }
+    for (let event of transaction.imageCreationEvents) {
+      unpin(event.object[meta].object);
     }
   }
 
@@ -431,33 +459,33 @@ function createWorld(configuration) {
   async function pushTransactionToDatabase() {
     if (state.objectEventTransactions.length > 0) {
       const transaction = state.objectEventTransactions.shift();
+      
       pushTransactionToImages(transaction);
-      await pushImageEventsToDatabase(transaction.imageCreationEvents); 
+      const imageEvents = state.imageEvents;
+      transaction.imageEvents.forEach(event => imageEvents.push(event)); // Not needed really...
+      state.imageEvents = [];
+      
+      twoPhaseComit(transaction.imageCreationEvents, imageEvents);
       unpinTransaction(transaction);      
     }
   }
 
-  function unpinTransaction() {
-    for (let event of transaction.events) {
-      unpin(event.object);
-    }
-  }
-
   async function pushTransactionToImages(transaction) {
-    for (let event of transaction.events) {
+    // Do the settings and deletes
+    for (let event of transaction.objectEvents) {
       if (typeof(event.object[meta].image) !== 'undefined') {
-        const image = event.object[meta].image;
 
         if (event.type === 'set') {
           setPropertyOfImage(event.object, event.property, event.newValue, event.oldValue);
         } else if (event.type === 'delete') {
           await unsettingPropertyOfImage(event.object, event.property, event.oldValue);
+          const image = event.object[meta].image;
           delete image[event.property];
         }
       }      
     }
 
-    // Fill the newly created images. 
+    // Fill the newly created images with object snapshots. 
     for (let imageCreation in transaction.imageCreationEvents) {
       const snapshot = imageCreation.object[meta].objectSnapshot;
       delete imageCreation.object[meta].objectSnapshot;
@@ -536,35 +564,25 @@ function createWorld(configuration) {
   *  Pushing image events to database
   ***************************************************/
 
-  async function pushImageEventsToDatabase(imageCreationEvents) {
-    const events = state.imageEvents;
-    state.imageEvents = [];
-    twoPhaseComit(events, imageCreationEvents);
-  }
-
-
-  async function twoPhaseComit(events, imageCreationEvents) {
+  async function twoPhaseComit(imageCreationEvents, imageEvents) {
 
     /**
      * First phase, write placeholders for all objects that we need to create, get their real ids, and create and save a compiled update with real dbids
      */ 
-
     // Leave a note at what stage the algorithm is, in case of failure. 
-    await mockMongoDB.updateRecord(state.updateDbId, {writingPlaceholders: true}); 
+    await mockMongoDB.updateRecord(state.updateDbId, {status: "writing placeholders"}); 
 
-    // Create all new objects we need. Give them a temporary id so we can track them down in case of failure.
+    // Create all new objects we need. Mark them with "_eternityJustCreated: true" for easy cleanup in case of failure.
     for (let event of imageCreationEvents) {
-      const tempDbId = event.object[meta].dbId; 
       const image = event.object;
-      let dbId = await mockMongoDB.saveNewRecord({_eternitySerializedTmpDbId : tmpDbId});  
-      state.tmpDbIdToDbId[tempDbId] = dbId;
-      image[meta].dbId = dbId;
+      let dbId = await mockMongoDB.saveNewRecord({_eternityJustCreated : true});  
+      setImageDbId(image, dbId);
       
       state.dbIdToImageMap[dbId] = image;
     }
 
     // Augment the update itself with the new ids.
-    const update = compileUpdate(events, imageCreationEvents);
+    const update = compileUpdate(imageCreationEvents, imageEvents);
 
     // Store the update itself so we can continue this update if any crash or power-out occurs while performing it. 
     await mockMongoDB.updateRecord(state.updateDbId, update);
@@ -572,7 +590,111 @@ function createWorld(configuration) {
 
     /**
      * Second phase, performing all the updates
-     */ 
+     */
+    await performAllUpdates(update);
+    
+    // Finish, clean up transaction
+    if (configuration.twoPhaseComit) mockMongoDB.updateRecord(updateDbId, { name: "updatePlaceholder", _eternityIncomingCount : 1 });
+    
+    // Remove pending update
+    // logUngroup();
+    pendingUpdate = null;
+  }
+  
+
+  function compileUpdate(imageCreationEvents, imageEvents) {
+
+    function serializeImage(image) {
+      let serialized = (image instanceof Array) ? [] : {};
+      for (let property in image) {
+        if (property === meta) throw Error("Meta key should not be in iteration!");
+        serialized[property] = serializeReferences(image[property]);
+      }
+      return serialized;      
+    }
+
+    function serializeReferences(entity) {
+      if (entity[meta]) {
+        return image[meta].serializedDbId;
+      } else {
+        return entity;
+      }
+    }
+
+    const recordReplacements = {};
+    const recordUpdates = {};
+    const imageDeallocations = {};
+
+    // Replace all new records    
+    for (let event of imageCreationEvents) {
+      const image = event.object;
+      recordReplacements[image[meta].dbId] = serializeImage(image);
+    }
+     
+    // Serialize updates.
+    for (let event of imageEvents) {
+      const image = event.object;
+      const dbId = image[meta].dbId;
+      if (!recordReplacements[dbId]) { // Only on non replaced objects. 
+
+        // Get specific record updates
+        if (typeof(recordUpdates[dbId]) === 'undefined') {
+          recordUpdates[dbId] = {};
+        }
+        const specificRecordUpdates = recordUpdates[dbId];
+
+        // Replace entire record or make targeted property update ajustments
+        if (Object.keys(specificRecordUpdates).length === 3) { // At most three property updates
+          // Replace entire record
+          recordReplacements[dbId] = serializeImage(image);
+          delete recordUpdates[dbId];
+        } else {
+          // Do a targeted property update
+          if (event.type === 'set') {               
+            specificRecordUpdates[event.property] = serializeReferences(event.value);
+          } else if (event.type === 'delete') {
+            specificRecordUpdates[event.property] = "_eternity_delete_property_";          
+          }   
+        }        
+      }
+    }
+
+    // Find image to deallocate:
+    for (let event of imageEvents) {
+      let dereferencedObject; 
+      if (event.type === 'set' && event.oldValue[meta]) {
+        dereferencedObject = event.oldValue; 
+      } else if (event.type === 'delete' && event.deletedValue[meta]) {
+        dereferencedObject = event.deletedValue; 
+      }
+
+      if (dereferencedObject && dereferencedObject.incomingReferenceCount === 0) {
+        const dbId = dereferencedObject[meta].dbId;
+
+        // Decouple from any object 
+        let correspondingObject = dereferencedObject[meta].object;
+        delete correspondingObject[meta].image;
+        delete correspondingObject[meta].object;
+        state.loadedObjects--;
+
+        // Target for destruction in update
+        compiledUpdate.imageDeallocations[dbId] = true;
+        if (compiledUpdate.recordUpdates[dbId]) {
+          delete compiledUpdate.recordUpdates[dbId];
+        }         
+      }
+    }
+
+    return {
+      recordReplacements,
+      recordUpdates,
+      imageDeallocations,
+    }
+  }
+
+
+  async function performAllUpdates(update) {
+
     // Write newly created
     for (let tmpDbId in imageCreations) {
       await mockMongoDB.updateRecord(tmpDbIdToDbId[tmpDbId], imageCreations[tmpDbId]));
@@ -584,9 +706,9 @@ function createWorld(configuration) {
     }     
     
     // TODO: Update entire record if the number of updates are more than half of fields.
-    if(trace.eternity) log("pendingUpdate.imageUpdates:" + Object.keys(pendingUpdate.imageUpdates).length);
-    for (let id in pendingUpdate.imageUpdates) {
-      let updates = pendingUpdate.imageUpdates[id];
+    if(trace.eternity) log("pendingUpdate.recordUpdates:" + Object.keys(pendingUpdate.recordUpdates).length);
+    for (let id in pendingUpdate.recordUpdates) {
+      let updates = pendingUpdate.recordUpdates[id];
       if (isTmpDbId(id)) {
         // log("id: " + id);
         if (typeof(tmpDbIdToDbId[id]) === 'undefined0') throw new Error("No db id found for tmpDbId: " + id);
@@ -610,88 +732,8 @@ function createWorld(configuration) {
         }
       }
     }
-    
-
-    
-    // Finish, clean up transaction
-    if (configuration.twoPhaseComit) mockMongoDB.updateRecord(updateDbId, { name: "updatePlaceholder", _eternityIncomingCount : 1 });
-    
-    // Remove pending update
-    // logUngroup();
-    pendingUpdate = null;
-  }
-  
-
-  function compileUpdate(events, imageCreationEvents) {
-    let compiledUpdate = {
-      imageCreations : {},
-      imageWritings : {},
-      imageDeallocations : {},
-      imageUpdates : {}, // TODO: Remember initial value for each field, so that events that cancel each other out might be removed altogether.
-      needsSaving : true
-    }
-     
-    // Serialize creations 
-    for (let event of imageCreationEvents) {
-      compiledUpdate.imageCreations[image[meta].dbId] = serializeDbImage(image);
-    }
-
-    // Serialize updates.
-    for (let event of events) {
-      const image = event.object;
-      const dbId = image[meta].dbId;
-      if (!compiledUpdate.imageCreations[dbId]) { // Only on non created objects. 
-        if (typeof(compiledUpdate.imageUpdates[dbId]) === 'undefined') {
-          compiledUpdate.imageUpdates[dbId] = {};
-        }
-        const imageUpdates = compiledUpdate.imageUpdates[dbId];                
-        if (event.type === 'set') {               
-          let value = serializeReferences(event.value);
-          let property = event.property; 
-          imageUpdates[event.property] = value;
-
-        } else if (event.type === 'delete') {
-          imageUpdates[event.property] = "_eternity_delete_property_";          
-        }   
-      }
-    }
-
-    // Find image to deallocate:
-    for (let event of events) {
-      let dereferencedObject; 
-      if (event.type === 'set' && event.oldValue[meta]) {
-        dereferencedObject = event.oldValue; 
-      } else if (event.type === 'delete' && event.deletedValue[meta]) {
-        dereferencedObject = event.deletedValue; 
-      }
-
-      if (dereferencedObject && dereferencedObject.incomingReferenceCount === 0) {
-        const dbId = dereferencedObject[meta].dbId;
-
-        // Decouple from any object 
-        let correspondingObject = dereferencedObject[meta].object;
-        delete correspondingObject[meta].image;
-        delete correspondingObject[meta].object;
-        state.loadedObjects--;
-
-        // Target for destruction in update
-        compiledUpdate.imageDeallocations[dbId] = true;
-        if (compiledUpdate.imageUpdates[dbId]) {
-          delete compiledUpdate.imageUpdates[dbId];
-        }         
-      }
-    }
-
-    return compiledUpdate;
   }
 
-  function serializeReferences(entity) {
-    if (entity[meta]) {
-      return image[meta].serializedDbId;
-    } else {
-      return entity;
-    }
-  }
 
   /****************************************************
   *  Garbage collection 
