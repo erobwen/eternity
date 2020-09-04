@@ -12,7 +12,6 @@ const defaultObjectlog = objectlog;
 const defaultConfiguration = {
   objectMetaProperty: "eternity",
   maxNumberOfLoadedObjects : 10000,
-  // twoPhaseComit : true,
   causalityConfiguration : {},
   allowPlainObjectReferences : true,
   classRegistry: {}
@@ -289,7 +288,7 @@ function createWorld(configuration) {
     unpin(object);
   }
 
-  function pin() {
+  function pin(object) {
     object[meta].pins++;
     if (object[meta].pins === 1) state.pinnedObjects++;
   }
@@ -334,14 +333,19 @@ function createWorld(configuration) {
   }
 
   function endTransaction() {
-    pinTransaction(state.objectEvents);
+
+    // Keep track of incoming references for all objects. 
     for (let event of state.objectEvents) {
       if (event.type === "set") {
         if (event.newValue[meta]) event.newValue[meta].incomingReferenceCount++;
         if (event.oldValue[meta]) event.newValue[meta].incomingReferenceCount--; // Try to forgett refered object here?       
       }
     }
+
     state.objectEventTransactions.push(preProcessTransaction(state.objectEvents));
+    
+    pinTransaction(state.objectEvents); // TODO: pin created images.
+
     state.objectEvents = [];
   }
 
@@ -366,7 +370,7 @@ function createWorld(configuration) {
           if (referedObject) {
             const referedImage = event.newValue[meta].image;
             if (referedObject && !event.newValue[meta].image) {
-              createDbImageForObjectRecursive(event.newValue);         
+              createImageForObjectRecursive(event.newValue);         
               const referedImage = event.newValue[meta].image; 
               referedImage.gcParent = image;
               referedImage.gcParentProperty = event.property; 
@@ -383,42 +387,7 @@ function createWorld(configuration) {
   }
 
 
-  function createDbImageForObjectRecursive(object) {
-
-    function setPropertyOfImageAndFloodCreateNewImages(objectWithImage, property, value) {
-      const image = objectWithImage[meta].image;
-      let imageValue;
-
-      // Set new value
-      if (value[meta]) {
-        const referedObject = value;           
-        let referedImage;
-
-        if (referedObject[meta].image) {
-          referedImage = referedObject[meta].image;
-          // Note: Remember to stabilize unstable data structures when the image creations are actually applied to the database.
-        } else {
-          createDbImageForObjectRecursive(referedObject);      
-          referedImage = referedObject[meta].image;
-
-          referedImage.gcParent = image;
-          referedImage.gcParentProperty = property; 
-        }
-
-        // Set back reference
-        await whileLoaded(referedObject, () => {
-          referedImage["_incoming_" + property + image[meta].dbId ]
-        });
-
-        imageValue = referedImage;
-      } else {
-        imageValue = value;
-      }
-      state.ignoreEvents++; // Stealth mode. Since this will be created, we do no need the settings also. 
-      image[property] = imageValue;
-      state.ignoreEvents--;
-    }
-
+  function createImageForObjectRecursive(object) {
     if (object[meta].image) throw new Error("Object already has an image");
     const className = object[meta]ructor.name;
     const imageClassName = (object instanceof Array) ? "Array" : "Object"; 
@@ -426,14 +395,26 @@ function createWorld(configuration) {
     object[meta].image = image;
     image[meta].object = object;
 
+    // Save snapshot for later. We will create these references later when we have finished the transaction. 
+    image[meta].objectSnapshot = {...object};
+
     for (let property in object) if (property !== "loaded") {
-      setPropertyOfImageAndFloodCreateNewImages(object, property, object[property]);
+      const value = object[property]; 
+      if (value[meta] && !value[meta].image) {
+        const referedObject = value;
+        const referedImage = referedObject[meta].image;
+        createImageForObjectRecursive(referedObject);
+
+        // Only create gc parent properties for now   
+        referedImage.gcParent = image;
+        referedImage.gcParentProperty = property;    
+      }
     }
   }
 
   function pinTransaction(transaction) {
     for (let event of transaction) {
-      event.object[meta].pins++;
+      pin(event.object);
     }
   }
 
@@ -457,8 +438,8 @@ function createWorld(configuration) {
   }
 
   function unpinTransaction() {
-    for (let event of transaction) {
-      event.object[meta].pins--;
+    for (let event of transaction.events) {
+      unpin(event.object);
     }
   }
 
@@ -468,37 +449,67 @@ function createWorld(configuration) {
         const image = event.object[meta].image;
 
         if (event.type === 'set') {
-          // markOldValueAsUnstable(image, event);
-            
           setPropertyOfImage(event.object, event.property, event.newValue, event.oldValue);
         } else if (event.type === 'delete') {
-          //markOldValueAsUnstable(image, event);
-                          
+          await unsettingPropertyOfImage(event.object, event.property, event.oldValue);
           delete image[event.property];
         }
       }      
+    }
+
+    // Fill the newly created images. 
+    for (let imageCreation in transaction.imageCreationEvents) {
+      const snapshot = imageCreation.object[meta].objectSnapshot;
+      delete imageCreation.object[meta].objectSnapshot;
+      for (let property in snapshot) {
+        await setPropertyOfImage(object, property, snapshot[property], null);        
+      }
+    }
+  }
+
+  // Unsetting property, used both for delete and for previous value in a normal set. 
+  async function unsettingPropertyOfImage(objectWithImage, property, oldValue) {
+    if (oldValue[meta]) {
+      const referedObject = oldValue;
+      const referedImage = oldValue[meta].image;
+
+      // Mark as unstable
+      if (referedImage.gcParent === image && referedImage.gcParentProperty === property) {
+        delete referedImage.gcParent;
+        delete referedImage.gcParentProperty;
+
+        await state.gc.addUnstableOrigin(referedImage); // TODO: Make sure gc internal loadings works..
+      }
+
+      // Remove incoming references
+      await whileLoaded(referedObject, () => {
+        let distinguisher = ""; 
+        while (referedImage["incoming:" + property + distinguisher] && referedImage["incoming:" + property + distinguisher] !== image) {
+          if (distinguisher === "") {
+            distinguisher = 1;
+          } else {
+            distinguisher++;
+          }
+        }
+        if (referedImage["incoming:" + property + distinguisher] !== image) throw new Error("Could not find incoming reference.");
+
+        delete referedImage["incoming:" + property + distinguisher];
+      });
     }
   }
 
   async function setPropertyOfImage(objectWithImage, property, value, oldValue) {
     const image = objectWithImage[meta].image;
-    let imageValue;
 
-    // Unset previous reference to object 
-    if (oldValue[meta]) {
-      if (oldValue[meta].image.gcParent === image) {
-        // TODO: Mark as unstable
-      }
-    }
+    // Unset previous value
+    await unsettingPropertyOfImage(objectWithImage, property, oldValue);
 
     // Set new value
+    let imageValue;
     if (value[meta]) {
       const referedObject = value;           
       const referedImage = referedObject[meta].image;
-
-      if (!referedImage) {        
-        throw new Error("Processing set in a transaction where the newValue refers to an object without an image");
-      }
+      if (!referedImage) throw new Error("Internal Error: Expected an image for the object");
 
       // Set back reference
       await whileLoaded(referedObject, () => {
@@ -530,7 +541,87 @@ function createWorld(configuration) {
     state.imageEvents = [];
     twoPhaseComit(events, imageCreationEvents);
   }
+
+
+  async function twoPhaseComit(events, imageCreationEvents) {
+
+    /**
+     * First phase, write placeholders for all objects that we need to create, get their real ids, and create and save a compiled update with real dbids
+     */ 
+
+    // Leave a note at what stage the algorithm is, in case of failure. 
+    await mockMongoDB.updateRecord(state.updateDbId, {writingPlaceholders: true}); 
+
+    // Create all new objects we need. Give them a temporary id so we can track them down in case of failure.
+    for (let event of imageCreationEvents) {
+      const tempDbId = event.object[meta].dbId; 
+      const image = event.object;
+      let dbId = await mockMongoDB.saveNewRecord({_eternitySerializedTmpDbId : tmpDbId});  
+      state.tmpDbIdToDbId[tempDbId] = dbId;
+      image[meta].dbId = dbId;
+      
+      state.dbIdToImageMap[dbId] = image;
+    }
+
+    // Augment the update itself with the new ids.
+    const update = compileUpdate(events, imageCreationEvents);
+
+    // Store the update itself so we can continue this update if any crash or power-out occurs while performing it. 
+    await mockMongoDB.updateRecord(state.updateDbId, update);
+
+
+    /**
+     * Second phase, performing all the updates
+     */ 
+    // Write newly created
+    for (let tmpDbId in imageCreations) {
+      await mockMongoDB.updateRecord(tmpDbIdToDbId[tmpDbId], imageCreations[tmpDbId]));
+    }
+
+    // Deallocate deleted
+    for (let dbId in pendingUpdate.imageDeallocations) {
+      mockMongoDB.deallocate(dbId);
+    }     
+    
+    // TODO: Update entire record if the number of updates are more than half of fields.
+    if(trace.eternity) log("pendingUpdate.imageUpdates:" + Object.keys(pendingUpdate.imageUpdates).length);
+    for (let id in pendingUpdate.imageUpdates) {
+      let updates = pendingUpdate.imageUpdates[id];
+      if (isTmpDbId(id)) {
+        // log("id: " + id);
+        if (typeof(tmpDbIdToDbId[id]) === 'undefined0') throw new Error("No db id found for tmpDbId: " + id);
+        id = tmpDbIdToDbId[id];
+      }
+      // log("update image id:" + id + " keys: " + Object.keys(pendingImageUpdates[id]));
+      let updatesWithoutTmpDbIds = replaceTmpDbIdsWithDbIds(updates);
+      if(trace.eternity) log(updatesWithoutTmpDbIds);
+      for (let property in updatesWithoutTmpDbIds) {
+        if (property !== "_eternityDeletedKeys") {
+          let value = updatesWithoutTmpDbIds[property];
+          // value = replaceTmpDbIdsWithDbIds(value);
+          // property = imageCausality.transformPossibleIdExpression(property, convertTmpDbIdToDbId);
+          mockMongoDB.updateRecordPath(id, [property], value);            
+        }
+      }
+      
+      if (typeof(updatesWithoutTmpDbIds["_eternityDeletedKeys"]) !== 'undefined') {
+        for (let deletedProperty in updatesWithoutTmpDbIds["_eternityDeletedKeys"]) {           
+          mockMongoDB.deleteRecordPath(id, [deletedProperty]);
+        }
+      }
+    }
+    
+
+    
+    // Finish, clean up transaction
+    if (configuration.twoPhaseComit) mockMongoDB.updateRecord(updateDbId, { name: "updatePlaceholder", _eternityIncomingCount : 1 });
+    
+    // Remove pending update
+    // logUngroup();
+    pendingUpdate = null;
+  }
   
+
   function compileUpdate(events, imageCreationEvents) {
     let compiledUpdate = {
       imageCreations : {},
@@ -602,85 +693,10 @@ function createWorld(configuration) {
     }
   }
 
-  async function twoPhaseComit(events, imageCreationEvents) {
+  /****************************************************
+  *  Garbage collection 
+  ***************************************************/
 
-    /**
-     * First phase, write placeholders for all objects that we need to create, get their real ids, and create and save a compiled update with real dbids
-     */ 
-
-    // Leave a note at what stage the algorithm is, in case of failure. 
-    await mockMongoDB.updateRecord(state.updateDbId, {writingPlaceholders: true}); 
-
-    // Create all new objects we need. Give them a temporary id so we can track them down in case of failure.
-    for (let event of imageCreationEvents) {
-      const tempDbId = event.object[meta].dbId; 
-      const image = event.object;
-      let dbId = await mockMongoDB.saveNewRecord({_eternitySerializedTmpDbId : tmpDbId});  
-      state.tmpDbIdToDbId[tempDbId] = dbId;
-      image[meta].dbId = dbId;
-      
-      state.dbIdToImageMap[dbId] = image;
-    }
-
-    // Augment the update itself with the new ids.
-    const update = compileUpdate(events, imageCreationEvents);
-
-    // Store the update itself so we can continue this update if any crash or power-out occurs while performing it. 
-    await mockMongoDB.updateRecord(state.updateDbId, update);
-
-
-    /**
-     * Second phase, performing all the updates
-     */ 
-
-    // Write newly created
-    for (let tmpDbId in imageCreations) {
-      await mockMongoDB.updateRecord(tmpDbIdToDbId[tmpDbId], imageCreations[tmpDbId]));
-    }
-
-    // Deallocate deleted
-    for (let dbId in pendingUpdate.imageDeallocations) {
-      mockMongoDB.deallocate(dbId);
-    }     
-    
-    // TODO: Update entire record if the number of updates are more than half of fields.
-    if(trace.eternity) log("pendingUpdate.imageUpdates:" + Object.keys(pendingUpdate.imageUpdates).length);
-    for (let id in pendingUpdate.imageUpdates) {
-      let updates = pendingUpdate.imageUpdates[id];
-      if (isTmpDbId(id)) {
-        // log("id: " + id);
-        if (typeof(tmpDbIdToDbId[id]) === 'undefined0') throw new Error("No db id found for tmpDbId: " + id);
-        id = tmpDbIdToDbId[id];
-      }
-      // log("update image id:" + id + " keys: " + Object.keys(pendingImageUpdates[id]));
-      let updatesWithoutTmpDbIds = replaceTmpDbIdsWithDbIds(updates);
-      if(trace.eternity) log(updatesWithoutTmpDbIds);
-      for (let property in updatesWithoutTmpDbIds) {
-        if (property !== "_eternityDeletedKeys") {
-          let value = updatesWithoutTmpDbIds[property];
-          // value = replaceTmpDbIdsWithDbIds(value);
-          // property = imageCausality.transformPossibleIdExpression(property, convertTmpDbIdToDbId);
-          mockMongoDB.updateRecordPath(id, [property], value);            
-        }
-      }
-      
-      if (typeof(updatesWithoutTmpDbIds["_eternityDeletedKeys"]) !== 'undefined') {
-        for (let deletedProperty in updatesWithoutTmpDbIds["_eternityDeletedKeys"]) {           
-          mockMongoDB.deleteRecordPath(id, [deletedProperty]);
-        }
-      }
-    }
-    
-
-    
-    // Finish, clean up transaction
-    if (configuration.twoPhaseComit) mockMongoDB.updateRecord(updateDbId, { name: "updatePlaceholder", _eternityIncomingCount : 1 });
-    
-    // Remove pending update
-    // logUngroup();
-    pendingUpdate = null;
-  }
-  
 
   /****************************************************
   *  Return world 
