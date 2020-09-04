@@ -3,7 +3,7 @@ import { argumentsToArray, configSignature, mergeInto } from "./lib/utility.js";
 import { objectlog } from "./lib/objectlog.js";
 import { createDatabase } from "./mockMongoDB.js";
 import { setupActivityList } from "./lib/activityList.js";
-import { setupGC } from "./lib/gc.js";
+import { setupGC } from "./lib/flameFrontGC.js";
 
 const log = console.log;
 
@@ -209,6 +209,7 @@ function createWorld(configuration) {
 
   function createImage(dbId, objectClassName, imageClassName) {
     const image = imageWorld.create(createTargetWithClass(className));
+    image._eternityIncomingCount = 0;
     image[meta].objectClassName = objectClassName;
     image[meta].imageClassName = imageClassName;
 
@@ -230,6 +231,7 @@ function createWorld(configuration) {
     if (typeof(state.dbIdToImageMap[dbId]) === 'undefined') {
       const image = createImage(dbId, className, imageClassName);
       state.dbIdToImageMap[dbId] = image;
+      state.rememberedImages++;
     }
     const image = state.dbIdToImageMap[dbId];
     image[meta].incomingReferenceCount++;
@@ -324,6 +326,7 @@ function createWorld(configuration) {
     imageWorld.state.nextObjectId = 1;
     delete world.persistent;   // Note: causality.persistent is replace after an unload... 
     state.dbIdToImageMap = {};
+    state.rememberedImages = 0;
     await setupDatabase();
   }
     
@@ -388,8 +391,8 @@ function createWorld(configuration) {
             if (referedObject && !event.newValue[meta].image) {
               createImageForObjectRecursive(event.newValue);         
               const referedImage = event.newValue[meta].image; 
-              referedImage.gcParent = image;
-              referedImage.gcParentProperty = event.property; 
+              referedImage._eternityPersistentParent = image;
+              referedImage._eternityPersistentParentProperty = event.property; 
               // Note: Wait with setting the property until later. Now we only prepare the images of the refered data structure.
             }
           }          
@@ -397,7 +400,7 @@ function createWorld(configuration) {
       }
     }
 
-    // Collect all the image creation events, to be used for later. note: mixed with settings of gcParent/gcParentProperty
+    // Collect all the image creation events, to be used for later. note: mixed with settings of _eternityPersistentParent/_eternityPersistentParentProperty
     newTransaction.imageCreationEvents = state.imageCrationEvents; state.imageCrationEvents = [];
     newTransaction.imageEvents = state.imageEvents; state.imageEvents = [];
   }
@@ -422,8 +425,8 @@ function createWorld(configuration) {
         createImageForObjectRecursive(referedObject);
 
         // Only create gc parent properties for now   
-        referedImage.gcParent = image;
-        referedImage.gcParentProperty = property;    
+        referedImage._eternityPersistentParent = image;
+        referedImage._eternityPersistentParentProperty = property;    
       }
     }
   }
@@ -502,9 +505,9 @@ function createWorld(configuration) {
       const referedImage = oldValue[meta].image;
 
       // Mark as unstable
-      if (referedImage.gcParent === image && referedImage.gcParentProperty === property) {
-        delete referedImage.gcParent;
-        delete referedImage.gcParentProperty;
+      if (referedImage._eternityPersistentParent === image && referedImage._eternityPersistentParentProperty === property) {
+        delete referedImage._eternityPersistentParent;
+        delete referedImage._eternityPersistentParentProperty;
 
         await state.gc.addUnstableOrigin(referedImage); // TODO: Make sure gc internal loadings works..
       }
@@ -522,6 +525,8 @@ function createWorld(configuration) {
         if (referedImage["incoming:" + property + distinguisher] !== image) throw new Error("Could not find incoming reference.");
 
         delete referedImage["incoming:" + property + distinguisher];
+
+        referedImage._eternityIncomingCount--;
       });
     }
   }
@@ -550,6 +555,7 @@ function createWorld(configuration) {
           }
         }
         referedImage["incoming:" + property + distinguisher] = image;
+        referedImage._eternityIncomingCount++;
       });
 
       imageValue = referedImage;
@@ -570,7 +576,7 @@ function createWorld(configuration) {
      * First phase, write placeholders for all objects that we need to create, get their real ids, and create and save a compiled update with real dbids
      */ 
     // Leave a note at what stage the algorithm is, in case of failure. 
-    await mockMongoDB.updateRecord(state.updateDbId, {status: "writing placeholders"}); 
+    await mockMongoDB.updateRecord(state.updateDbId, { name: "updatePlaceholder", status: "writing image placeholders"}); 
 
     // Create all new objects we need. Mark them with "_eternityJustCreated: true" for easy cleanup in case of failure.
     for (let event of imageCreationEvents) {
@@ -579,6 +585,7 @@ function createWorld(configuration) {
       setImageDbId(image, dbId);
       
       state.dbIdToImageMap[dbId] = image;
+      state.rememberedImages++;
     }
 
     // Augment the update itself with the new ids.
@@ -594,7 +601,7 @@ function createWorld(configuration) {
     await performAllUpdates(update);
     
     // Finish, clean up transaction
-    if (configuration.twoPhaseComit) mockMongoDB.updateRecord(updateDbId, { name: "updatePlaceholder", _eternityIncomingCount : 1 });
+    if (configuration.twoPhaseComit) mockMongoDB.updateRecord(state.updateDbId, { name: "updatePlaceholder" });
     
     // Remove pending update
     // logUngroup();
@@ -625,9 +632,13 @@ function createWorld(configuration) {
     const recordUpdates = {};
     const imageDeallocations = {};
 
+    const allImages = {};
+
     // Replace all new records    
     for (let event of imageCreationEvents) {
       const image = event.object;
+      const dbId = image[meta].dbId;
+      allImages[dbId] = image; 
       recordReplacements[image[meta].dbId] = serializeImage(image);
     }
      
@@ -635,6 +646,7 @@ function createWorld(configuration) {
     for (let event of imageEvents) {
       const image = event.object;
       const dbId = image[meta].dbId;
+      allImages[dbId] = image; 
       if (!recordReplacements[dbId]) { // Only on non replaced objects. 
 
         // Get specific record updates
@@ -659,33 +671,31 @@ function createWorld(configuration) {
       }
     }
 
-    // Find image to deallocate:
-    for (let event of imageEvents) {
-      let dereferencedObject; 
-      if (event.type === 'set' && event.oldValue[meta]) {
-        dereferencedObject = event.oldValue; 
-      } else if (event.type === 'delete' && event.deletedValue[meta]) {
-        dereferencedObject = event.deletedValue; 
-      }
+    // Find image to deallocate.
+    // Note, upon deallocation they need to be removed from any GC list. 
+    for (dbId in allImages) {
+      const image = allImages[dbId];
 
-      if (dereferencedObject && dereferencedObject.incomingReferenceCount === 0) {
-        const dbId = dereferencedObject[meta].dbId;
+      if (image._eternityIncomingCount === 0) {
+        
+        // Decouple from object 
+        let object = image[meta].object;
+        delete object[meta].image;
+        delete object[meta].object;
 
-        // Decouple from any object 
-        let correspondingObject = dereferencedObject[meta].object;
-        delete correspondingObject[meta].image;
-        delete correspondingObject[meta].object;
-        state.loadedObjects--;
+        // Forget
+        delete state.dbIdToImageMap[dbId]; 
+        state.rememberedImages--;
 
-        // Target for destruction in update
-        compiledUpdate.imageDeallocations[dbId] = true;
-        if (compiledUpdate.recordUpdates[dbId]) {
-          delete compiledUpdate.recordUpdates[dbId];
-        }         
+        // Setup for destruction
+        imageDeallocations[dbId] = true;
+        if (recordUpdates[dbId]) delete recordUpdates[dbId];
+        if (recordReplacements[dbId]) delete recordReplacements[dbId];
       }
     }
 
     return {
+      name: "update",
       recordReplacements,
       recordUpdates,
       imageDeallocations,
