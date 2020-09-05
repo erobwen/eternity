@@ -156,9 +156,9 @@ function createWorld(configuration) {
       log("initialize empty database");
       [state.persistentDbId, state.updateDbId, state.collectionDbId] = 
         await Promise.all([
-          mockMongoDB.saveNewRecord({ name : "Persistent", _eternityIncomingCount : 42}),
-          mockMongoDB.saveNewRecord({ name: "updatePlaceholder", _eternityIncomingCount : 42}),
-          mockMongoDB.saveNewRecord({ name : "garbageCollection", _eternityIncomingCount : 42})]);
+          mockMongoDB.saveNewRecord({ name : "persistent", _eternityIncomingCount : 0}),
+          mockMongoDB.saveNewRecord({ name: "updatePlaceholder" }),
+          mockMongoDB.saveNewRecord({ name : "garbageCollection" })]);
 
       state.gcStateImage = getImage(state.collectionDbId, "Object", "Object");
       state.gc = setupGC(state.gcStateImage);
@@ -173,8 +173,19 @@ function createWorld(configuration) {
       state.gcStateImage = getImage(state.collectionDbId, "Object", "Object");
       state.gc = setupGC(state.gcStateImage);
     }
-    log("setting persistent");
+    log(state.persistentDbId);
+
+    // Protect images from accidental deallocation
+    state.protectedImages = {};
+    state.protectedImages[state.persistentDbId] = true; 
+    state.protectedImages[state.updateDbId] = true; 
+    state.protectedImages[state.collectionDbId] = true; 
+
     world.persistent = getPersistentObject(state.persistentDbId, "Object", "Object");
+    // log(world.persistent[meta]);
+    // log(world.persistent[meta].image);
+    // log(world.persistent[meta].image[meta]);
+    // log(world.persistent[meta].image[meta].dbId);
     await loadAndPin(world.persistent); // Pin persistent! 
   }
 
@@ -208,12 +219,12 @@ function createWorld(configuration) {
   }
 
   function createImage(dbId, objectClassName, imageClassName) {
-    const image = imageWorld.create(createTargetWithClass(className));
+    const image = imageWorld.create(createTargetWithClass(objectClassName));
     image._eternityIncomingCount = 0;
     image[meta].objectClassName = objectClassName;
     image[meta].imageClassName = imageClassName;
 
-    if (dbId) {
+    if (typeof(dbId) === "number") {
       setImageDbId(image, dbId);
     } 
 
@@ -342,15 +353,24 @@ function createWorld(configuration) {
   *  Transactions
   ***************************************************/
 
-  function transaction(action) {
+  // Note: You typically do not need to wait for the promise returned, unless you want to be sure that the data has been stored persistently. 
+  // If not, the changes will be queued upp and persisted gradually, which is fine in most cases.
+  async function transaction(action) { // action can not be async. 
     if (state.objectEvents.length > 0) endTransaction();
     action();
-    endTransaction();
+    return endTransaction();
   }
 
-  function endTransaction() {
+  // Note: You typically do not need to wait for the promise returned, unless you want to be sure that the data has been stored persistently. 
+  // If not, the changes will be queued upp and persisted gradually, which is fine in most cases.
+  async function endTransaction() {
     const objectEvents = state.objectEvents; 
     state.objectEvents = null; // Force fail if event!
+
+    let resolvePromise; 
+    const onPersistPromise = new Promise((resolve, reject) => { 
+      resolvePromise = resolve;
+    });
 
     // Keep track of incoming references for all objects. 
     for (let event of objectEvents) {
@@ -361,10 +381,12 @@ function createWorld(configuration) {
     }
 
     const transaction = preCreateImagesWithSnapshot(objectEvents);
+    transaction.resolvePromise = resolvePromise;
     state.objectEventTransactions.push(transaction);
     
     pinTransaction(objectEvents); // TODO: pin created images.
     state.objectEvents = [];
+    return onPersistPromise; 
   }
 
   function preCreateImagesWithSnapshot(objectEvents) {
@@ -408,7 +430,7 @@ function createWorld(configuration) {
 
   function createImageForObjectRecursive(object) {
     if (object[meta].image) throw new Error("Object already has an image");
-    const className = object[meta]ructor.name;
+    const className = object.constructor.name;
     const imageClassName = (object instanceof Array) ? "Array" : "Object"; 
     const image = createImage(null, className, imageClassName);
     object[meta].image = image;
@@ -469,7 +491,8 @@ function createWorld(configuration) {
       state.imageEvents = [];
       
       twoPhaseComit(transaction.imageCreationEvents, imageEvents);
-      unpinTransaction(transaction);      
+      unpinTransaction(transaction);
+      transaction.resolvePromise();
     }
   }
 
@@ -588,24 +611,22 @@ function createWorld(configuration) {
       state.rememberedImages++;
     }
 
-    // Augment the update itself with the new ids.
+    // Augment the update itself with the new ids. 
     const update = compileUpdate(imageCreationEvents, imageEvents);
 
-    // Store the update itself so we can continue this update if any crash or power-out occurs while performing it. 
+    // Store the update itself so we can continue this update if any crash or power-out occurs while performing it.
+    // After the update has been stored, no rollback is possible, only roll-forward and complete the whole update. 
     await mockMongoDB.updateRecord(state.updateDbId, update);
 
 
     /**
-     * Second phase, performing all the updates
+     * Second phase, performing all the updates & remove the update.
      */
+     // Perform all updates
     await performAllUpdates(update);
     
     // Finish, clean up transaction
-    if (configuration.twoPhaseComit) mockMongoDB.updateRecord(state.updateDbId, { name: "updatePlaceholder" });
-    
-    // Remove pending update
-    // logUngroup();
-    pendingUpdate = null;
+    await mockMongoDB.updateRecord(state.updateDbId, { name: "updatePlaceholder" });
   }
   
 
@@ -674,6 +695,8 @@ function createWorld(configuration) {
     // Find image to deallocate.
     // Note, upon deallocation they need to be removed from any GC list. 
     for (dbId in allImages) {
+      if (state.protectedImages[dbId]) continue;
+
       const image = allImages[dbId];
 
       if (image._eternityIncomingCount === 0) {
@@ -705,49 +728,36 @@ function createWorld(configuration) {
 
   async function performAllUpdates(update) {
 
-    // Write newly created
-    for (let tmpDbId in imageCreations) {
-      await mockMongoDB.updateRecord(tmpDbIdToDbId[tmpDbId], imageCreations[tmpDbId]));
+    // Deallocate deleted
+    for (let dbId in update.imageDeallocations) {
+      await mockMongoDB.deallocate(dbId);
+    }
+    
+    // Update records
+    for (let dbId in update.recordUpdates) {
+      const specificUpdates = update.recordUpdates[dbId];
+      for (let property in specificUpdates) {
+        const value = specificUpdates[property];
+        if (value === "_eternity_delete_property_") {
+          await mockMongoDB.deleteRecordPath(dbId, [property]);
+        } else {
+          await mockMongoDB.updateRecordPath(dbId, [property], value);
+        }
+      }
     }
 
-    // Deallocate deleted
-    for (let dbId in pendingUpdate.imageDeallocations) {
-      mockMongoDB.deallocate(dbId);
-    }     
-    
-    // TODO: Update entire record if the number of updates are more than half of fields.
-    if(trace.eternity) log("pendingUpdate.recordUpdates:" + Object.keys(pendingUpdate.recordUpdates).length);
-    for (let id in pendingUpdate.recordUpdates) {
-      let updates = pendingUpdate.recordUpdates[id];
-      if (isTmpDbId(id)) {
-        // log("id: " + id);
-        if (typeof(tmpDbIdToDbId[id]) === 'undefined0') throw new Error("No db id found for tmpDbId: " + id);
-        id = tmpDbIdToDbId[id];
-      }
-      // log("update image id:" + id + " keys: " + Object.keys(pendingImageUpdates[id]));
-      let updatesWithoutTmpDbIds = replaceTmpDbIdsWithDbIds(updates);
-      if(trace.eternity) log(updatesWithoutTmpDbIds);
-      for (let property in updatesWithoutTmpDbIds) {
-        if (property !== "_eternityDeletedKeys") {
-          let value = updatesWithoutTmpDbIds[property];
-          // value = replaceTmpDbIdsWithDbIds(value);
-          // property = imageCausality.transformPossibleIdExpression(property, convertTmpDbIdToDbId);
-          mockMongoDB.updateRecordPath(id, [property], value);            
-        }
-      }
-      
-      if (typeof(updatesWithoutTmpDbIds["_eternityDeletedKeys"]) !== 'undefined') {
-        for (let deletedProperty in updatesWithoutTmpDbIds["_eternityDeletedKeys"]) {           
-          mockMongoDB.deleteRecordPath(id, [deletedProperty]);
-        }
-      }
+    // Replace records
+    for (let dbId in update.recordReplacements) {
+      const replacement = update.recordUpdates[dbId];
+      await mockMongoDB.updateRecord(dbId, replacement);
     }
-  }
+   }
 
 
   /****************************************************
   *  Garbage collection 
   ***************************************************/
+
 
 
   /****************************************************
@@ -797,63 +807,6 @@ export default getWorld;
 //         //   removeFromAllGcLists(imageValue);
 //         // }
 
-
-
-    // function postImagePulseAction(events) {
-    //   // log("postImagePulseAction: " + events.length + " events");
-    //   // logGroup();
-    //   if (events.length > 0) {
-    //     // Set the class of objects created... TODO: Do this in-pulse somehow instead?
-    //     addImageClassNames(events);
-        
-    //     updateIncomingReferencesCounters(events);
-    //     // pendingUpdates.push(events);
-        
-    //     // Push to pending updates
-    //     let compiledUpdate = compileUpdate(events);
-    //     // log("compiledUpdate");
-    //     // log(compiledUpdate, 10);
-    //     if (pendingUpdate === null) {
-    //       pendingUpdate = compiledUpdate;
-    //     } else {
-    //       mergeUpdate(pendingUpdate, compiledUpdate);         
-    //       // log("pendingUpdate after merge");
-    //       // log(pendingUpdate, 10);
-    //     }
-    //     // flushImageToDatabase();
-    //   } else {
-    //     // log("no events...");
-    //     // throw new Error("a pulse with no events?");
-    //   }
-    //   // logUngroup();
-    //   unloadAndForgetImages();
-    // } 
-
-  // function createImage(source, buildId) {
-  //   let createdTarget;
-  //   if (typeof(source) === 'undefined') {
-  //       // Create from nothing
-  //       createdTarget = {};
-  //   } else if (typeof(source) === 'function') {
-  //     // Create from initializer
-  //     initializer = source; 
-  //     createdTarget = {};
-  //   } else if (typeof(source) === 'string') {
-  //     // Create from a string
-  //     if (source === 'Array') {
-  //       createdTarget = []; // On Node.js this is different from Object.create(eval("Array").prototype) for some reason... 
-  //     } else if (source === 'Object') {
-  //       createdTarget = {}; // Just in case of similar situations to above for some Javascript interpretors... 
-  //     } else {
-  //       let classOrPrototype = configuration.classRegistry[source];
-  //       if (typeof(classOrPrototype) !== 'function') {
-  //         throw new Error("No class found: " +  createdTarget);
-  //       }
-  //       createdTarget = new configuration.classRegistry[createdTarget]();
-  //     }
-  //   }
-  //   return imageWorld.create(createdTarget, buildId);
-  // }
 
 
 
