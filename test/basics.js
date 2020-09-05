@@ -26,8 +26,8 @@ before(async () => {
   persistent = world.persistent; 
 });
 
-describe("basics", function() {
-  
+describe("basic operations", function() {
+
   async function unloadAll() {
     await world.unloadAll();
     persistent = world.persistent;
@@ -39,30 +39,27 @@ describe("basics", function() {
   }
   
   it('should save persistent globals (non objects) + reset database', async function() {
-    console.log("foobar")
+    log("--------------------------------------------------");
     persistent.foo = 42;
-    logToFile(world.mockMongoDB.getAllRecordsParsed(), 10, "./databaseDump.json");
+    // logToFile(world.mockMongoDB.getAllRecordsParsed(), 10, "./databaseDump1.json");
     endTransaction();
-    logToFile(world.mockMongoDB.getAllRecordsParsed(), 10, "./databaseDump.json");
+    // logToFile(world.mockMongoDB.getAllRecordsParsed(), 10, "./databaseDump2.json");
     assert.equal(42, persistent.foo);
 
-    console.log("foobar2")
-    logToFile(world.mockMongoDB.getAllRecordsParsed(), 10, "./databaseDump.json");
+
+    // logToFile(world.mockMongoDB.getAllRecordsParsed(), 10, "./databaseDump3.json");
     await unloadAll();
 
-    log("after unload all...");
-    logToFile(world.mockMongoDB.getAllRecordsParsed(), 10, "./databaseDump.json");
+    // logToFile(world.mockMongoDB.getAllRecordsParsed(), 10, "./databaseDump4.json");
     log("--------------------------------------------------");
     log(persistent.loaded);
     log(world.eternityState);
 
 
     assert.equal(42, persistent.foo);   
-    console.log("foobar3")
     
     await unloadAllAndClearDatabase();
     assert.equal(true, typeof(persistent.foo) === 'undefined');
-    console.log("foobar4")
 
     load(persistent, () => {
       assert.equal(44, persistent.foo);

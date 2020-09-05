@@ -5,7 +5,8 @@ import { createDatabase } from "./mockMongoDB.js";
 import { setupActivityList } from "./lib/activityList.js";
 import { setupGC } from "./lib/flameFrontGC.js";
 
-const log = console.log;
+const log = objectlog.log;
+// const log = console.log;
 
 const defaultObjectlog = objectlog;
 
@@ -125,8 +126,12 @@ function createWorld(configuration) {
     //   // handler.target
     //   // handler.proxy
     // }, 
+    emitEvents: true, 
     onEventGlobal: event => {
-      if (state.ignoreObjectEvents === 0 && ignoreEvents === 0) {
+      log("onEventGlobal");
+      log(state.ignoreEvents);
+      if (state.ignoreObjectEvents === 0 && state.ignoreEvents === 0) {
+        log(event);
         state.objectEvents.push(event);
       }
     }
@@ -135,7 +140,7 @@ function createWorld(configuration) {
   const imageWorld = getCausalityWorld({
     objectMetaProperty: meta,
     onEventGlobal: event => {
-      if (state.ignoreImageEvents === 0 && ignoreEvents === 0) {
+      if (state.ignoreImageEvents === 0 && state.ignoreEvents === 0) {
         if (event.type === "creation") {
           state.imageCreationEvents.push(event);
         } else {
@@ -151,9 +156,10 @@ function createWorld(configuration) {
   ***************************************************/
 
   async function setupDatabase() {
+    log("setupDatabase:");
     if ((await mockMongoDB.getRecordsCount()) === 0) {
       // Initialize empty database
-      log("initialize empty database");
+      log("initialize empty database...");
       [state.persistentDbId, state.updateDbId, state.collectionDbId] = 
         await Promise.all([
           mockMongoDB.saveNewRecord({ name : "persistent", _eternityIncomingCount : 0}),
@@ -165,7 +171,7 @@ function createWorld(configuration) {
       state.gc.initializeGcState();
     } else {
       // Reconnect existing database
-      log("reconnect database");
+      log("reconnect database...");
       state.persistentDbId = 0;
       state.updateDbId = 1;
       state.collectionDbId = 2;
@@ -173,7 +179,6 @@ function createWorld(configuration) {
       state.gcStateImage = getImage(state.collectionDbId, "Object", "Object");
       state.gc = setupGC(state.gcStateImage);
     }
-    log(state.persistentDbId);
 
     // Protect images from accidental deallocation
     state.protectedImages = {};
@@ -296,7 +301,9 @@ function createWorld(configuration) {
       throw new Error("Cannot load non-persistent object");
     }
 
+    state.ignoreEvents++; // No events to push
     object.loaded = true; // Possibly Trigger reactions.
+    state.ignoreEvents--;
   }
 
   async function loadAndPin(object) {
@@ -364,6 +371,7 @@ function createWorld(configuration) {
   // Note: You typically do not need to wait for the promise returned, unless you want to be sure that the data has been stored persistently. 
   // If not, the changes will be queued upp and persisted gradually, which is fine in most cases.
   async function endTransaction() {
+    log("endTransaction:");
     const objectEvents = state.objectEvents; 
     state.objectEvents = null; // Force fail if event!
 
@@ -371,18 +379,21 @@ function createWorld(configuration) {
     const onPersistPromise = new Promise((resolve, reject) => { 
       resolvePromise = resolve;
     });
+    log("...")
 
     // Keep track of incoming references for all objects. 
-    for (let event of objectEvents) {
-      if (event.type === "set") {
-        if (event.newValue[meta]) event.newValue[meta].incomingReferenceCount++;
-        if (event.oldValue[meta]) event.newValue[meta].incomingReferenceCount--; // Try to forgett refered object here?       
-      }
-    }
+    // for (let event of objectEvents) {
+    //   if (event.type === "set") {
+    //     if (event.newValue[meta]) event.newValue[meta].incomingReferenceCount++;
+    //     if (event.oldValue[meta]) event.newValue[meta].incomingReferenceCount--; // Try to forgett refered object here?       
+    //   }
+    // }
+    log("...")
 
     const transaction = preCreateImagesWithSnapshot(objectEvents);
     transaction.resolvePromise = resolvePromise;
     state.objectEventTransactions.push(transaction);
+    log(state.objectEventTransactions, 4)
     
     pinTransaction(transaction);
     state.objectEvents = [];
@@ -477,15 +488,18 @@ function createWorld(configuration) {
   ***************************************************/
 
   async function flushToDatabase() {
+    log("flushToDatabase:");
     while (state.objectEventTransactions.length > 0) {
       await pushTransactionToDatabase();
     }
   }
 
   async function pushTransactionToDatabase() {
+    log("pushTransactionToDatabase")
     if (state.objectEventTransactions.length > 0) {
       const transaction = state.objectEventTransactions.shift();
-      
+      log(transaction);
+
       pushTransactionToImages(transaction);
       const imageEvents = state.imageEvents;
       transaction.imageEvents.forEach(event => imageEvents.push(event)); // Not needed really...
@@ -595,7 +609,7 @@ function createWorld(configuration) {
   ***************************************************/
 
   async function twoPhaseComit(imageCreationEvents, imageEvents) {
-
+    log("twoPhaseComit");
     /**
      * First phase, write placeholders for all objects that we need to create, get their real ids, and create and save a compiled update with real dbids
      */ 
@@ -614,6 +628,7 @@ function createWorld(configuration) {
 
     // Augment the update itself with the new ids. 
     const update = compileUpdate(imageCreationEvents, imageEvents);
+    log(update);
 
     // Store the update itself so we can continue this update if any crash or power-out occurs while performing it.
     // After the update has been stored, no rollback is possible, only roll-forward and complete the whole update. 
