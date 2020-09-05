@@ -759,21 +759,38 @@ function createWorld(configuration) {
   *  Garbage collection 
   ***************************************************/
 
+  /****************************************************
+  *  To move later 
+  ***************************************************/
 
+
+  const fs = require("fs");
+  function logToFile(entity, pattern, filename) {
+    // log(entity);
+    // log(pattern);
+    let result = objectlog.logToString(entity, pattern);
+    fs.writeFile(filename, result, function(err) {
+      if(err) {
+        return console.log(err);
+      }
+    }); 
+  }
 
   /****************************************************
   *  Return world 
   ***************************************************/
 
   Object.assign(world, {
+    ...objectWorld, 
     whileLoaded,
-    eternityState: state,
+    state,
+    mockMongoDB,
+    logToFile,
     transaction, 
     endTransaction,
     setupDatabase,
     unloadAll, 
-    unloadAllAndClearDatabase, 
-    ...objectWorld
+    unloadAllAndClearDatabase
   });
   return world; 
 }

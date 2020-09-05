@@ -4,7 +4,7 @@ const assert = require('assert');
 const world = require('../eternity.js').getWorld({name: "basics.js"});
 let persistent;
 const log = console.log;
-const { create, whileLoaded } = world;
+const { create, whileLoaded, logToFile } = world;
 
 const { endTransaction } = world;
 
@@ -41,12 +41,17 @@ describe("basics", function() {
   it('should save persistent globals (non objects) + reset database', async function() {
     console.log("foobar")
     persistent.foo = 42;
+    logToFile(world.mockMongoDB.getAllRecordsParsed(), 10, "./databaseDump.json");
     endTransaction();
+    logToFile(world.mockMongoDB.getAllRecordsParsed(), 10, "./databaseDump.json");
     assert.equal(42, persistent.foo);
 
     console.log("foobar2")
+    logToFile(world.mockMongoDB.getAllRecordsParsed(), 10, "./databaseDump.json");
     await unloadAll();
+
     log("after unload all...");
+    logToFile(world.mockMongoDB.getAllRecordsParsed(), 10, "./databaseDump.json");
     log("--------------------------------------------------");
     log(persistent.loaded);
     log(world.eternityState);
