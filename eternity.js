@@ -384,7 +384,7 @@ function createWorld(configuration) {
     transaction.resolvePromise = resolvePromise;
     state.objectEventTransactions.push(transaction);
     
-    pinTransaction(objectEvents); // TODO: pin created images.
+    pinTransaction(transaction);
     state.objectEvents = [];
     return onPersistPromise; 
   }
@@ -423,8 +423,9 @@ function createWorld(configuration) {
     }
 
     // Collect all the image creation events, to be used for later. note: mixed with settings of _eternityPersistentParent/_eternityPersistentParentProperty
-    newTransaction.imageCreationEvents = state.imageCrationEvents; state.imageCrationEvents = [];
+    newTransaction.imageCreationEvents = state.imageCreationEvents; state.imageCerationEvents = [];
     newTransaction.imageEvents = state.imageEvents; state.imageEvents = [];
+    return newTransaction;
   }
 
 
@@ -462,7 +463,7 @@ function createWorld(configuration) {
     }
   }
 
-  function unpinTransaction() {
+  function unpinTransaction(transaction) {
     for (let event of transaction.objectEvents) {
       unpin(event.object);
     }
@@ -765,6 +766,8 @@ function createWorld(configuration) {
   ***************************************************/
 
   Object.assign(world, {
+    whileLoaded,
+    eternityState: state,
     transaction, 
     endTransaction,
     setupDatabase,

@@ -4,7 +4,7 @@ const assert = require('assert');
 const world = require('../eternity.js').getWorld({name: "basics.js"});
 let persistent;
 const log = console.log;
-// const { create, load } = world;
+const { create, whileLoaded } = world;
 
 const { endTransaction } = world;
 
@@ -47,7 +47,11 @@ describe("basics", function() {
     console.log("foobar2")
     await unloadAll();
     log("after unload all...");
-    log( )
+    log("--------------------------------------------------");
+    log(persistent.loaded);
+    log(world.eternityState);
+
+
     assert.equal(42, persistent.foo);   
     console.log("foobar3")
     
