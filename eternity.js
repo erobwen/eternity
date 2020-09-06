@@ -167,35 +167,46 @@ function createWorld(configuration) {
   async function setupDatabase() {
     logg("setupDatabase:");
     log(state.imageEvents.length);
+
+    function protectImages() {
+      // Protect images from accidental deallocation
+      state.protectedImages = {};
+      state.protectedImages[state.persistentDbId] = true; 
+      state.protectedImages[state.updateDbId] = true; 
+      state.protectedImages[state.collectionDbId] = true; 
+    }
+
     if ((await mockMongoDB.getRecordsCount()) === 0) {
       // Initialize empty database
       log("initialize empty database...");
       [state.persistentDbId, state.updateDbId, state.collectionDbId] = 
         await Promise.all([
-          mockMongoDB.saveNewRecord({ name : "persistent", _eternityIncomingCount : 0}),
+          mockMongoDB.saveNewRecord({ name: "persistent", _eternityIncomingCount : 0}),
           mockMongoDB.saveNewRecord({ name: "updatePlaceholder" }),
-          mockMongoDB.saveNewRecord({ name : "garbageCollection" })]);
+          mockMongoDB.saveNewRecord({ name: "garbageCollection" })]);
+      protectImages();
 
       state.gcStateImage = getImage(state.collectionDbId, "Object", "Object");
       state.gc = setupGC(state.gcStateImage);
       state.gc.initializeGcState();
-      await flushToDatabase();
+      endTransaction(); 
+      await flushToDatabase(); // Just to flush the image changes done by initializeGcState();
+      log("finished initialize empty database...");
+      await logToFile(world.mockMongoDB.getAllRecordsParsed(), 10, "./databaseDumpAfterInitialize.json");
+      process.exit();
     } else {
       // Reconnect existing database
       log("reconnect database...");
       state.persistentDbId = 0;
       state.updateDbId = 1;
       state.collectionDbId = 2;
+      protectImages();
       
       state.gcStateImage = getImage(state.collectionDbId, "Object", "Object");
       state.gc = setupGC(state.gcStateImage);
+      log("finish reconnect database...");
     }
 
-    // Protect images from accidental deallocation
-    state.protectedImages = {};
-    state.protectedImages[state.persistentDbId] = true; 
-    state.protectedImages[state.updateDbId] = true; 
-    state.protectedImages[state.collectionDbId] = true; 
 
     world.persistent = getPersistentObject(state.persistentDbId, "Object", "Object");
     // log(world.persistent[meta]);
@@ -231,8 +242,8 @@ function createWorld(configuration) {
       createObjectForImage(className, image);
     }
     state.ignoreEvents--;
-    log("getPersistentObject:");
-    log(image[meta].object);
+    // log("getPersistentObject:");
+    // log(image[meta].object);
     return image[meta].object;
   }
 
@@ -425,7 +436,7 @@ function createWorld(configuration) {
       imageEvents: null
     } 
 
-    if (state.imageEvents.length > 0) throw new Error("Internal Error: Image event buffer should be empty at this stage!");
+    // if (state.imageEvents.length > 0) throw new Error("Internal Error: Image event buffer should be empty at this stage!");
     for (let event of objectEvents) {
       const image = event.object[meta].image; 
       if (image) {
@@ -506,7 +517,7 @@ function createWorld(configuration) {
     while (state.objectEventTransactions.length > 0) {
       await pushTransactionToDatabase();
     }
-  }
+  } 
 
   async function pushTransactionToDatabase() {
     log("pushTransactionToDatabase")
@@ -520,7 +531,7 @@ function createWorld(configuration) {
       transaction.imageEvents.forEach(event => imageEvents.push(event)); // Not needed really...
       state.imageEvents = [];
       
-      twoPhaseComit(transaction.imageCreationEvents, imageEvents);
+      await twoPhaseComit(transaction.imageCreationEvents, imageEvents);
       unpinTransaction(transaction);
       transaction.resolvePromise();
     }
@@ -590,19 +601,19 @@ function createWorld(configuration) {
   }
 
   async function setPropertyOfImage(objectWithImage, property, value, oldValue) {
-    log("setPropertyOfImage:");
+    // log("setPropertyOfImage:");
     const image = objectWithImage[meta].image;
 
     // Unset previous value
     await unsettingPropertyOfImage(objectWithImage, property, oldValue);
-    log("...");
+    // log("...");
     // Set new value
     let imageValue;
     if (value[meta]) {
-      log("....");
+      // log("....");
       const referedObject = value;           
       const referedImage = referedObject[meta].image;
-      log("...");
+      // log("...");
       if (!referedImage) throw new Error("Internal Error: Expected an image for the object");
 
       // Set back reference
@@ -621,18 +632,18 @@ function createWorld(configuration) {
 
       imageValue = referedImage;
     } else {
-      log("....");
-      log("here...")
+      // log("....");
+      // log("here...")
       imageValue = value;
     }
 
-    log("world names")
-    log(objectWithImage[meta].world.name);
-    log(image[meta].world.name);
-    log("really setting property of image...");
-    log(property)
-    log(imageValue)
-    log(state.ignoreEvents);
+    // log("world names")
+    // log(objectWithImage[meta].world.name);
+    // log(image[meta].world.name);
+    // log("really setting property of image...");
+    // log(property)
+    // log(imageValue)
+    // log(state.ignoreEvents);
     if (image[meta].world !== imageWorld) throw new Error("not a proper image");
 
     image[property] = imageValue;
@@ -677,7 +688,9 @@ function createWorld(configuration) {
     await performAllUpdates(update);
     
     // Finish, clean up transaction
+    log("cleanup...")
     await mockMongoDB.updateRecord(state.updateDbId, { name: "updatePlaceholder" });
+    log("finish cleanup...")
   }
   
 
@@ -695,7 +708,7 @@ function createWorld(configuration) {
     }
 
     function serializeReferences(entity) {
-      if (entity[meta]) {
+      if (typeof(entity) === "object" && entity !== null && entity[meta]) {
         return image[meta].serializedDbId;
       } else {
         return entity;
@@ -718,30 +731,30 @@ function createWorld(configuration) {
      
     // Serialize updates.
     for (let event of imageEvents) {
-      log(event);
+      // log(event);
       const image = event.object;
       const dbId = image[meta].dbId;
       allImages[dbId] = image; 
       if (!recordReplacements[dbId]) { // Only on non replaced objects. 
-        log("here...")
+        // log("here...")
         // Get specific record updates
         if (typeof(recordUpdates[dbId]) === 'undefined') {
           recordUpdates[dbId] = {};
         }
         const specificRecordUpdates = recordUpdates[dbId];
-        log("and here...")
+        // log("and here...")
 
         // Replace entire record or make targeted property update ajustments
         if (Object.keys(specificRecordUpdates).length === 3) { // At most three property updates
           // Replace entire record
-          log("replace entire record...")
+          // log("replace entire record...")
           recordReplacements[dbId] = serializeImage(image);
           delete recordUpdates[dbId];
         } else {
           // Do a targeted property update
-          log("do a specific...")
+          // log("do a specific...")
           if (event.type === 'set') {               
-            log("a set...")
+            // log("a set...")
             specificRecordUpdates[event.property] = serializeReferences(event.value);
           } else if (event.type === 'delete') {
             specificRecordUpdates[event.property] = "_eternity_delete_property_";          
@@ -752,7 +765,7 @@ function createWorld(configuration) {
 
     // Find image to deallocate.
     // Note, upon deallocation they need to be removed from any GC list. 
-    for (dbId in allImages) {
+    for (let dbId in allImages) {
       if (state.protectedImages[dbId]) continue;
 
       const image = allImages[dbId];
@@ -785,6 +798,7 @@ function createWorld(configuration) {
 
 
   async function performAllUpdates(update) {
+    log("performAllUpdates:");
 
     // Deallocate deleted
     for (let dbId in update.imageDeallocations) {
@@ -806,8 +820,10 @@ function createWorld(configuration) {
 
     // Replace records
     for (let dbId in update.recordReplacements) {
-      const replacement = update.recordUpdates[dbId];
+      log("replacing...")
+      const replacement = update.recordReplacements[dbId];
       await mockMongoDB.updateRecord(dbId, replacement);
+      log("done replace...")
     }
    }
 
@@ -825,12 +841,16 @@ function createWorld(configuration) {
   function logToFile(entity, pattern, filename) {
     // log(entity);
     // log(pattern);
+
     let result = objectlog.logToString(entity, pattern);
-    fs.writeFile(filename, result, function(err) {
-      if(err) {
-        return console.log(err);
-      }
-    }); 
+    return new Promise((resolve, reject) => {
+      fs.writeFile(filename, result, function(err) {
+        if(err) {
+          return console.log(err);
+        }
+        resolve();
+      }); 
+    });
   }
 
   /****************************************************

@@ -39,10 +39,10 @@ describe("basic operations", function() {
   }
   
   it('should save persistent globals (non objects) + reset database', async function() {
+    logToFile(world.mockMongoDB.getAllRecordsParsed(), 10, "./databaseDump.json");
     log("--------------------------------------------------");
     persistent.foo = 42;
     assert.equal(42, persistent.foo);
-    // logToFile(world.mockMongoDB.getAllRecordsParsed(), 10, "./databaseDump10.json");
     endTransaction();
     // logToFile(world.mockMongoDB.getAllRecordsParsed(), 10, "./databaseDump2.json");
 
