@@ -6,6 +6,8 @@ import { setupActivityList } from "./lib/activityList.js";
 import { setupGC } from "./lib/flameFrontGC.js";
 
 const log = objectlog.log;
+const logg = objectlog.logg.bind(objectlog);
+
 // const log = console.log;
 
 const defaultObjectlog = objectlog;
@@ -116,6 +118,7 @@ function createWorld(configuration) {
   const mockMongoDB = createDatabase(JSON.stringify(configuration));
 
   const objectWorld = getCausalityWorld({
+    name: "objectWorld",
     objectMetaProperty: meta,
     // onWriteGlobal: (handler, target) => {
     //   return true; 
@@ -126,20 +129,26 @@ function createWorld(configuration) {
     //   // handler.target
     //   // handler.proxy
     // }, 
-    emitEvents: true, 
+    // emitEvents: true, 
     onEventGlobal: event => {
-      log("onEventGlobal");
-      log(state.ignoreEvents);
+      log("onEventGlobal (object)");
+      if (event.object[meta].world !== objectWorld) throw new Error("Fatal: Wrong world!");
+      // log(state.ignoreEvents);
       if (state.ignoreObjectEvents === 0 && state.ignoreEvents === 0) {
-        log(event);
+        // log(event);
         state.objectEvents.push(event);
       }
     }
   });
 
   const imageWorld = getCausalityWorld({
+    name: "imageWorld",
+    // emitEvents: true,
     objectMetaProperty: meta,
     onEventGlobal: event => {
+      if (event.object[meta].world !== imageWorld) throw new Error("Fatal: Wrong world!");
+      log("onEventGlobal (image)")
+      // log(state.ignoreEvents);
       if (state.ignoreImageEvents === 0 && state.ignoreEvents === 0) {
         if (event.type === "creation") {
           state.imageCreationEvents.push(event);
@@ -156,7 +165,8 @@ function createWorld(configuration) {
   ***************************************************/
 
   async function setupDatabase() {
-    log("setupDatabase:");
+    logg("setupDatabase:");
+    log(state.imageEvents.length);
     if ((await mockMongoDB.getRecordsCount()) === 0) {
       // Initialize empty database
       log("initialize empty database...");
@@ -169,6 +179,7 @@ function createWorld(configuration) {
       state.gcStateImage = getImage(state.collectionDbId, "Object", "Object");
       state.gc = setupGC(state.gcStateImage);
       state.gc.initializeGcState();
+      await flushToDatabase();
     } else {
       // Reconnect existing database
       log("reconnect database...");
@@ -191,6 +202,7 @@ function createWorld(configuration) {
     // log(world.persistent[meta].image);
     // log(world.persistent[meta].image[meta]);
     // log(world.persistent[meta].image[meta].dbId);
+    log(state.imageEvents.length);
     await loadAndPin(world.persistent); // Pin persistent! 
   }
 
@@ -201,6 +213,7 @@ function createWorld(configuration) {
 
   function createObjectForImage(className, image) {
     const object = objectWorld.create(createTargetWithClass(className));
+      object[meta].createObjectForImage = true;
       object[meta].incomingPersistentReferenceCount = null; // We only know after load
       object[meta].incomingReferenceCount = 0;
       object[meta].pins = 0;
@@ -226,6 +239,7 @@ function createWorld(configuration) {
   function createImage(dbId, objectClassName, imageClassName) {
     const image = imageWorld.create(createTargetWithClass(objectClassName));
     image._eternityIncomingCount = 0;
+    image[meta].createdAsImage = true; 
     image[meta].objectClassName = objectClassName;
     image[meta].imageClassName = imageClassName;
 
@@ -371,7 +385,7 @@ function createWorld(configuration) {
   // Note: You typically do not need to wait for the promise returned, unless you want to be sure that the data has been stored persistently. 
   // If not, the changes will be queued upp and persisted gradually, which is fine in most cases.
   async function endTransaction() {
-    log("endTransaction:");
+    logg("endTransaction:");
     const objectEvents = state.objectEvents; 
     state.objectEvents = null; // Force fail if event!
 
@@ -379,7 +393,7 @@ function createWorld(configuration) {
     const onPersistPromise = new Promise((resolve, reject) => { 
       resolvePromise = resolve;
     });
-    log("...")
+    // log("...")
 
     // Keep track of incoming references for all objects. 
     // for (let event of objectEvents) {
@@ -388,12 +402,12 @@ function createWorld(configuration) {
     //     if (event.oldValue[meta]) event.newValue[meta].incomingReferenceCount--; // Try to forgett refered object here?       
     //   }
     // }
-    log("...")
+    // log("...")
 
     const transaction = preCreateImagesWithSnapshot(objectEvents);
     transaction.resolvePromise = resolvePromise;
     state.objectEventTransactions.push(transaction);
-    log(state.objectEventTransactions, 4)
+    // log(state.objectEventTransactions, 4)
     
     pinTransaction(transaction);
     state.objectEvents = [];
@@ -488,7 +502,7 @@ function createWorld(configuration) {
   ***************************************************/
 
   async function flushToDatabase() {
-    log("flushToDatabase:");
+    logg("flushToDatabase:");
     while (state.objectEventTransactions.length > 0) {
       await pushTransactionToDatabase();
     }
@@ -498,10 +512,11 @@ function createWorld(configuration) {
     log("pushTransactionToDatabase")
     if (state.objectEventTransactions.length > 0) {
       const transaction = state.objectEventTransactions.shift();
-      log(transaction);
+      // log(transaction, 3);
 
       pushTransactionToImages(transaction);
       const imageEvents = state.imageEvents;
+      log(imageEvents);
       transaction.imageEvents.forEach(event => imageEvents.push(event)); // Not needed really...
       state.imageEvents = [];
       
@@ -517,6 +532,7 @@ function createWorld(configuration) {
       if (typeof(event.object[meta].image) !== 'undefined') {
 
         if (event.type === 'set') {
+          log("setting property of image... ")
           setPropertyOfImage(event.object, event.property, event.newValue, event.oldValue);
         } else if (event.type === 'delete') {
           await unsettingPropertyOfImage(event.object, event.property, event.oldValue);
@@ -538,7 +554,11 @@ function createWorld(configuration) {
 
   // Unsetting property, used both for delete and for previous value in a normal set. 
   async function unsettingPropertyOfImage(objectWithImage, property, oldValue) {
-    if (oldValue[meta]) {
+    // log("unsettingPropertyOfImage");
+    // log(objectWithImage);
+    // log(property);
+    // log(oldValue);
+    if (oldValue && oldValue[meta]) {
       const referedObject = oldValue;
       const referedImage = oldValue[meta].image;
 
@@ -570,16 +590,19 @@ function createWorld(configuration) {
   }
 
   async function setPropertyOfImage(objectWithImage, property, value, oldValue) {
+    log("setPropertyOfImage:");
     const image = objectWithImage[meta].image;
 
     // Unset previous value
     await unsettingPropertyOfImage(objectWithImage, property, oldValue);
-
+    log("...");
     // Set new value
     let imageValue;
     if (value[meta]) {
+      log("....");
       const referedObject = value;           
       const referedImage = referedObject[meta].image;
+      log("...");
       if (!referedImage) throw new Error("Internal Error: Expected an image for the object");
 
       // Set back reference
@@ -598,8 +621,20 @@ function createWorld(configuration) {
 
       imageValue = referedImage;
     } else {
+      log("....");
+      log("here...")
       imageValue = value;
     }
+
+    log("world names")
+    log(objectWithImage[meta].world.name);
+    log(image[meta].world.name);
+    log("really setting property of image...");
+    log(property)
+    log(imageValue)
+    log(state.ignoreEvents);
+    if (image[meta].world !== imageWorld) throw new Error("not a proper image");
+
     image[property] = imageValue;
   }
 
@@ -628,7 +663,7 @@ function createWorld(configuration) {
 
     // Augment the update itself with the new ids. 
     const update = compileUpdate(imageCreationEvents, imageEvents);
-    log(update);
+    log(update, 3);
 
     // Store the update itself so we can continue this update if any crash or power-out occurs while performing it.
     // After the update has been stored, no rollback is possible, only roll-forward and complete the whole update. 
@@ -647,7 +682,9 @@ function createWorld(configuration) {
   
 
   function compileUpdate(imageCreationEvents, imageEvents) {
-
+    log("compileUpdate");
+    log(imageCreationEvents)
+    log(imageEvents)
     function serializeImage(image) {
       let serialized = (image instanceof Array) ? [] : {};
       for (let property in image) {
@@ -681,25 +718,30 @@ function createWorld(configuration) {
      
     // Serialize updates.
     for (let event of imageEvents) {
+      log(event);
       const image = event.object;
       const dbId = image[meta].dbId;
       allImages[dbId] = image; 
       if (!recordReplacements[dbId]) { // Only on non replaced objects. 
-
+        log("here...")
         // Get specific record updates
         if (typeof(recordUpdates[dbId]) === 'undefined') {
           recordUpdates[dbId] = {};
         }
         const specificRecordUpdates = recordUpdates[dbId];
+        log("and here...")
 
         // Replace entire record or make targeted property update ajustments
         if (Object.keys(specificRecordUpdates).length === 3) { // At most three property updates
           // Replace entire record
+          log("replace entire record...")
           recordReplacements[dbId] = serializeImage(image);
           delete recordUpdates[dbId];
         } else {
           // Do a targeted property update
+          log("do a specific...")
           if (event.type === 'set') {               
+            log("a set...")
             specificRecordUpdates[event.property] = serializeReferences(event.value);
           } else if (event.type === 'delete') {
             specificRecordUpdates[event.property] = "_eternity_delete_property_";          
