@@ -62,11 +62,12 @@ describe("basic operations", function() {
     // log(world.eternityState);
 
 
-    // assert.equal(true, persistent.loaded);   
-    // assert.equal(42, persistent.foo);   
+    assert.equal(true, persistent.loaded);   
+    assert.equal(42, persistent.foo);   
     
     // log("--------------------------------------------------");
     await persistentReset();
+    assert.equal(true, persistent.loaded);   
     assert.equal(true, typeof(persistent.foo) === 'undefined');
 
     // load(persistent, () => {
