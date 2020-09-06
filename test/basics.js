@@ -22,13 +22,13 @@ const { endTransaction } = world;
 // Tests based on mobx test/array.js
 
 before(async () => {
-  log("before")
+  // log("before")
   await world.startDatabase();
   persistent = world.persistent; 
 });
 
 after(async () => {
-  log("after")
+  // log("after")
   await world.stopDatabase();
 });
 
@@ -45,7 +45,7 @@ describe("basic operations", function() {
   }
   
   it('should save persistent globals (non objects) + reset database', async function() {
-    log("--------------------------------------------------");
+    // log("--------------------------------------------------");
     persistent.foo = 42;
     assert.equal(42, persistent.foo);
 
@@ -65,7 +65,7 @@ describe("basic operations", function() {
     // assert.equal(true, persistent.loaded);   
     // assert.equal(42, persistent.foo);   
     
-    log("--------------------------------------------------");
+    // log("--------------------------------------------------");
     await persistentReset();
     assert.equal(true, typeof(persistent.foo) === 'undefined');
 

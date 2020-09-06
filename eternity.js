@@ -156,7 +156,7 @@ function createWorld(configuration) {
         if (event.type === "creation") {
           state.imageCreationEvents.push(event);
         } else {
-          log("pushing event");
+          // log("pushing event");
           state.imageEvents.push(event);
         }
       }
@@ -169,8 +169,8 @@ function createWorld(configuration) {
   ***************************************************/
 
   async function startDatabase() {
-    logg("startDatabase:");
-    log(state.imageEvents.length);
+    // logg("startDatabase:");
+    // log(state.imageEvents.length);
     startAutoFlushing();
 
     function protectImages() {
@@ -183,7 +183,7 @@ function createWorld(configuration) {
 
     if ((await mockMongoDB.getRecordsCount()) === 0) {
       // Initialize empty database
-      log("initialize empty database...");
+      // log("initialize empty database...");
       [state.persistentDbId, state.updateDbId, state.collectionDbId] = 
         await Promise.all([
           mockMongoDB.saveNewRecord({ name: "persistent", _eternityIncomingCount : 0}),
@@ -196,12 +196,12 @@ function createWorld(configuration) {
       state.gc.initializeGcState();
       await endTransaction(); 
       // await flushToDatabase(); // Just to flush the image changes done by initializeGcState();
-      log("finished initialize empty database...");
+      // log("finished initialize empty database...");
       // await logToFile(world.mockMongoDB.getAllRecordsParsed(), 10, "./databaseDumpAfterInitialize.json");
       // process.exit();
     } else {
       // Reconnect existing database
-      log("reconnect database...");
+      // log("reconnect database...");
       state.persistentDbId = 0;
       state.updateDbId = 1;
       state.collectionDbId = 2;
@@ -211,7 +211,7 @@ function createWorld(configuration) {
       state.ignoreEvents++;
       state.gc = setupGC(state.gcStateImage);
       state.ignoreEvents--;
-      log("finish reconnect database...");
+      // log("finish reconnect database...");
     }
 
 
@@ -220,12 +220,12 @@ function createWorld(configuration) {
     // log(world.persistent[meta].image);
     // log(world.persistent[meta].image[meta]);
     // log(world.persistent[meta].image[meta].dbId);
-    log(state.imageEvents.length);
+    // log(state.imageEvents.length);
     await loadAndPin(world.persistent); // Pin persistent! 
   }
 
   async function stopDatabase() {
-    logg("stopDatabase:")
+    // logg("stopDatabase:")
     return new Promise((resolve, reject) => {
       const lastIndex = state.transactions.length - 1
       if (lastIndex >= 0) {
@@ -394,12 +394,11 @@ function createWorld(configuration) {
   ***************************************************/
   
   async function volatileReset(databaseStoppedAlready) {
-    log("volatileReset:")
+    // log("volatileReset:")
     // Stop and flush all to database
     if (!databaseStoppedAlready) {
       await endTransaction();
       await stopDatabase();
-      log("stop database");      
     }
 
     // Reset all object ids
@@ -416,18 +415,11 @@ function createWorld(configuration) {
   }
     
   async function persistentReset() {
-    log("persistentReset:")
-    // Stop and flush all to database
+    // log("persistentReset:")
     await endTransaction();
-
     await stopDatabase();
-    log("stopped database");
-    
     await mockMongoDB.clearDatabase();
-    log("cleared database");
-    
     await volatileReset(true);
-    log("volatile reset");
   }
 
 
@@ -448,7 +440,7 @@ function createWorld(configuration) {
   async function endTransaction() {
     if (!state.autoFlush) throw new Error("Cannot end transaction when database is stopped!");
     return new Promise((resolve, reject) => { 
-      logg("endTransaction:");
+      // logg("endTransaction:");
       const objectEvents = state.objectEvents; 
       state.objectEvents = null; // Force fail if event!
 
@@ -586,14 +578,14 @@ function createWorld(configuration) {
 
   async function flushToDatabase() {
     while (state.transactions.length > 0) {
-      logg("flushToDatabase:");
+      // logg("flushToDatabase:");
       await pushTransactionToDatabase();
     }
-    log("flush to database done!")
+    // log("flush to database done!")
   } 
 
   async function pushTransactionToDatabase() {
-    log("pushTransactionToDatabase")
+    // log("pushTransactionToDatabase")
     if (state.transactions.length > 0) {
       const transaction = state.transactions.shift();
       // log(transaction, 3);
@@ -602,16 +594,16 @@ function createWorld(configuration) {
       
       const imageEvents = state.imageEvents; 
       state.imageEvents = [];
-      log("imageEvents:")
-      log(imageEvents);
+      // log("imageEvents:")
+      // log(imageEvents);
       transaction.imageEvents.forEach(event => imageEvents.push(event)); // Not needed really...
       
       
       await twoPhaseComit(transaction.imageCreationEvents, imageEvents);
-      log("unpin...")
+      // log("unpin...")
       unpinTransaction(transaction);
-      log("resolve...")
-      console.log(transaction.resolvePromise);
+      // log("resolve...")
+      // console.log(transaction.resolvePromise);
       setTimeout(transaction.resolvePromise, 0);
     }
   }
@@ -622,7 +614,7 @@ function createWorld(configuration) {
       if (typeof(event.object[meta].image) !== 'undefined') {
 
         if (event.type === 'set') {
-          log("setting property of image... ")
+          // log("setting property of image... ")
           setPropertyOfImage(event.object, event.property, event.newValue, event.oldValue);
         } else if (event.type === 'delete') {
           await unsettingPropertyOfImage(event.object, event.property, event.oldValue);
@@ -734,7 +726,7 @@ function createWorld(configuration) {
   ***************************************************/
 
   async function twoPhaseComit(imageCreationEvents, imageEvents) {
-    log("twoPhaseComit");
+    // log("twoPhaseComit");
     /**
      * First phase, write placeholders for all objects that we need to create, get their real ids, and create and save a compiled update with real dbids
      */ 
@@ -753,7 +745,7 @@ function createWorld(configuration) {
 
     // Augment the update itself with the new ids. 
     const update = compileUpdate(imageCreationEvents, imageEvents);
-    log(update, 2);
+    // log(update, 2);
 
     // Store the update itself so we can continue this update if any crash or power-out occurs while performing it.
     // After the update has been stored, no rollback is possible, only roll-forward and complete the whole update. 
@@ -767,16 +759,16 @@ function createWorld(configuration) {
     await performAllUpdates(update);
     
     // Finish, clean up transaction
-    log("cleanup...")
+    // log("cleanup...")
     await mockMongoDB.updateRecord(state.updateDbId, { name: "updatePlaceholder" });
-    log("finish cleanup...")
+    // log("finish cleanup...")
   }
   
 
   function compileUpdate(imageCreationEvents, imageEvents) {
-    log("compileUpdate");
-    log(imageCreationEvents)
-    log(imageEvents, 2)
+    // log("compileUpdate");
+    // log(imageCreationEvents)
+    // log(imageEvents, 2)
     function serializeImage(image) {
       let serialized = (image instanceof Array) ? [] : {};
       for (let property in image) {
@@ -877,7 +869,7 @@ function createWorld(configuration) {
 
 
   async function performAllUpdates(update) {
-    log("performAllUpdates:");
+    // log("performAllUpdates:");
 
     // Deallocate deleted
     for (let dbId in update.imageDeallocations) {
@@ -892,10 +884,10 @@ function createWorld(configuration) {
         if (value === "_eternity_delete_property_") {
           await mockMongoDB.deleteRecordPath(dbId, [property]);
         } else {
-          log("updateRecordPath:");
-          log(dbId)
-          log(property)
-          log(value)
+          // log("updateRecordPath:");
+          // log(dbId)
+          // log(property)
+          // log(value)
           await mockMongoDB.updateRecordPath(dbId, [property], value);
         }
       }
@@ -903,10 +895,10 @@ function createWorld(configuration) {
 
     // Replace records
     for (let dbId in update.recordReplacements) {
-      log("replacing...")
+      // log("replacing...")
       const replacement = update.recordReplacements[dbId];
       await mockMongoDB.updateRecord(dbId, replacement);
-      log("done replace...")
+      // log("done replace...")
     }
    }
 
