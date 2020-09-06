@@ -28,41 +28,41 @@ let logUngroup = objectlog.exit;
 // Tests based on mobx test/array.js
 describe("classes", function () {
 	
-	function unloadAll() {
-		eternity.unloadAll();
+	function volatileReset() {
+		eternity.volatileReset();
 		persistent = eternity.persistent;
 	}
 	
-	function unloadAllAndClearDatabase() {
-		eternity.unloadAllAndClearDatabase();
+	function persistentReset() {
+		eternity.persistentReset();
 		persistent = eternity.persistent;
 	}
 	
 	
     it('should persist class belongings', function () {
 		persistent.x = create(new MyClass());
-		unloadAll();
+		volatileReset();
 		// log("==================== CLEAR MEMORY ==========================");
-		unloadAll();
+		volatileReset();
 		
 		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
 		
 		assert.equal("MyClass", Object.getPrototypeOf(persistent.x).constructor.name);
 		assert.equal(42, persistent.x.getFoobar());
-		unloadAllAndClearDatabase();
+		persistentReset();
 	});	
 	
 	it('should persist arrays', function () {
 		persistent.x = create([42]); // Consider... maybe even causality need to create a new object and record all assignments... 
-		unloadAll();
+		volatileReset();
 		// log("==================== CLEAR MEMORY ==========================");
-		unloadAll();
+		volatileReset();
 		
 		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
 		
 		assert.equal("Array", Object.getPrototypeOf(persistent.x).constructor.name);
 		assert.equal(42, persistent.x.shift()); //
-		unloadAllAndClearDatabase();
+		persistentReset();
 	});	  
 });
 

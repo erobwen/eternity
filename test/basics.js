@@ -22,48 +22,56 @@ const { endTransaction } = world;
 // Tests based on mobx test/array.js
 
 before(async () => {
-  await world.setupDatabase();
+  log("before")
+  await world.startDatabase();
   persistent = world.persistent; 
+});
+
+after(async () => {
+  log("after")
+  await world.stopDatabase();
 });
 
 describe("basic operations", function() {
 
-  async function unloadAll() {
-    await world.unloadAll();
+  async function volatileReset() {
+    await world.volatileReset();
     persistent = world.persistent;
   }
   
-  async function unloadAllAndClearDatabase() {
-    await world.unloadAllAndClearDatabase();
+  async function persistentReset() {
+    await world.persistentReset();
     persistent = world.persistent;
   }
   
   it('should save persistent globals (non objects) + reset database', async function() {
-    logToFile(world.mockMongoDB.getAllRecordsParsed(), 10, "./databaseDump.json");
     log("--------------------------------------------------");
     persistent.foo = 42;
     assert.equal(42, persistent.foo);
-    endTransaction();
+
     // logToFile(world.mockMongoDB.getAllRecordsParsed(), 10, "./databaseDump2.json");
 
 
     // logToFile(world.mockMongoDB.getAllRecordsParsed(), 10, "./databaseDump3.json");
-    await unloadAll();
-
+    // endTransaction();
+    await volatileReset();
+    await logToFile(world.mockMongoDB.getAllRecordsParsed(), 10, "./databaseDump.json");
+    // log("FINISHED")
     // logToFile(world.mockMongoDB.getAllRecordsParsed(), 10, "./databaseDump4.json");
-    log("--------------------------------------------------");
-    log(persistent.loaded);
-    log(world.eternityState);
+    // log(persistent.loaded);
+    // log(world.eternityState);
 
 
-    assert.equal(42, persistent.foo);   
+    // assert.equal(true, persistent.loaded);   
+    // assert.equal(42, persistent.foo);   
     
-    await unloadAllAndClearDatabase();
+    log("--------------------------------------------------");
+    await persistentReset();
     assert.equal(true, typeof(persistent.foo) === 'undefined');
 
-    load(persistent, () => {
-      assert.equal(44, persistent.foo);
-    });
+    // load(persistent, () => {
+    //   assert.equal(44, persistent.foo);
+    // });
   });
 });
 
@@ -73,7 +81,7 @@ describe("basic operations", function() {
   //  let A = create({name : 'A'});
   //  persistent.A = A;
     
-  //  unloadAll();
+  //  volatileReset();
     
   //  assert.notEqual(A, persistent.A); // Should now be a different eternity object... freshly loaded.
   //  A = persistent.A;
@@ -81,7 +89,7 @@ describe("basic operations", function() {
   //  // log(persistent.A);
   //  assert.equal("A", persistent.A.name);
     
-  //  unloadAllAndClearDatabase();
+  //  persistentReset();
   // });
   
  //  it('should save refered objects recursivley', function () {
@@ -94,11 +102,11 @@ describe("basic operations", function() {
   //  A.B = B;
   //  persistent.A = A;   
     
-  //  unloadAll();
+  //  volatileReset();
     
   //  assert.equal(256, persistent.A.B.bitsAndPieces);
 
-  //  unloadAllAndClearDatabase();
+  //  persistentReset();
   // });
   
   
@@ -115,11 +123,11 @@ describe("basic operations", function() {
     
   //  // log(eternity.mockMongoDB.getAllRecordsParsed(), 3);  
     
-  //  unloadAll();
+  //  volatileReset();
     
   //  assert.equal("B", persistent.A.B.name);
 
-  //  unloadAllAndClearDatabase();
+  //  persistentReset();
   // });
   
   
@@ -128,7 +136,7 @@ describe("basic operations", function() {
   //  persistent.A = A;
   //  // log(eternity.mockMongoDB.getAllRecordsParsed(), 3);  
         
-  //  unloadAll();
+  //  volatileReset();
   //  // log("==================== CLEAR MEMORY ==========================");
 
   //  A = persistent.A;
@@ -138,7 +146,7 @@ describe("basic operations", function() {
     
   //  assert.equal(256, persistent.A.B.bitsAndPieces);
 
-  //  unloadAllAndClearDatabase(); // TODO: Cannot run in sequence with unloadAll
+  //  persistentReset(); // TODO: Cannot run in sequence with unloadAll
   // });
    
   

@@ -2375,8 +2375,8 @@
 		let updateDbId;
 		let collectionDbId;
 		
-		function setupDatabase() {
-			// log("setupDatabase");
+		function startDatabase() {
+			// log("startDatabase");
 			trace.eternity && logGroup();
 			imageCausality.pulse(function() {					
 
@@ -2416,19 +2416,19 @@
 		
 		
 		// Note: causality.persistent is replace after an unload... 
-		function unloadAll() {
+		function volatileReset() {
 			flushToDatabase();
 			objectCausality.resetObjectIds();
 			imageCausality.resetObjectIds();
 			delete instance.persistent;
 			dbIdToDbImageMap = {};
-			setupDatabase();
+			startDatabase();
 		}
 		
-		function unloadAllAndClearDatabase() {
+		function persistentReset() {
 			flushToDatabase();
 			mockMongoDB.clearDatabase();
-			unloadAll();
+			volatileReset();
 		}
 		
 		/*-----------------------------------------------
@@ -2781,7 +2781,7 @@
 		// trace.eternity = false;
 		
 		// Setup database
-		setupDatabase();
+		startDatabase();
 		
 		return instance;
 	}

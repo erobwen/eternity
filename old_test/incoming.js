@@ -33,13 +33,13 @@ let logUngroup = objectlog.exit;
 // Tests based on mobx test/array.js
 describe("incoming", function () {
 	
-	function unloadAll() {
-		eternity.unloadAll();
+	function volatileReset() {
+		eternity.volatileReset();
 		persistent = eternity.persistent;
 	}
 	
-	function unloadAllAndClearDatabase() {
-		eternity.unloadAllAndClearDatabase();
+	function persistentReset() {
+		eternity.persistentReset();
 		persistent = eternity.persistent;
 	}
 	
@@ -56,7 +56,7 @@ describe("incoming", function () {
 	
 		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
 
-		unloadAll();
+		volatileReset();
 		// log("==================== CLEAR MEMORY ==========================");
 		
 		referers = [];
@@ -67,7 +67,7 @@ describe("incoming", function () {
 		assert.equal(persistent.A, referers[0]);		
 		assert.equal(persistent.B, referers[1]);		
 		assert.equal(persistent.C, referers[2]);
-		unloadAllAndClearDatabase();		
+		persistentReset();		
 	});	
 	
 	
@@ -84,7 +84,7 @@ describe("incoming", function () {
 	
 		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
 
-		unloadAll();
+		volatileReset();
 		// log("==================== CLEAR MEMORY ==========================");
 		
 		referers = [];
@@ -102,7 +102,7 @@ describe("incoming", function () {
 		assert.equal(persistent.A, referers[0]);		
 		assert.equal(persistent.B, referers[1]);		
 		assert.equal(persistent.C, referers[2]);		
-		unloadAllAndClearDatabase();		
+		persistentReset();		
 	});
 	
 	
@@ -122,7 +122,7 @@ describe("incoming", function () {
 
 		// log(eternity.mockMongoDB.getAllRecordsParsed(), 3);	
 
-		unloadAll();
+		volatileReset();
 		// log("==================== CLEAR MEMORY ==========================");
 		
 		
@@ -132,6 +132,6 @@ describe("incoming", function () {
 		assert.equal(persistent.A, collector.keep[0]);		
 		assert.equal(persistent.B, collector.keep[1]);		
 		assert.equal(persistent.C, collector.keep[2]);		
-		unloadAllAndClearDatabase();		
+		persistentReset();		
 	});
 });

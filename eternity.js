@@ -57,7 +57,7 @@ function createWorld(configuration) {
 
   const state = {
     objectEvents: [],
-    objectEventTransactions: [],
+    transactions: [],
 
     imageEvents: [],
     imageCreationEvents: [],
@@ -131,7 +131,8 @@ function createWorld(configuration) {
     // }, 
     // emitEvents: true, 
     onEventGlobal: event => {
-      log("onEventGlobal (object)");
+      // log("onEventGlobal (object)");
+      // log(event, 2);
       if (event.object[meta].world !== objectWorld) throw new Error("Fatal: Wrong world!");
       // log(state.ignoreEvents);
       if (state.ignoreObjectEvents === 0 && state.ignoreEvents === 0) {
@@ -147,12 +148,15 @@ function createWorld(configuration) {
     objectMetaProperty: meta,
     onEventGlobal: event => {
       if (event.object[meta].world !== imageWorld) throw new Error("Fatal: Wrong world!");
-      log("onEventGlobal (image)")
-      // log(state.ignoreEvents);
+      // log("onEventGlobal (image)")
+      // log(event, 2);
+      // console.log(event);
+      // log("state.ignoreEvents: " + state.ignoreEvents);
       if (state.ignoreImageEvents === 0 && state.ignoreEvents === 0) {
         if (event.type === "creation") {
           state.imageCreationEvents.push(event);
         } else {
+          log("pushing event");
           state.imageEvents.push(event);
         }
       }
@@ -164,9 +168,10 @@ function createWorld(configuration) {
   *  Setup database
   ***************************************************/
 
-  async function setupDatabase() {
-    logg("setupDatabase:");
+  async function startDatabase() {
+    logg("startDatabase:");
     log(state.imageEvents.length);
+    startAutoFlushing();
 
     function protectImages() {
       // Protect images from accidental deallocation
@@ -189,11 +194,11 @@ function createWorld(configuration) {
       state.gcStateImage = getImage(state.collectionDbId, "Object", "Object");
       state.gc = setupGC(state.gcStateImage);
       state.gc.initializeGcState();
-      endTransaction(); 
-      await flushToDatabase(); // Just to flush the image changes done by initializeGcState();
+      await endTransaction(); 
+      // await flushToDatabase(); // Just to flush the image changes done by initializeGcState();
       log("finished initialize empty database...");
-      await logToFile(world.mockMongoDB.getAllRecordsParsed(), 10, "./databaseDumpAfterInitialize.json");
-      process.exit();
+      // await logToFile(world.mockMongoDB.getAllRecordsParsed(), 10, "./databaseDumpAfterInitialize.json");
+      // process.exit();
     } else {
       // Reconnect existing database
       log("reconnect database...");
@@ -203,7 +208,9 @@ function createWorld(configuration) {
       protectImages();
       
       state.gcStateImage = getImage(state.collectionDbId, "Object", "Object");
+      state.ignoreEvents++;
       state.gc = setupGC(state.gcStateImage);
+      state.ignoreEvents--;
       log("finish reconnect database...");
     }
 
@@ -215,6 +222,30 @@ function createWorld(configuration) {
     // log(world.persistent[meta].image[meta].dbId);
     log(state.imageEvents.length);
     await loadAndPin(world.persistent); // Pin persistent! 
+  }
+
+  async function stopDatabase() {
+    logg("stopDatabase:")
+    return new Promise((resolve, reject) => {
+      const lastIndex = state.transactions.length - 1
+      if (lastIndex >= 0) {
+        // Still transactions left, let those finish then stop auto flushing.
+        const oldResolve = state.transactions[lastIndex].resolvePromise;
+        state.transactions[lastIndex].resolvePromise = value => {
+          stopAutoFlushing()
+            .then(() => {          
+              oldResolve();
+              resolve();
+            });
+        }
+      } else {
+        // No transactions, just stop auto-flushing. 
+        stopAutoFlushing()
+          .then(() => {
+            resolve();
+          })
+      }
+    });
   }
 
 
@@ -359,25 +390,44 @@ function createWorld(configuration) {
 
 
   /****************************************************
-  *  Clearing
+  *  System reset, mostly for testing
   ***************************************************/
   
-  async function unloadAll() {
-    // Flush to database?
-    await flushToDatabase();
+  async function volatileReset(databaseStoppedAlready) {
+    log("volatileReset:")
+    // Stop and flush all to database
+    if (!databaseStoppedAlready) {
+      await endTransaction();
+      await stopDatabase();
+      log("stop database");      
+    }
+
+    // Reset all object ids
     objectWorld.state.nextObjectId = 1;
     imageWorld.state.nextObjectId = 1;
-    delete world.persistent;   // Note: causality.persistent is replace after an unload... 
+
+    // Forget all images including persistent object
     state.dbIdToImageMap = {};
     state.rememberedImages = 0;
-    await setupDatabase();
+    delete world.persistent;   // Note: causality.persistent is replaced after an unload... 
+
+    // Restart database
+    await startDatabase();
   }
     
-  async function unloadAllAndClearDatabase() {
-    // Flush to database?
-    await flushToDatabase();
-    mockMongoDB.clearDatabase();
-    await unloadAll();
+  async function persistentReset() {
+    log("persistentReset:")
+    // Stop and flush all to database
+    await endTransaction();
+
+    await stopDatabase();
+    log("stopped database");
+    
+    await mockMongoDB.clearDatabase();
+    log("cleared database");
+    
+    await volatileReset(true);
+    log("volatile reset");
   }
 
 
@@ -396,33 +446,30 @@ function createWorld(configuration) {
   // Note: You typically do not need to wait for the promise returned, unless you want to be sure that the data has been stored persistently. 
   // If not, the changes will be queued upp and persisted gradually, which is fine in most cases.
   async function endTransaction() {
-    logg("endTransaction:");
-    const objectEvents = state.objectEvents; 
-    state.objectEvents = null; // Force fail if event!
+    if (!state.autoFlush) throw new Error("Cannot end transaction when database is stopped!");
+    return new Promise((resolve, reject) => { 
+      logg("endTransaction:");
+      const objectEvents = state.objectEvents; 
+      state.objectEvents = null; // Force fail if event!
 
-    let resolvePromise; 
-    const onPersistPromise = new Promise((resolve, reject) => { 
-      resolvePromise = resolve;
+      // Keep track of incoming references for all objects. 
+      // for (let event of objectEvents) {
+      //   if (event.type === "set") {
+      //     if (event.newValue[meta]) event.newValue[meta].incomingReferenceCount++;
+      //     if (event.oldValue[meta]) event.newValue[meta].incomingReferenceCount--; // Try to forgett refered object here?       
+      //   }
+      // }
+      // log("...")
+
+      const transaction = preCreateImagesWithSnapshot(objectEvents);
+      transaction.resolvePromise = resolve;
+      transaction.rejectPromise = reject;
+      state.transactions.push(transaction);
+      // log(state.transactions, 4)
+      
+      pinTransaction(transaction);
+      state.objectEvents = [];
     });
-    // log("...")
-
-    // Keep track of incoming references for all objects. 
-    // for (let event of objectEvents) {
-    //   if (event.type === "set") {
-    //     if (event.newValue[meta]) event.newValue[meta].incomingReferenceCount++;
-    //     if (event.oldValue[meta]) event.newValue[meta].incomingReferenceCount--; // Try to forgett refered object here?       
-    //   }
-    // }
-    // log("...")
-
-    const transaction = preCreateImagesWithSnapshot(objectEvents);
-    transaction.resolvePromise = resolvePromise;
-    state.objectEventTransactions.push(transaction);
-    // log(state.objectEventTransactions, 4)
-    
-    pinTransaction(transaction);
-    state.objectEvents = [];
-    return onPersistPromise; 
   }
 
   function preCreateImagesWithSnapshot(objectEvents) {
@@ -512,28 +559,60 @@ function createWorld(configuration) {
   *  Pushing transactions to images
   ***************************************************/
 
+  function startAutoFlushing() {
+    state.autoFlush = true;
+    autoFlush(); 
+  }
+
+  let stopAutoFlushResolve;
+  async function stopAutoFlushing() {
+    return new Promise((resolve, reject) => {
+      state.autoFlush = false;
+      stopAutoFlushResolve = resolve; 
+    })
+  }
+
+  function autoFlush() {    
+    async function flushAndWaitAgain() {
+      if (state.autoFlush) {      
+        await flushToDatabase();
+        startAutoFlushing();
+      } else {
+        if (stopAutoFlushResolve) stopAutoFlushResolve();
+      }
+    }
+    setTimeout(flushAndWaitAgain, 0);
+  } 
+
   async function flushToDatabase() {
-    logg("flushToDatabase:");
-    while (state.objectEventTransactions.length > 0) {
+    while (state.transactions.length > 0) {
+      logg("flushToDatabase:");
       await pushTransactionToDatabase();
     }
+    log("flush to database done!")
   } 
 
   async function pushTransactionToDatabase() {
     log("pushTransactionToDatabase")
-    if (state.objectEventTransactions.length > 0) {
-      const transaction = state.objectEventTransactions.shift();
+    if (state.transactions.length > 0) {
+      const transaction = state.transactions.shift();
       // log(transaction, 3);
 
-      pushTransactionToImages(transaction);
-      const imageEvents = state.imageEvents;
+      await pushTransactionToImages(transaction);
+      
+      const imageEvents = state.imageEvents; 
+      state.imageEvents = [];
+      log("imageEvents:")
       log(imageEvents);
       transaction.imageEvents.forEach(event => imageEvents.push(event)); // Not needed really...
-      state.imageEvents = [];
+      
       
       await twoPhaseComit(transaction.imageCreationEvents, imageEvents);
+      log("unpin...")
       unpinTransaction(transaction);
-      transaction.resolvePromise();
+      log("resolve...")
+      console.log(transaction.resolvePromise);
+      setTimeout(transaction.resolvePromise, 0);
     }
   }
 
@@ -674,7 +753,7 @@ function createWorld(configuration) {
 
     // Augment the update itself with the new ids. 
     const update = compileUpdate(imageCreationEvents, imageEvents);
-    log(update, 3);
+    log(update, 2);
 
     // Store the update itself so we can continue this update if any crash or power-out occurs while performing it.
     // After the update has been stored, no rollback is possible, only roll-forward and complete the whole update. 
@@ -697,7 +776,7 @@ function createWorld(configuration) {
   function compileUpdate(imageCreationEvents, imageEvents) {
     log("compileUpdate");
     log(imageCreationEvents)
-    log(imageEvents)
+    log(imageEvents, 2)
     function serializeImage(image) {
       let serialized = (image instanceof Array) ? [] : {};
       for (let property in image) {
@@ -755,7 +834,7 @@ function createWorld(configuration) {
           // log("do a specific...")
           if (event.type === 'set') {               
             // log("a set...")
-            specificRecordUpdates[event.property] = serializeReferences(event.value);
+            specificRecordUpdates[event.property] = serializeReferences(event.newValue);
           } else if (event.type === 'delete') {
             specificRecordUpdates[event.property] = "_eternity_delete_property_";          
           }   
@@ -813,6 +892,10 @@ function createWorld(configuration) {
         if (value === "_eternity_delete_property_") {
           await mockMongoDB.deleteRecordPath(dbId, [property]);
         } else {
+          log("updateRecordPath:");
+          log(dbId)
+          log(property)
+          log(value)
           await mockMongoDB.updateRecordPath(dbId, [property], value);
         }
       }
@@ -838,7 +921,7 @@ function createWorld(configuration) {
 
 
   const fs = require("fs");
-  function logToFile(entity, pattern, filename) {
+  async function logToFile(entity, pattern, filename) {
     // log(entity);
     // log(pattern);
 
@@ -865,9 +948,10 @@ function createWorld(configuration) {
     logToFile,
     transaction, 
     endTransaction,
-    setupDatabase,
-    unloadAll, 
-    unloadAllAndClearDatabase
+    startDatabase,
+    stopDatabase,
+    volatileReset, 
+    persistentReset
   });
   return world; 
 }

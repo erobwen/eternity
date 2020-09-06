@@ -80,7 +80,7 @@ export function createDatabase() {
   
   async function updateRecordPath(id, path, value) {
     // log("updateRecordPath: {id:" + id + "}." + path.join(".") + " = " + value);
-    let record = getRecord(id);
+    let record = await getRecord(id);
     let property = path[path.length - 1];
     let index = 0;
     let target = record;
@@ -88,13 +88,16 @@ export function createDatabase() {
       target = target[path[index]];
       index++;
     }
+    log("replacing")
+    log(target)
     target[property] = value;
+    log(target)
     dataRecords[id] = JSON.stringify(record);
   }
   
   async function deleteRecordPath(id, path) {
     // log("updateRecordPath: {id:" + id + "}." + path.join(".") + " = " + value);
-    let record = getRecord(id);
+    let record = await getRecord(id);
     let property = path[path.length - 1];
     let index = 0;
     let target = record;
