@@ -153,7 +153,7 @@ function createWorld(configuration) {
       // console.log(event);
       // log("state.ignoreEvents: " + state.ignoreEvents);
       if (state.ignoreImageEvents === 0 && state.ignoreEvents === 0) {
-        if (event.type === "creation") {
+        if (event.type === "create") {
           state.imageCreationEvents.push(event);
         } else {
           // log("pushing event");
@@ -255,15 +255,17 @@ function createWorld(configuration) {
 
   function createObjectForImage(className, image) {
     const object = objectWorld.create(createTargetWithClass(className));
+      state.ignoreEvents++; // Just in case... 
       object[meta].createObjectForImage = true;
       object[meta].incomingPersistentReferenceCount = null; // We only know after load
       object[meta].incomingReferenceCount = 0;
       object[meta].pins = 0;
-      object[meta].target.loaded = false;
+      object[meta].target.loaded = false; // Avoid event alltogether.
 
       // Connect with image
       image[meta].object = object; 
       object[meta].image = image;
+      state.ignoreEvents--;
   }
 
   function getPersistentObject(dbId, className, imageClassName) {
@@ -364,7 +366,9 @@ function createWorld(configuration) {
 
   async function loadAndPin(object) {
     if (object[meta].image) {
-      await loadObject(object);
+      if (!object.loaded){
+        await loadObject(object);
+      } 
       pin(object);
     }  else {
       throw new Error("Cannot load and pin non-persistent object");
@@ -394,7 +398,7 @@ function createWorld(configuration) {
   ***************************************************/
   
   async function volatileReset(databaseStoppedAlready) {
-    // log("volatileReset:")
+    log("volatileReset:")
     // Stop and flush all to database
     if (!databaseStoppedAlready) {
       await endTransaction();
@@ -412,6 +416,7 @@ function createWorld(configuration) {
 
     // Restart database
     await startDatabase();
+    log("finish volatileReset...");
   }
     
   async function persistentReset() {
@@ -457,7 +462,8 @@ function createWorld(configuration) {
       transaction.resolvePromise = resolve;
       transaction.rejectPromise = reject;
       state.transactions.push(transaction);
-      // log(state.transactions, 4)
+    // log("END TRANSACTION")
+    // log(state.transactions, 4)
       
       pinTransaction(transaction);
       state.objectEvents = [];
@@ -465,6 +471,7 @@ function createWorld(configuration) {
   }
 
   function preCreateImagesWithSnapshot(objectEvents) {
+  // logg("preCreateImagesWithSnapshot");
     // The purpose of this is to 
     // 1. Filter out non persistent events
     // 2. Save image snapshots of newly persisted objects. It has to be done right away, since their state might change later.
@@ -486,6 +493,7 @@ function createWorld(configuration) {
           if (referedObject) {
             const referedImage = event.newValue[meta].image;
             if (referedObject && !event.newValue[meta].image) {
+            // log("here!")
               createImageForObjectRecursive(event.newValue);         
               const referedImage = event.newValue[meta].image; 
               referedImage._eternityPersistentParent = image;
@@ -498,8 +506,10 @@ function createWorld(configuration) {
     }
 
     // Collect all the image creation events, to be used for later. note: mixed with settings of _eternityPersistentParent/_eternityPersistentParentProperty
-    newTransaction.imageCreationEvents = state.imageCreationEvents; state.imageCerationEvents = [];
+    newTransaction.imageCreationEvents = state.imageCreationEvents; state.imageCreationEvents = [];
+  // log(newTransaction.imageCreationEvents, 2);
     newTransaction.imageEvents = state.imageEvents; state.imageEvents = [];
+  // logg();
     return newTransaction;
   }
 
@@ -511,6 +521,9 @@ function createWorld(configuration) {
     const image = createImage(null, className, imageClassName);
     object[meta].image = image;
     image[meta].object = object;
+    state.ignoreEvents++;
+    object.loaded = true;
+    state.ignoreEvents--;
 
     // Save snapshot for later. We will create these references later when we have finished the transaction. 
     image[meta].objectSnapshot = {...object};
@@ -585,10 +598,11 @@ function createWorld(configuration) {
   } 
 
   async function pushTransactionToDatabase() {
-    // log("pushTransactionToDatabase")
+  // log("pushTransactionToDatabase")
     if (state.transactions.length > 0) {
       const transaction = state.transactions.shift();
-      // log(transaction, 3);
+
+    // log(transaction, 3);
 
       await pushTransactionToImages(transaction);
       
@@ -597,8 +611,8 @@ function createWorld(configuration) {
       // log("imageEvents:")
       // log(imageEvents);
       transaction.imageEvents.forEach(event => imageEvents.push(event)); // Not needed really...
-      
-      
+    // logg("push to database...")
+    // log(transaction.imageCreationEvents, 3)
       await twoPhaseComit(transaction.imageCreationEvents, imageEvents);
       // log("unpin...")
       unpinTransaction(transaction);
@@ -625,11 +639,14 @@ function createWorld(configuration) {
     }
 
     // Fill the newly created images with object snapshots. 
-    for (let imageCreation in transaction.imageCreationEvents) {
+    for (let imageCreation of transaction.imageCreationEvents) {
       const snapshot = imageCreation.object[meta].objectSnapshot;
+      const object = imageCreation.object[meta].object;
       delete imageCreation.object[meta].objectSnapshot;
       for (let property in snapshot) {
-        await setPropertyOfImage(object, property, snapshot[property], null);        
+        if (property !== "loaded") {
+          await setPropertyOfImage(object, property, snapshot[property], null);        
+        }
       }
     }
   }
@@ -735,6 +752,7 @@ function createWorld(configuration) {
 
     // Create all new objects we need. Mark them with "_eternityJustCreated: true" for easy cleanup in case of failure.
     for (let event of imageCreationEvents) {
+    // logg("creating images!");
       const image = event.object;
       let dbId = await mockMongoDB.saveNewRecord({_eternityJustCreated : true});  
       setImageDbId(image, dbId);
@@ -742,10 +760,13 @@ function createWorld(configuration) {
       state.dbIdToImageMap[dbId] = image;
       state.rememberedImages++;
     }
+    // await logToFile(world.mockMongoDB.getAllRecordsParsed(), 10, "./databaseDump.json");
+
 
     // Augment the update itself with the new ids. 
     const update = compileUpdate(imageCreationEvents, imageEvents);
-    // log(update, 2);
+  // log("update");
+  // log(update, 3);
 
     // Store the update itself so we can continue this update if any crash or power-out occurs while performing it.
     // After the update has been stored, no rollback is possible, only roll-forward and complete the whole update. 
@@ -780,7 +801,7 @@ function createWorld(configuration) {
 
     function serializeReferences(entity) {
       if (typeof(entity) === "object" && entity !== null && entity[meta]) {
-        return image[meta].serializedDbId;
+        return entity[meta].serializedDbId;
       } else {
         return entity;
       }

@@ -44,54 +44,42 @@ describe("basic operations", function() {
     persistent = world.persistent;
   }
   
-  it('should save persistent globals (non objects) + reset database', async function() {
-    // log("--------------------------------------------------");
-    persistent.foo = 42;
-    assert.equal(42, persistent.foo);
+  // it('should save properties on the persistent object', async function() {
+  //   persistent.foo = 42;
+  //   assert.equal(42, persistent.foo);
 
-    // logToFile(world.mockMongoDB.getAllRecordsParsed(), 10, "./databaseDump2.json");
-
-
-    // logToFile(world.mockMongoDB.getAllRecordsParsed(), 10, "./databaseDump3.json");
-    // endTransaction();
-    await volatileReset();
-    await logToFile(world.mockMongoDB.getAllRecordsParsed(), 10, "./databaseDump.json");
-    // log("FINISHED")
-    // logToFile(world.mockMongoDB.getAllRecordsParsed(), 10, "./databaseDump4.json");
-    // log(persistent.loaded);
-    // log(world.eternityState);
-
-
-    assert.equal(true, persistent.loaded);   
-    assert.equal(42, persistent.foo);   
+  //   await volatileReset();
     
-    // log("--------------------------------------------------");
-    await persistentReset();
-    assert.equal(true, persistent.loaded);   
-    assert.equal(true, typeof(persistent.foo) === 'undefined');
+  //   // await logToFile(world.mockMongoDB.getAllRecordsParsed(), 10, "./databaseDump.json");
 
-    // load(persistent, () => {
-    //   assert.equal(44, persistent.foo);
+  //   assert.equal(true, persistent.loaded);   
+  //   assert.equal(42, persistent.foo);      
+    
+  //   await persistentReset();
+
+  //   assert.equal(true, persistent.loaded);   
+  //   assert.equal(true, typeof(persistent.foo) === 'undefined');
+  // });
+
+  it('should save refered objects', async function () {
+    let A = create({name : 'A'});
+    persistent.A = A;
+      
+    await volatileReset();
+    log("logToFile:");
+    await logToFile(world.mockMongoDB.getAllRecordsParsed(), 10, "./databaseDump.json");
+    log("after logToFile...");
+      
+    assert.notEqual(A, persistent.A); // Should now be a different eternity object... freshly loaded.
+    A = persistent.A;
+    // await whileLoaded(persistent.A, () => {
+    //   assert.equal("A", persistent.A.name);
     // });
+      
+    // await persistentReset();
   });
 });
 
-
- //  it('should save persistent globals', function () {
-  //  // log("=============================");
-  //  let A = create({name : 'A'});
-  //  persistent.A = A;
-    
-  //  volatileReset();
-    
-  //  assert.notEqual(A, persistent.A); // Should now be a different eternity object... freshly loaded.
-  //  A = persistent.A;
-  //  // log(persistent);
-  //  // log(persistent.A);
-  //  assert.equal("A", persistent.A.name);
-    
-  //  persistentReset();
-  // });
   
  //  it('should save refered objects recursivley', function () {
   //  // log("=============================");
