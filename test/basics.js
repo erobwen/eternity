@@ -4,8 +4,11 @@ const assert = require('assert');
 const world = require('../eternity.js').getWorld({name: "basics.js"});
 let persistent;
 const log = console.log;
+function logg() {
+  log("-------------------------------------------------");
+}
 const { create, whileLoaded, logToFile } = world;
-
+const meta = "eternity";
 const { endTransaction } = world;
 
 // 'use strict';
@@ -63,15 +66,14 @@ describe("basic operations", function() {
     persistent.A = A;
       
     await volatileReset();
-    await logToFile(world.mockMongoDB.getAllRecordsParsed(), 10, "./databaseDump.json");
-      
-    assert.notEqual(A, persistent.A); // Should now be a different eternity object... freshly loaded.
+    // await logToFile(world.mockMongoDB.getAllRecordsParsed(), 10, "./databaseDump.json");
+
     A = persistent.A;
-    // await whileLoaded(persistent.A, () => {
-    //   assert.equal("A", persistent.A.name);
-    // });
+    await whileLoaded(A, () => {
+      assert.equal("A", A.name);
+    });
       
-    // await persistentReset();
+    await persistentReset();
   });
 });
 

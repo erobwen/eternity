@@ -102,13 +102,13 @@ function createWorld(configuration) {
   }
 
   function isDbReference(string) {
-    return string.startsWith("_db_id_");
+    return string.startsWith("_db_id");
   }
 
   function decodeDbReference(reference) {
     const fragments = reference.split(":");
     return {
-      dbId: fragments[1],
+      dbId: parseInt(fragments[1]),
       className: fragments[2],
       imageClassName: fragments[3]
     };
@@ -288,6 +288,8 @@ function createWorld(configuration) {
   ***************************************************/
 
   function createObjectForImage(className, image) {
+    // log("createObjectForImage:");
+    // log(image[meta].target.A);
     const object = objectWorld.create(createTargetWithClass(className));
       state.ignoreEvents++; // Just in case... 
       object[meta].createObjectForImage = true;
@@ -352,13 +354,17 @@ function createWorld(configuration) {
   ***************************************************/
 
   async function loadImage(image) {
+    // log("loadImage");
     const record = await mockMongoDB.getRecord(image[meta].dbId);
     const imageTarget = image[meta].target;
     for (let property in record) {
       const value = record[property];
+      // log(property + " : " + value);
       if (property !== "id") {      
         if (typeof(value) === "string" && isDbReference(value)) {
+          // log("A reference!!!");
           const reference = decodeDbReference(value);
+          // log(reference);
           imageTarget[property] = getImage(reference.dbId, reference.className, reference.imageClassName);
         } else {
           imageTarget[property] = value;
@@ -382,6 +388,8 @@ function createWorld(configuration) {
     const image = object[meta].image;
     if (image) {
       await loadImage(image);
+      // log("just loaded image");
+      // log(image[meta].target.A);
       const imageTarget = image[meta].target;
       const objectTarget = object[meta].target;
       for (let property in imageTarget) {
@@ -530,6 +538,7 @@ function createWorld(configuration) {
             // log("here!")
               createImageForObjectRecursive(event.newValue);         
               const referedImage = event.newValue[meta].image; 
+              referedImage._eternityNewPersistedRoot = true; 
               referedImage._eternityPersistentParent = image;
               referedImage._eternityPersistentParentProperty = event.property; 
               // Note: Wait with setting the property until later. Now we only prepare the images of the refered data structure.
@@ -541,9 +550,9 @@ function createWorld(configuration) {
 
     // Collect all the image creation events, to be used for later. note: mixed with settings of _eternityPersistentParent/_eternityPersistentParentProperty
     newTransaction.imageCreationEvents = state.imageCreationEvents; state.imageCreationEvents = [];
-  // log(newTransaction.imageCreationEvents, 2);
+    // log(newTransaction.imageCreationEvents, 2);
     newTransaction.imageEvents = state.imageEvents; state.imageEvents = [];
-  // logg();
+    // logg();
     return newTransaction;
   }
 
@@ -617,11 +626,10 @@ function createWorld(configuration) {
 
       await pushTransactionToImages(transaction);
       
-      const imageEvents = state.imageEvents; 
-      state.imageEvents = [];
+      const imageEvents = state.imageEvents; state.imageEvents = [];
       // log("imageEvents:")
       // log(imageEvents);
-      transaction.imageEvents.forEach(event => imageEvents.push(event)); // Not needed really...
+      transaction.imageEvents.forEach(event => imageEvents.push(event)); // Not needed really as these objects will be created...
     // logg("push to database...")
     // log(transaction.imageCreationEvents, 3)
       await twoPhaseComit(transaction.imageCreationEvents, imageEvents);
@@ -776,8 +784,8 @@ function createWorld(configuration) {
 
     // Augment the update itself with the new ids. 
     const update = compileUpdate(imageCreationEvents, imageEvents);
-  // log("update");
-  // log(update, 3);
+    // log("update");
+    // log(update, 3);
 
     // Store the update itself so we can continue this update if any crash or power-out occurs while performing it.
     // After the update has been stored, no rollback is possible, only roll-forward and complete the whole update. 
@@ -785,11 +793,13 @@ function createWorld(configuration) {
 
 
     /**
-     * Second phase, performing all the updates & remove the update.
+     * Second phase, performing all the updates, connect to GC list if needed & remove the update.
      */
      // Perform all updates
     await performAllUpdates(update);
     
+    // Add all the newly persisted roots to apropriate GC list, if needed
+
     // Finish, clean up transaction
     // log("cleanup...")
     await mockMongoDB.updateRecord(state.updateDbId, { name: "updatePlaceholder" });

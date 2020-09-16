@@ -32,6 +32,7 @@
   {
     "id": "_id_3_di_", 
     "_eternityIncomingCount": 1, 
+    "_eternityNewPersistedRoot": true, 
     "_eternityPersistentParent": "_db_id:0:Object:Object", 
     "_eternityPersistentParentProperty": "A", 
     "name": "A", 
