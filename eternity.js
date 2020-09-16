@@ -14,6 +14,7 @@ const defaultObjectlog = objectlog;
 
 const defaultConfiguration = {
   objectMetaProperty: "eternity",
+  metaPrefix: "_eternity",
   maxNumberOfLoadedObjects : 10000,
   causalityConfiguration : {},
   allowPlainObjectReferences : true,
@@ -198,7 +199,7 @@ function createWorld(configuration) {
       let somethingToCollect = !state.gc.isDone(); 
       if (state.transactions.length > 0 && (!tooManyFlushes || !somethingToCollect || state.stoppingDataBaseWorker)) {
         flushesSinceCollect++;
-        await flushToDatabase();
+        await pushTransactionToDatabase();
       } else if (state.stoppingDataBaseWorker) {
         // Stop doing GC if we are about to quit (no need, can be done later)
         break;
@@ -243,7 +244,7 @@ function createWorld(configuration) {
       protectImages();
 
       state.gcStateImage = getImage(state.collectionDbId, "Object", "Object");
-      state.gc = setupGC(state.gcStateImage);
+      state.gc = setupGC(state.gcStateImage, configuration);
       state.gc.initializeGcState();
       startDataBaseWorker();
       await endTransaction(); 
@@ -261,7 +262,7 @@ function createWorld(configuration) {
       
       state.gcStateImage = getImage(state.collectionDbId, "Object", "Object");
       state.ignoreEvents++;
-      state.gc = setupGC(state.gcStateImage);
+      state.gc = setupGC(state.gcStateImage, configuration);
       state.ignoreEvents--;
       startDataBaseWorker();
       // log("finish reconnect database...");
@@ -622,9 +623,9 @@ function createWorld(configuration) {
     if (state.transactions.length > 0) {
       const transaction = state.transactions.shift();
 
-    // log(transaction, 3);
-
       await pushTransactionToImages(transaction);
+
+      // We probably should update GC state here!
       
       const imageEvents = state.imageEvents; state.imageEvents = [];
       // log("imageEvents:")
