@@ -17,7 +17,8 @@ const defaultConfiguration = {
   maxNumberOfLoadedObjects : 10000,
   causalityConfiguration : {},
   allowPlainObjectReferences : true,
-  classRegistry: {}
+  classRegistry: {},
+  maxFlushToCollectRatio: 10
 }
     
 function createWorld(configuration) {
@@ -73,6 +74,8 @@ function createWorld(configuration) {
     collectionDbId: null,
     gcStateImage: null,
     gc: null,
+
+    stoppingDataBaseWorker: false,
 
     loadedObjects: 0,
     pinnedObjects: 0,
@@ -168,10 +171,58 @@ function createWorld(configuration) {
   *  Setup database
   ***************************************************/
 
+  async function releaseControl(time) {
+    if (typeof(time) === "undefined") time = 0;
+    return new Promise((resolve, reject) => {
+      setTimeout(() => { resolve()} , time);
+    })
+  }
+
+  function startDataBaseWorker() {
+    workWithDataBase(); 
+  }
+
+  let stopDataBaseWorkerResolve;
+  async function stopDataBaseWorker() {
+    return new Promise((resolve, reject) => {
+      stopDataBaseWorkerResolve = resolve; 
+      state.stoppingDataBaseWorker = true;
+    })
+  }
+
+  let flushesSinceCollect = 0;
+  async function workWithDataBase() {
+
+    while (true) {
+      let tooManyFlushes = flushesSinceCollect => configuration.maxFlushToCollectRatio;
+      let somethingToCollect = !state.gc.isDone(); 
+      if (state.transactions.length > 0 && (!tooManyFlushes || !somethingToCollect || state.stoppingDataBaseWorker)) {
+        flushesSinceCollect++;
+        await flushToDatabase();
+      } else if (state.stoppingDataBaseWorker) {
+        // Stop doing GC if we are about to quit (no need, can be done later)
+        break;
+      } else if (somethingToCollect){
+        flushesSinceCollect = 0;
+        await releaseControl(0);
+        // await state.gc.oneStepCollection();
+      } else {
+        await releaseControl(0);
+      }
+    }
+
+    // Terminate worker
+    state.stoppingDataBaseWorker = false;
+    if (stopDataBaseWorkerResolve) {
+      let resolve = stopDataBaseWorkerResolve;
+      stopDataBaseWorkerResolve = null;
+      resolve();
+    }
+  }
+
   async function startDatabase() {
-    // logg("startDatabase:");
+    // log("startDatabase:");
     // log(state.imageEvents.length);
-    startAutoFlushing();
 
     function protectImages() {
       // Protect images from accidental deallocation
@@ -194,6 +245,7 @@ function createWorld(configuration) {
       state.gcStateImage = getImage(state.collectionDbId, "Object", "Object");
       state.gc = setupGC(state.gcStateImage);
       state.gc.initializeGcState();
+      startDataBaseWorker();
       await endTransaction(); 
       // await flushToDatabase(); // Just to flush the image changes done by initializeGcState();
       // log("finished initialize empty database...");
@@ -211,6 +263,7 @@ function createWorld(configuration) {
       state.ignoreEvents++;
       state.gc = setupGC(state.gcStateImage);
       state.ignoreEvents--;
+      startDataBaseWorker();
       // log("finish reconnect database...");
     }
 
@@ -225,27 +278,8 @@ function createWorld(configuration) {
   }
 
   async function stopDatabase() {
-    // logg("stopDatabase:")
-    return new Promise((resolve, reject) => {
-      const lastIndex = state.transactions.length - 1
-      if (lastIndex >= 0) {
-        // Still transactions left, let those finish then stop auto flushing.
-        const oldResolve = state.transactions[lastIndex].resolvePromise;
-        state.transactions[lastIndex].resolvePromise = value => {
-          stopAutoFlushing()
-            .then(() => {          
-              oldResolve();
-              resolve();
-            });
-        }
-      } else {
-        // No transactions, just stop auto-flushing. 
-        stopAutoFlushing()
-          .then(() => {
-            resolve();
-          })
-      }
-    });
+    // log("stopDatabase");
+    await stopDataBaseWorker();
   }
 
 
@@ -398,7 +432,7 @@ function createWorld(configuration) {
   ***************************************************/
   
   async function volatileReset(databaseStoppedAlready) {
-    log("volatileReset:")
+    // log("volatileReset:")
     // Stop and flush all to database
     if (!databaseStoppedAlready) {
       await endTransaction();
@@ -416,7 +450,7 @@ function createWorld(configuration) {
 
     // Restart database
     await startDatabase();
-    log("finish volatileReset...");
+    // log("finish volatileReset...");
   }
     
   async function persistentReset() {
@@ -443,7 +477,7 @@ function createWorld(configuration) {
   // Note: You typically do not need to wait for the promise returned, unless you want to be sure that the data has been stored persistently. 
   // If not, the changes will be queued upp and persisted gradually, which is fine in most cases.
   async function endTransaction() {
-    if (!state.autoFlush) throw new Error("Cannot end transaction when database is stopped!");
+    if (state.stoppingDataBaseWorker) throw new Error("Cannot end transaction when database is stopped!");
     return new Promise((resolve, reject) => { 
       // logg("endTransaction:");
       const objectEvents = state.objectEvents; 
@@ -564,30 +598,7 @@ function createWorld(configuration) {
   *  Pushing transactions to images
   ***************************************************/
 
-  function startAutoFlushing() {
-    state.autoFlush = true;
-    autoFlush(); 
-  }
 
-  let stopAutoFlushResolve;
-  async function stopAutoFlushing() {
-    return new Promise((resolve, reject) => {
-      state.autoFlush = false;
-      stopAutoFlushResolve = resolve; 
-    })
-  }
-
-  function autoFlush() {    
-    async function flushAndWaitAgain() {
-      if (state.autoFlush) {      
-        await flushToDatabase();
-        startAutoFlushing();
-      } else {
-        if (stopAutoFlushResolve) stopAutoFlushResolve();
-      }
-    }
-    setTimeout(flushAndWaitAgain, 0);
-  } 
 
   async function flushToDatabase() {
     while (state.transactions.length > 0) {

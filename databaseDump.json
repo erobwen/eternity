@@ -3,7 +3,7 @@
     "id": "_id_0_di_", 
     "name": "persistent", 
     "_eternityIncomingCount": 0, 
-    "foo": 42
+    "A": "_db_id:3:Object:Object"
   }, 
   { "id": "_id_1_di_", "name": "updatePlaceholder" }, 
   {
@@ -28,5 +28,13 @@
     "_eternityDestructionZoneFirst": null, 
     "_eternityDestructionZoneLast": null, 
     "_eternityDestructionZoneCounter": 0
+  }, 
+  {
+    "id": "_id_3_di_", 
+    "_eternityIncomingCount": 1, 
+    "_eternityPersistentParent": "_db_id:0:Object:Object", 
+    "_eternityPersistentParentProperty": "A", 
+    "name": "A", 
+    "incoming:A": "_db_id:0:Object:Object"
   }
 ]

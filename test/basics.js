@@ -22,13 +22,11 @@ const { endTransaction } = world;
 // Tests based on mobx test/array.js
 
 before(async () => {
-  // log("before")
   await world.startDatabase();
   persistent = world.persistent; 
 });
 
 after(async () => {
-  // log("after")
   await world.stopDatabase();
 });
 
@@ -44,31 +42,28 @@ describe("basic operations", function() {
     persistent = world.persistent;
   }
   
-  // it('should save properties on the persistent object', async function() {
-  //   persistent.foo = 42;
-  //   assert.equal(42, persistent.foo);
+  it('should save properties on the persistent object', async function() {
+    persistent.foo = 42;
+    assert.equal(42, persistent.foo);
 
-  //   await volatileReset();
+    await volatileReset();
+    // await logToFile(world.mockMongoDB.getAllRecordsParsed(), 10, "./databaseDump.json");
+
+    assert.equal(true, persistent.loaded);   
+    assert.equal(42, persistent.foo);
+
+    await persistentReset();
     
-  //   // await logToFile(world.mockMongoDB.getAllRecordsParsed(), 10, "./databaseDump.json");
-
-  //   assert.equal(true, persistent.loaded);   
-  //   assert.equal(42, persistent.foo);      
-    
-  //   await persistentReset();
-
-  //   assert.equal(true, persistent.loaded);   
-  //   assert.equal(true, typeof(persistent.foo) === 'undefined');
-  // });
+    assert.equal(true, persistent.loaded);   
+    assert.equal(true, typeof(persistent.foo) === 'undefined');
+  });
 
   it('should save refered objects', async function () {
     let A = create({name : 'A'});
     persistent.A = A;
       
     await volatileReset();
-    log("logToFile:");
     await logToFile(world.mockMongoDB.getAllRecordsParsed(), 10, "./databaseDump.json");
-    log("after logToFile...");
       
     assert.notEqual(A, persistent.A); // Should now be a different eternity object... freshly loaded.
     A = persistent.A;
