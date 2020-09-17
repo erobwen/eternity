@@ -172,6 +172,41 @@ function createWorld(configuration) {
 
 
   /****************************************************
+  *  System reset, mostly for testing
+  ***************************************************/
+  
+  async function volatileReset(databaseStoppedAlready) {
+    // log("volatileReset:")
+    // Stop and flush all to database
+    if (!databaseStoppedAlready) {
+      await endTransaction();
+      await stopDatabase();
+    }
+
+    // Reset all object ids
+    objectWorld.state.nextObjectId = 1;
+    imageWorld.state.nextObjectId = 1;
+
+    // Forget all images including persistent object
+    state.dbIdToImageMap = {};
+    state.rememberedImages = 0;
+    delete world.persistent;   // Note: causality.persistent is replaced after an unload... 
+
+    // Restart database
+    await startDatabase();
+    // log("finish volatileReset...");
+  }
+    
+  async function persistentReset() {
+    // log("persistentReset:")
+    await endTransaction();
+    await stopDatabase();
+    await mockMongoDB.clearDatabase();
+    await volatileReset(true);
+  }
+
+
+  /****************************************************
   *  Setup database
   ***************************************************/
 
@@ -434,41 +469,6 @@ function createWorld(configuration) {
 
 
   /****************************************************
-  *  System reset, mostly for testing
-  ***************************************************/
-  
-  async function volatileReset(databaseStoppedAlready) {
-    // log("volatileReset:")
-    // Stop and flush all to database
-    if (!databaseStoppedAlready) {
-      await endTransaction();
-      await stopDatabase();
-    }
-
-    // Reset all object ids
-    objectWorld.state.nextObjectId = 1;
-    imageWorld.state.nextObjectId = 1;
-
-    // Forget all images including persistent object
-    state.dbIdToImageMap = {};
-    state.rememberedImages = 0;
-    delete world.persistent;   // Note: causality.persistent is replaced after an unload... 
-
-    // Restart database
-    await startDatabase();
-    // log("finish volatileReset...");
-  }
-    
-  async function persistentReset() {
-    // log("persistentReset:")
-    await endTransaction();
-    await stopDatabase();
-    await mockMongoDB.clearDatabase();
-    await volatileReset(true);
-  }
-
-
-  /****************************************************
   *  Transactions
   ***************************************************/
 
@@ -528,15 +528,14 @@ function createWorld(configuration) {
       if (image) {
         newTransaction.objectEvents.push(event);
 
-        if (event.type === "set") {
+        if (event.type === "set" && event.newValue !== null && event.newValue[meta]) {
           const referedObject = event.newValue[meta];
           if (referedObject) {
             const referedImage = event.newValue[meta].image;
             if (referedObject && !event.newValue[meta].image) {
-            // log("here!")
               createImageForObjectRecursive(event.newValue);         
               const referedImage = event.newValue[meta].image; 
-              referedImage._eternityNewPersistedRoot = true; 
+              referedImage._eternityNewPersistedRoot = true;
               referedImage._eternityPersistentParent = image;
               referedImage._eternityPersistentParentProperty = event.property; 
               // Note: Wait with setting the property until later. Now we only prepare the images of the refered data structure.
@@ -601,40 +600,25 @@ function createWorld(configuration) {
     }
   }
 
+
   /****************************************************
   *  Pushing transactions to images
   ***************************************************/
 
-
-
   async function flushToDatabase() {
     while (state.transactions.length > 0) {
-      // logg("flushToDatabase:");
       await pushTransactionToDatabase();
     }
-    // log("flush to database done!")
   } 
 
   async function pushTransactionToDatabase() {
-  // log("pushTransactionToDatabase")
     if (state.transactions.length > 0) {
       const transaction = state.transactions.shift();
-
-      await pushTransactionToImages(transaction);
-
-      // We probably should update GC state here!
-      
+      await pushTransactionToImages(transaction);     
       const imageEvents = state.imageEvents; state.imageEvents = [];
-      // log("imageEvents:")
-      // log(imageEvents);
       transaction.imageEvents.forEach(event => imageEvents.push(event)); // Not needed really as these objects will be created...
-    // logg("push to database...")
-    // log(transaction.imageCreationEvents, 3)
       await twoPhaseComit(transaction.imageCreationEvents, imageEvents);
-      // log("unpin...")
       unpinTransaction(transaction);
-      // log("resolve...")
-      // console.log(transaction.resolvePromise);
       setTimeout(transaction.resolvePromise, 0);
     }
   }
@@ -645,7 +629,6 @@ function createWorld(configuration) {
       if (typeof(event.object[meta].image) !== 'undefined') {
 
         if (event.type === 'set') {
-          // log("setting property of image... ")
           setPropertyOfImage(event.object, event.property, event.newValue, event.oldValue);
         } else if (event.type === 'delete') {
           await unsettingPropertyOfImage(event.object, event.property, event.oldValue);
@@ -657,12 +640,21 @@ function createWorld(configuration) {
 
     // Fill the newly created images with object snapshots. 
     for (let imageCreation of transaction.imageCreationEvents) {
-      const snapshot = imageCreation.object[meta].objectSnapshot;
-      const object = imageCreation.object[meta].object;
+      const image = imageCreation.object;
+      const snapshot = image[meta].objectSnapshot;
+      const object = image[meta].object;
       delete imageCreation.object[meta].objectSnapshot;
       for (let property in snapshot) {
         if (property !== "loaded") {
           await setPropertyOfImage(object, property, snapshot[property], null);        
+        }
+      }
+
+      // Setup gc state
+      if (image._eternityNewPersistedRoot) {
+        if (!image._eternityPersistentParent._eternityPersistentParent) {
+          // Parent is not attached, re detatch it so we can continue propagate detatchment.  
+          state.gc.justDetatchedList.addLast(image._eternityPersistentParent[meta].object);
         }
       }
     }
@@ -688,88 +680,78 @@ function createWorld(configuration) {
 
   // Unsetting property, used both for delete and for previous value in a normal set. 
   async function unsettingPropertyOfImage(objectWithImage, property, oldValue) {
-    // log("unsettingPropertyOfImage");
-    // log(objectWithImage);
-    // log(property);
-    // log(oldValue);
     if (oldValue && oldValue[meta]) {
       const referedObject = oldValue;
       const referedImage = oldValue[meta].image;
+      await loadAndPin(referedObject);
 
-      // Mark as unstable
+      // Notify detatched to gc
       if (referedImage._eternityPersistentParent === image && referedImage._eternityPersistentParentProperty === property) {
         delete referedImage._eternityPersistentParent;
         delete referedImage._eternityPersistentParentProperty;
 
-        await state.gc.detatchedFromPersistentParent(referedImage); // TODO: Make sure gc internal loadings works..
+        await state.gc.detatchedFromPersistentParent(referedImage);
       }
 
       // Remove incoming references
-      await whileLoaded(referedObject, () => {
-        let distinguisher = ""; 
-        let currentEncoded = encodeIncomingReference(property, distinguisher); 
-        while (referedImage[currentEncoded] && referedImage[currentEncoded] !== image) {
-          if (distinguisher === "") {
-            distinguisher = 1;
-          } else {
-            distinguisher++;
-          }
-          currentEncoded = encodeIncomingReference(property, distinguisher); 
+      let distinguisher = ""; 
+      let reverseProperty = encodeIncomingReference(property, distinguisher); 
+      while (referedImage[reverseProperty] && referedImage[reverseProperty] !== image) {
+        if (distinguisher === "") {
+          distinguisher = 1;
+        } else {
+          distinguisher++;
         }
-        if (referedImage[currentEncoded] !== image) throw new Error("Could not find incoming reference.");
+        reverseProperty = encodeIncomingReference(property, distinguisher); 
+      }
+      if (referedImage[reverseProperty] !== image) throw new Error("Could not find incoming reference.");
 
-        delete referedImage[currentEncoded];
+      delete referedImage[reverseProperty];
+      referedImage._eternityIncomingCount--;
 
-        referedImage._eternityIncomingCount--;
-      });
+      unpin(referedObject);
     }
   }
 
   async function setPropertyOfImage(objectWithImage, property, value, oldValue) {
-    // log("setPropertyOfImage:");
     const image = objectWithImage[meta].image;
+    if (image[meta].world !== imageWorld) throw new Error("not a proper image");
 
     // Unset previous value
     await unsettingPropertyOfImage(objectWithImage, property, oldValue);
-    // log("...");
+
     // Set new value
     let imageValue;
-    if (value[meta]) {
-      // log("....");
+    if (value !== null && typeof(value) === "object" && value[meta]) {
       const referedObject = value;           
       const referedImage = referedObject[meta].image;
-      // log("...");
       if (!referedImage) throw new Error("Internal Error: Expected an image for the object");
+      await loadAndPin(referedObject);
+
+      // Reattatch if unattatched
+      if (!referedImage._eternityPersistentParent) {
+        referedImage._eternityPersistentParent = image;
+        referedImage._eternityPersistentParentProperty = property;
+        await state.gc.justReattatchedList.addLast(referedImage);
+      }
 
       // Set back reference
-      await whileLoaded(referedObject, () => {
-        let distinguisher = ""; 
-        while (referedImage[encodeIncomingReference(property, distinguisher)]) {
-          if (distinguisher === "") {
-            distinguisher = 1;
-          } else {
-            distinguisher++;
-          }
+      let distinguisher = ""; 
+      while (referedImage[encodeIncomingReference(property, distinguisher)]) {
+        if (distinguisher === "") {
+          distinguisher = 1;
+        } else {
+          distinguisher++;
         }
-        referedImage[encodeIncomingReference(property, distinguisher)] = image;
-        referedImage._eternityIncomingCount++;
-      });
+      }
+      referedImage[encodeIncomingReference(property, distinguisher)] = image;
+      referedImage._eternityIncomingCount++;
 
+      unpin(referedObject);
       imageValue = referedImage;
     } else {
-      // log("....");
-      // log("here...")
       imageValue = value;
     }
-
-    // log("world names")
-    // log(objectWithImage[meta].world.name);
-    // log(image[meta].world.name);
-    // log("really setting property of image...");
-    // log(property)
-    // log(imageValue)
-    // log(state.ignoreEvents);
-    if (image[meta].world !== imageWorld) throw new Error("not a proper image");
 
     image[property] = imageValue;
   }
@@ -780,7 +762,6 @@ function createWorld(configuration) {
   ***************************************************/
 
   async function twoPhaseComit(imageCreationEvents, imageEvents) {
-    // log("twoPhaseComit");
     /**
      * First phase, write placeholders for all objects that we need to create, get their real ids, and create and save a compiled update with real dbids
      */ 
@@ -797,13 +778,9 @@ function createWorld(configuration) {
       state.dbIdToImageMap[dbId] = image;
       state.rememberedImages++;
     }
-    // await logToFile(world.mockMongoDB.getAllRecordsParsed(), 10, "./databaseDump.json");
-
 
     // Augment the update itself with the new ids. 
     const update = compileUpdate(imageCreationEvents, imageEvents);
-    // log("update");
-    // log(update, 3);
 
     // Store the update itself so we can continue this update if any crash or power-out occurs while performing it.
     // After the update has been stored, no rollback is possible, only roll-forward and complete the whole update. 
@@ -819,16 +796,11 @@ function createWorld(configuration) {
     // Add all the newly persisted roots to apropriate GC list, if needed
 
     // Finish, clean up transaction
-    // log("cleanup...")
     await mockMongoDB.updateRecord(state.updateDbId, { name: "updatePlaceholder" });
-    // log("finish cleanup...")
   }
   
 
   function compileUpdate(imageCreationEvents, imageEvents) {
-    // log("compileUpdate");
-    // log(imageCreationEvents)
-    // log(imageEvents, 2)
     function serializeImage(image) {
       let serialized = (image instanceof Array) ? [] : {};
       for (let property in image) {
@@ -867,13 +839,11 @@ function createWorld(configuration) {
       const dbId = image[meta].dbId;
       allImages[dbId] = image; 
       if (!recordReplacements[dbId]) { // Only on non replaced objects. 
-        // log("here...")
         // Get specific record updates
         if (typeof(recordUpdates[dbId]) === 'undefined') {
           recordUpdates[dbId] = {};
         }
         const specificRecordUpdates = recordUpdates[dbId];
-        // log("and here...")
 
         // Replace entire record or make targeted property update ajustments
         if (Object.keys(specificRecordUpdates).length === 3) { // At most three property updates
@@ -960,12 +930,8 @@ function createWorld(configuration) {
       await mockMongoDB.updateRecord(dbId, replacement);
       // log("done replace...")
     }
-   }
+  }
 
-
-  /****************************************************
-  *  Garbage collection 
-  ***************************************************/
 
   /****************************************************
   *  To move later 
@@ -995,6 +961,8 @@ function createWorld(configuration) {
   Object.assign(world, {
     ...objectWorld, 
     whileLoaded,
+    loadAndPin,
+    unpin,
     state,
     mockMongoDB,
     logToFile,
