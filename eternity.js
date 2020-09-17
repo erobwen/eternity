@@ -33,7 +33,7 @@ function createWorld(configuration) {
   ***************************************************/
 
   const meta = configuration.objectMetaProperty;
-  const { classRegistry } = configuration;
+  const { classRegistry, metaPrefix } = configuration;
 
   function createTargetWithClass(className) {
     let createdTarget;
@@ -668,17 +668,19 @@ function createWorld(configuration) {
     }
   }
 
-  world.encodeIncomingReference = function(property, distinguisher) {
+  function encodeIncomingReference(property, distinguisher) {
     return metaPrefix + "Incoming:" + property + ":" + distinguisher;
   }
+  world.encodeIncomingReference = encodeIncomingReference; 
 
-  world.decodeIncomingReference = function(incomingReference) {
+  function decodeIncomingReference(incomingReference) {
     const parts = incomingReference.split(":");
     return {
       property: parts[1],
       distinguisher: parseInt(parts[2])
     }
   }
+  world.decodeIncomingReference = decodeIncomingReference;
 
   world.isIncomingReference = function(string) {
     return string.startsWith(metaPrefix + "Incoming");
