@@ -24,7 +24,9 @@ const defaultConfiguration = {
     
 function createWorld(configuration) {
 
-  const world = {};
+  const world = {
+    configuration
+  };
 
   /****************************************************
   *   Deploy configuration & class registry
@@ -93,6 +95,7 @@ function createWorld(configuration) {
       // Consider?: Add and remove to activity list as we persist/unpersist this object.... ??? 
     })
   }
+  world.state = state; 
 
   /****************************************************
   *   Database encoding/decoding
@@ -244,7 +247,8 @@ function createWorld(configuration) {
       protectImages();
 
       state.gcStateImage = getImage(state.collectionDbId, "Object", "Object");
-      state.gc = setupGC(state.gcStateImage, configuration);
+      world.persistent = getPersistentObject(state.persistentDbId, "Object", "Object");
+      state.gc = setupGC(world);
       state.gc.initializeGcState();
       startDataBaseWorker();
       await endTransaction(); 
@@ -262,19 +266,12 @@ function createWorld(configuration) {
       
       state.gcStateImage = getImage(state.collectionDbId, "Object", "Object");
       state.ignoreEvents++;
-      state.gc = setupGC(state.gcStateImage, configuration);
+      world.persistent = getPersistentObject(state.persistentDbId, "Object", "Object");
+      state.gc = setupGC(world);
       state.ignoreEvents--;
       startDataBaseWorker();
       // log("finish reconnect database...");
     }
-
-
-    world.persistent = getPersistentObject(state.persistentDbId, "Object", "Object");
-    // log(world.persistent[meta]);
-    // log(world.persistent[meta].image);
-    // log(world.persistent[meta].image[meta]);
-    // log(world.persistent[meta].image[meta].dbId);
-    // log(state.imageEvents.length);
     await loadAndPin(world.persistent); // Pin persistent! 
   }
 
@@ -671,6 +668,22 @@ function createWorld(configuration) {
     }
   }
 
+  world.encodeIncomingReference = function(property, distinguisher) {
+    return metaPrefix + "Incoming:" + property + ":" + distinguisher;
+  }
+
+  world.decodeIncomingReference = function(incomingReference) {
+    const parts = incomingReference.split(":");
+    return {
+      property: parts[1],
+      distinguisher: parseInt(parts[2])
+    }
+  }
+
+  world.isIncomingReference = function(string) {
+    return string.startsWith(metaPrefix + "Incoming");
+  }
+
   // Unsetting property, used both for delete and for previous value in a normal set. 
   async function unsettingPropertyOfImage(objectWithImage, property, oldValue) {
     // log("unsettingPropertyOfImage");
@@ -686,22 +699,24 @@ function createWorld(configuration) {
         delete referedImage._eternityPersistentParent;
         delete referedImage._eternityPersistentParentProperty;
 
-        await state.gc.addUnstableOrigin(referedImage); // TODO: Make sure gc internal loadings works..
+        await state.gc.detatchedFromPersistentParent(referedImage); // TODO: Make sure gc internal loadings works..
       }
 
       // Remove incoming references
       await whileLoaded(referedObject, () => {
         let distinguisher = ""; 
-        while (referedImage["incoming:" + property + distinguisher] && referedImage["incoming:" + property + distinguisher] !== image) {
+        let currentEncoded = encodeIncomingReference(property, distinguisher); 
+        while (referedImage[currentEncoded] && referedImage[currentEncoded] !== image) {
           if (distinguisher === "") {
             distinguisher = 1;
           } else {
             distinguisher++;
           }
+          currentEncoded = encodeIncomingReference(property, distinguisher); 
         }
-        if (referedImage["incoming:" + property + distinguisher] !== image) throw new Error("Could not find incoming reference.");
+        if (referedImage[currentEncoded] !== image) throw new Error("Could not find incoming reference.");
 
-        delete referedImage["incoming:" + property + distinguisher];
+        delete referedImage[currentEncoded];
 
         referedImage._eternityIncomingCount--;
       });
@@ -727,14 +742,14 @@ function createWorld(configuration) {
       // Set back reference
       await whileLoaded(referedObject, () => {
         let distinguisher = ""; 
-        while (referedImage["incoming:" + property + distinguisher]) {
+        while (referedImage[encodeIncomingReference(property, distinguisher)]) {
           if (distinguisher === "") {
             distinguisher = 1;
           } else {
             distinguisher++;
           }
         }
-        referedImage["incoming:" + property + distinguisher] = image;
+        referedImage[encodeIncomingReference(property, distinguisher)] = image;
         referedImage._eternityIncomingCount++;
       });
 
@@ -1005,90 +1020,3 @@ export function getWorld(configuration) {
 }                                                                   
 
 export default getWorld;
-
-
-
-/* 
---------------------------------------------------------------------
-*/
-
-// restabilize object/image if unstable
-//         // if (unstableOrBeeingForgetedInGcProcess(imageValue)) {
-//         //   imageValue._eternityParent = objectWithImage[meta].image;
-//         //   imageValue._eternityParentProperty = property;
-//         //   if (inList(deallocationZone, imageValue)) {
-//         //     fillDbImageFromCorrespondingObject(imageValue);               
-//         //   }
-//         //   addFirstToList(gcState, pendingForChildReattatchment, imageValue);  
-//         //   removeFromAllGcLists(imageValue);
-//         // }
-
-
-
-
-  // async function loadFromDbIdToImage(image) {
-  //   const dbId = image[meta].dbId;
-  //   const dbRecord = await getDbRecord(dbId);
-  //   for (let property in dbRecord) {
-  //     if (property !== 'const' && property !== 'id') {// && property !== "_eternityIncoming"
-  //       let recordValue = dbRecord[property];
-  //       const value = loadDbValue(recordValue);
-        
-  //       image[property] = value;
-  //     }
-  //   }
-  //   image[meta].loaded = true;
-
-  //   imageCausality.state.incomingStructuresDisabled--;
-  //   imageCausality.state.emitEventPaused--;
-  //   imageCausality.state.inPulse--; if (imageCausality.state.inPulse === 0) imageCausality.postPulseCleanup();  
-  //   // if (typeof(dbRecord[meta]) !== 'undefined') {
-  //     // for (property in dbRecord[meta]) {
-  //       // if (typeof(image[meta][property]) === 'undefined') {
-  //         // let value = loadDbValue(dbRecord[meta][property]);
-  //         // image[meta][property] = value;
-  //         // if (typeof(object[meta][property]) === 'undefined') {
-  //           // object[meta][property] = imageToObject(value);                         
-  //         // }
-  //       // }
-  //     // }
-  //   // }    
-  // }
-
-  // function getDbRecord(dbId) {
-  //   // flushToDatabase(); TODO... really have here??
-  //   if (typeof(peekedAtDbRecords[dbId]) === 'undefined') {
-  //     // No previous peeking, just get it
-  //     return mockMongoDB.getRecord(dbId);
-  //   } else {
-  //     // Already stored for peeking, get and remove
-  //     let record = peekedAtDbRecords[dbId];
-  //     delete peekedAtDbRecords[dbId];
-  //     return record;
-  //   }
-  // }
-    
-  // function loadDbValue(dbValue) {
-  //   // trace.load && log("loadDbValue");
-  //   if (typeof(dbValue) === 'string') {
-  //     if (imageCausality.isIdExpression(dbValue)) {
-  //       let dbId = imageCausality.extractIdFromExpression(dbValue);
-  //       let image = getDbImage(dbId);
-  //       image[meta].incomingReferenceCount++;
-  //       return image;
-  //     } else {
-  //       return dbValue;
-  //     }
-  //   } else if (typeof(dbValue) === 'object') { // TODO: handle the array case
-  //     if (dbValue === null) return null;
-  //     let javascriptObject = {};
-  //     for (let property in dbValue) {
-  //       javascriptObject[property] = loadDbValue(dbValue[property]);
-  //     }
-  //     return javascriptObject;
-  //   } 
-    
-  //   else {
-  //     return dbValue;
-  //   }
-  // }

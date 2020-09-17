@@ -283,7 +283,7 @@
 						&& oldValueDbImage._eternityParentProperty === event.property) {
 						
 						if (trace.eternity) log("add unstabe origin...");
-						addUnstableOrigin(oldValueDbImage);
+						detatchedFromPersistentParent(oldValueDbImage);
 					}
 				}
 			}
@@ -2078,8 +2078,8 @@
 			initializeList(gcState, destructionZone);	
 		}
 		
-		function addUnstableOrigin(pendingUnstableImage) {
-			// log("addUnstableOrigin");
+		function detatchedFromPersistentParent(pendingUnstableImage) {
+			// log("detatchedFromPersistentParent");
 			// log(pendingUnstableImage);
 			imageCausality.disableIncomingRelations(function() {
 				if (!inList(pendingUnstableOrigins, pendingUnstableImage)) {
