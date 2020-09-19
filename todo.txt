@@ -1,0 +1,3 @@
+
+
+Remember to prevent the parent of a newly persistent root to be deallocated before the newly persistent root is inserted into the database.

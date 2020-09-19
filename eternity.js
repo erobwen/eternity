@@ -126,21 +126,55 @@ function createWorld(configuration) {
     //   // handler.target
     //   // handler.proxy
     // }, 
-    // emitEvents: true, 
+    // emitEvents: true,
     onEventGlobal: event => {
-      // log("onEventGlobal (object)");
-      // log(event, 2);
       if (event.object[meta].world !== objectWorld) throw new Error("Fatal: Wrong world!");
-      // log(state.ignoreEvents);
 
-      // TODO: register incoming counts. Forget images.. 
-
+      // updateIncomingCounters(event);
       if (state.ignoreObjectEvents === 0 && state.ignoreEvents === 0) {
-        // log(event);
         state.objectEvents.push(event);
       }
     }
   });
+
+  function isObject(entity) {
+    return typeof(entity) === "object" && entity !== null && entity[meta] && entity[meta].world === objectWorld;
+  }
+
+  function decreaseIncomingCounter(object) {
+    object[meta].incomingReferences--;
+    if (object[meta].incomingReferences === 0 && object[meta].image && !object.loaded) {
+      forgetPersistentObject(object);
+    }
+  }
+
+  function increaseIncomingCounter(object) {
+    object[meta].incomingReferences++;
+  }
+
+  function updateIncomingCounters(event) {
+    // TODO: register incoming counts. Forget images.. 
+    if (event.type === "set") {
+      if (typeof(event.oldValue) === "object" && event.oldValue !== null && event.oldValue[meta]) {
+        decreaseIncomingCounter(event.oldValue);
+      }
+      if (typeof(event.newValue) === "object" && event.newValue !== null && event.newValue[meta]) {
+        increaseIncomingCounter(event.newValue);
+      }
+    } else if (event.type === "delete") {
+      if (typeof(event.deletedValue) === "object" && event.deletedValue !== null && event.deletedValue[meta]) {
+        decreaseIncomingCounter(event.deletedValue);
+      }
+    } else if (event.type === "create") {
+      event.object[meta].incomingReferences = 0;
+      for (let property in event.object) {
+        const initialValue = event.object[property];
+        if (typeof(initialValue) === "object" && initialValue !== null && initialValue[meta]) {
+          increaseIncomingCounter(initialValue);
+        }
+      }
+    }   
+  }
 
   const imageWorld = getCausalityWorld({
     name: "imageWorld",
@@ -163,18 +197,24 @@ function createWorld(configuration) {
     },
   });
 
+  function isImage(entity) {
+    return typeof(entity) === "object" && entity !== null && entity[meta] && entity[meta].world === imageWorld;
+  }
+
 
   /****************************************************
   *  System reset, mostly for testing
   ***************************************************/
   
   async function volatileReset(databaseStoppedAlready) {
-    // log("volatileReset:")
     // Stop and flush all to database
     if (!databaseStoppedAlready) {
+      logg("volatileReset:")
       await endTransaction();
       await stopDatabase();
     }
+    log("finished transaction...");
+
 
     // Reset all object ids
     objectWorld.state.nextObjectId = 1;
@@ -191,7 +231,7 @@ function createWorld(configuration) {
   }
     
   async function persistentReset() {
-    // log("persistentReset:")
+    logg("persistentReset:")
     await endTransaction();
     await stopDatabase();
     await mockMongoDB.clearDatabase();
@@ -253,7 +293,7 @@ function createWorld(configuration) {
   }
 
   async function startDatabase() {
-    // log("startDatabase:");
+    logg("startDatabase:");
     // log(state.imageEvents.length);
 
     function protectImages() {
@@ -266,16 +306,17 @@ function createWorld(configuration) {
 
     if ((await mockMongoDB.getRecordsCount()) === 0) {
       // Initialize empty database
-      // log("initialize empty database...");
+      log("initialize empty database...");
       [state.persistentDbId, state.updateDbId, state.collectionDbId] = 
         await Promise.all([
-          mockMongoDB.saveNewRecord({ name: "persistent", _eternityIncomingCount : 0}),
+          mockMongoDB.saveNewRecord({ name: "persistent", _eternityIncomingPersistentCount : 0}),
           mockMongoDB.saveNewRecord({ name: "updatePlaceholder" }),
           mockMongoDB.saveNewRecord({ name: "garbageCollection" })]);
       protectImages();
 
-      state.gcStateImage = getImage(state.collectionDbId, "Object", "Object");
-      world.persistent = getPersistentObject(state.persistentDbId, "Object", "Object");
+      state.gcStateImage = getImageFromDbId(state.collectionDbId, "Object", "Object");
+      world.persistent = getPersistentObjectFromDbId(state.persistentDbId, "Object", "Object");
+      log(world.persistent[meta]);
       state.gc = setupGC(world);
       state.gc.initializeGcState();
       startDataBaseWorker();
@@ -286,21 +327,23 @@ function createWorld(configuration) {
       // process.exit();
     } else {
       // Reconnect existing database
-      // log("reconnect database...");
+      log("reconnect database...");
       state.persistentDbId = 0;
       state.updateDbId = 1;
       state.collectionDbId = 2;
       protectImages();
       
-      state.gcStateImage = getImage(state.collectionDbId, "Object", "Object");
+      state.gcStateImage = getImageFromDbId(state.collectionDbId, "Object", "Object");
       state.ignoreEvents++;
-      world.persistent = getPersistentObject(state.persistentDbId, "Object", "Object");
+      world.persistent = getPersistentObjectFromDbId(state.persistentDbId, "Object", "Object");
       state.gc = setupGC(world);
       state.ignoreEvents--;
       startDataBaseWorker();
-      // log("finish reconnect database...");
+      log("finish reconnect database...");
     }
+    log("load and pin pers..  ")
     await loadAndPin(world.persistent); // Pin persistent! 
+    log("done load and pin pers..  ")
   }
 
   async function stopDatabase() {
@@ -316,42 +359,55 @@ function createWorld(configuration) {
   function createObjectForImage(className, image) {
     // log("createObjectForImage:");
     // log(image[meta].target.A);
+    if (!isImage(image)) throw new Error("Needs an image!");
     const object = objectWorld.create(createTargetWithClass(className));
-      state.ignoreEvents++; // Just in case... 
-      object[meta].createObjectForImage = true;
-      object[meta].incomingPersistentReferenceCount = null; // We only know after load
-      object[meta].incomingReferenceCount = 0;
       object[meta].pins = 0;
       object[meta].target.loaded = false; // Avoid event alltogether.
 
       // Connect with image
       image[meta].object = object; 
       object[meta].image = image;
-      state.ignoreEvents--;
   }
 
-  function getPersistentObject(dbId, className, imageClassName) {
+  function getPersistentObjectFromDbId(dbId, className, imageClassName) {
     state.ignoreEvents++;
-    const image = getImage(dbId, className, imageClassName);
+    const image = getImageFromDbId(dbId, className, imageClassName);
     if (!image[meta].object) {
       createObjectForImage(className, image);
     }
+    const object = image[meta].object; 
+    if (!object[meta].image) throw new Error("Object does not have an image");
     state.ignoreEvents--;
     // log("getPersistentObject:");
     // log(image[meta].object);
-    return image[meta].object;
+    return object;
+  }
+
+  function forgetPersistentObject(object) {
+    const image = object[meta].image; 
+    
+    // Mark object as forgotten (so we can do something if someone tries to load it)
+    object[meta].dbId = image[meta].dbId; // To create ghosts?
+    object[meta].isForgotten = true; 
+
+    delete image[meta].object;
+    delete object[meta].image;
+    forgetImageWithDbId(object[meta].image[meta].dbId);
   }
 
   function createImage(dbId, objectClassName, imageClassName) {
     const image = imageWorld.create(createTargetWithClass(objectClassName));
-    image._eternityIncomingCount = 0;
     image[meta].createdAsImage = true; 
     image[meta].objectClassName = objectClassName;
     image[meta].imageClassName = imageClassName;
 
-    if (typeof(dbId) === "number") {
+    if (dbId === null) {
+      // Creating a new image for saving
+      image._eternityIncomingPersistentCount = 0;
+    } else if (typeof(dbId) === "number") {
+      // Creating a new image for loading
       setImageDbId(image, dbId);
-    } 
+    }
 
     return image;
   }
@@ -362,17 +418,20 @@ function createWorld(configuration) {
     metaObject.serializedDbId = encodeDbReference(dbId, metaObject.objectClassName, metaObject.imageClassName);
   }
 
-  function getImage(dbId, className, imageClassName) {
-    state.ignoreEvents++;
+  function getImageFromDbId(dbId, className, imageClassName) {
     if (typeof(state.dbIdToImageMap[dbId]) === 'undefined') {
+      state.ignoreEvents++;
       const image = createImage(dbId, className, imageClassName);
+      state.ignoreEvents--;
       state.dbIdToImageMap[dbId] = image;
       state.rememberedImages++;
     }
-    const image = state.dbIdToImageMap[dbId];
-    image[meta].incomingReferenceCount++;
-    state.ignoreEvents--;
     return state.dbIdToImageMap[dbId];
+  }
+
+  function forgetImageWithDbId(dbId) {
+    delete state.dbIdToImageMap[dbId]; // This is what lets the system survive! Ignorance is bliss. 
+    state.rememberedImages--;
   }
   
   /****************************************************
@@ -380,18 +439,18 @@ function createWorld(configuration) {
   ***************************************************/
 
   async function loadImage(image) {
-    // log("loadImage");
+    logg("loadImage");
     const record = await mockMongoDB.getRecord(image[meta].dbId);
     const imageTarget = image[meta].target;
     for (let property in record) {
       const value = record[property];
-      // log(property + " : " + value);
+      log(property + " : " + value);
       if (property !== "id") {      
         if (typeof(value) === "string" && isDbReference(value)) {
           // log("A reference!!!");
           const reference = decodeDbReference(value);
           // log(reference);
-          imageTarget[property] = getImage(reference.dbId, reference.className, reference.imageClassName);
+          imageTarget[property] = getImageFromDbId(reference.dbId, reference.className, reference.imageClassName);
         } else {
           imageTarget[property] = value;
         }      
@@ -400,8 +459,9 @@ function createWorld(configuration) {
   }
 
   async function loadObject(object) {
+    if (object[meta].isForgotten) throw new Error("Cannot load forgotten object, please do not hold on to unloaded object references indefinitley. Get your objects freshly loaded from the world.persistent object.");
     function imageValueToObjectValue(imageValue) {
-      if (typeof(imageValue) === "object" && imageValue[meta]) {
+      if (typeof(imageValue) === "object" && imageValue === null && imageValue[meta]) {
         if (!imageValue[meta].object) {
           createObjectForImage(imageValue[meta].objectClassName, imageValue);
         }
@@ -419,7 +479,7 @@ function createWorld(configuration) {
       const imageTarget = image[meta].target;
       const objectTarget = object[meta].target;
       for (let property in imageTarget) {
-        if (!property.startsWith("_incoming_") && property !== "loaded") {
+        if (!world.isIncomingReference(property) && property !== "loaded") {
           objectTarget[property] = imageValueToObjectValue(imageTarget[property])
         }
       }
@@ -438,7 +498,7 @@ function createWorld(configuration) {
     for (let property of object) {
       delete object[property]
     }
-    for (let property of image}) {
+    for (let property of image) {
       // if (!property.startsWith(metaPrefix)) {
       delete image[property]
       // }
@@ -468,7 +528,10 @@ function createWorld(configuration) {
   function pin(object) {
     object[meta].pins++;
     if (object[meta].pins === 1) state.pinnedObjects++;
-    state.activityList.removeFromActivityList(object);
+    const image = object[meta].image;
+    if (!isImage(image)) throw new Error("Cannot pin non persisted object.");
+    state.protectedImages[image[meta].dbId] = true; // Protect image from deallocation during writing.
+    // state.activityList.removeFromActivityList(object);
   }
 
   function unpin(object) {
@@ -476,7 +539,12 @@ function createWorld(configuration) {
     if (object[meta].pins === 0) {
       state.pinnedObjects--;
     }
-    state.activityList.registerActivity(object);
+    const image = object[meta].image;
+    log(object);
+    log(object[meta]);
+    if (!isImage(image)) throw new Error("Cannot unpin non persisted object.");
+    delete state.protectedImages[image[meta].dbId];
+    // state.activityList.registerActivity(object);
     tryUnload();
   } 
 
@@ -511,30 +579,15 @@ function createWorld(configuration) {
   async function endTransaction() {
     if (state.stoppingDataBaseWorker) throw new Error("Cannot end transaction when database is stopped!");
     return new Promise((resolve, reject) => { 
-      // logg("endTransaction:");
       const objectEvents = state.objectEvents; 
       state.objectEvents = null; // Force fail if event!
-
-      // Keep track of incoming references for all objects. 
-      // for (let event of objectEvents) {
-      //   if (event.type === "set") {
-      //     if (event.newValue[meta]) event.newValue[meta].incomingReferenceCount++;
-      //     if (event.oldValue[meta]) event.newValue[meta].incomingReferenceCount--; // Try to forgett refered object here?       
-      //   }
-      // }
-      // log("...")
 
       const transaction = preCreateImagesWithSnapshot(objectEvents);
       transaction.resolvePromise = resolve;
       transaction.rejectPromise = reject;
       state.transactions.push(transaction);
-    // log("END TRANSACTION")
-    // log(state.transactions, 4)
       
       pinTransaction(transaction);
-
-      // Unload all or some non-pinned objects. 
-
       state.objectEvents = [];
     });
   }
@@ -681,12 +734,14 @@ function createWorld(configuration) {
 
       // Setup gc state
       if (image._eternityNewPersistedRoot) {
-        await loadAndPin(image._eternityPersistentParent); // Consider: can there be a situation where this is deallocated already? What happens then?
-        if (!image._eternityPersistentParent._eternityPersistentParent) {
-          // Parent is not attached, re detatch it so we can continue propagate detatchment.  
-          state.gc.justDetatchedList.addLast(image._eternityPersistentParent[meta].object);
+        const persistentParentObject = image._eternityPersistentParent[meta].object;
+        const persistentParentImage = persistentParentObject[meta].image;
+        await loadAndPin(persistentParentObject); // Consider: can there be a situation where this is deallocated already? What happens then?
+        if (!persistentParentImage._eternityPersistentParent && persistentParentImage !== world.persistent[meta].image) {
+          // Parent is not attached, mark as just detatched it so we can continue propagate detatchment.  
+          state.gc.justDetatchedList.addLast(persistentParentObject);
         }
-        unpin(image._eternityPersistentParent);
+        unpin(persistentParentObject);
       }
     }
   }
@@ -738,7 +793,7 @@ function createWorld(configuration) {
       if (referedImage[reverseProperty] !== image) throw new Error("Could not find incoming reference.");
 
       delete referedImage[reverseProperty];
-      referedImage._eternityIncomingCount--;
+      referedImage._eternityIncomingPersistentCount--;
 
       unpin(referedObject);
     }
@@ -776,7 +831,7 @@ function createWorld(configuration) {
         }
       }
       referedImage[encodeIncomingReference(property, distinguisher)] = image;
-      referedImage._eternityIncomingCount++;
+      referedImage._eternityIncomingPersistentCount++;
 
       unpin(referedObject);
       imageValue = referedImage;
@@ -793,6 +848,8 @@ function createWorld(configuration) {
   ***************************************************/
 
   async function twoPhaseComit(imageCreationEvents, imageEvents) {
+    // logg("twoPhaseComit");
+
     /**
      * First phase, write placeholders for all objects that we need to create, get their real ids, and create and save a compiled update with real dbids
      */ 
@@ -821,6 +878,9 @@ function createWorld(configuration) {
     /**
      * Second phase, performing all the updates, connect to GC list if needed & remove the update.
      */
+    // log("second phase... perform update");
+    // log(update, 3);
+
      // Perform all updates
     await performAllUpdates(update);
     
@@ -897,28 +957,28 @@ function createWorld(configuration) {
 
     // Find image to deallocate.
     // Note, upon deallocation they need to be removed from any GC list. 
-    for (let dbId in allImages) {
-      if (state.protectedImages[dbId]) continue;
+    // for (let dbId in allImages) {
+    //   if (state.protectedImages[dbId]) continue;
 
-      const image = allImages[dbId];
+    //   const image = allImages[dbId];
 
-      if (image._eternityIncomingCount === 0) {
+    //   if (image._eternityIncomingPersistentCount === 0) {
         
-        // Decouple from object 
-        let object = image[meta].object;
-        delete object[meta].image;
-        delete object[meta].object;
+    //     // Decouple from object 
+    //     let object = image[meta].object;
+    //     delete object[meta].image;
+    //     delete image[meta].object;
 
-        // Forget
-        delete state.dbIdToImageMap[dbId]; 
-        state.rememberedImages--;
+    //     // Forget
+    //     delete state.dbIdToImageMap[dbId]; 
+    //     state.rememberedImages--;
 
-        // Setup for destruction
-        imageDeallocations[dbId] = true;
-        if (recordUpdates[dbId]) delete recordUpdates[dbId];
-        if (recordReplacements[dbId]) delete recordReplacements[dbId];
-      }
-    }
+    //     // Setup for destruction
+    //     imageDeallocations[dbId] = true;
+    //     if (recordUpdates[dbId]) delete recordUpdates[dbId];
+    //     if (recordReplacements[dbId]) delete recordReplacements[dbId];
+    //   }
+    // }
 
     return {
       name: "update",
