@@ -167,6 +167,7 @@ function createWorld(configuration) {
       }
     } else if (event.type === "create") {
       event.object[meta].incomingReferences = 0;
+      event.object[meta].inTransaction = 0; 
       for (let property in event.object) {
         const initialValue = event.object[property];
         if (typeof(initialValue) === "object" && initialValue !== null && initialValue[meta]) {
@@ -683,19 +684,30 @@ function createWorld(configuration) {
 
   function pinTransaction(transaction) {
     for (let event of transaction.objectEvents) {
+      const object = event.object; 
+      if (typeof(event.object[meta]) === "undefined") event.object[meta].inTransaction = 0;
+      event.object[meta].inTransaction++;
       pin(event.object);
     } 
     for (let event of transaction.imageCreationEvents) {
-      pin(event.object[meta].object);
+      const createdImage = event.object;
+      const createdObject = createdImage[meta].object;  
+      if (typeof(event.object[meta]) === "undefined") event.object[meta].inTransaction = 0;
+      createdObject[meta].inTransaction++;
+      pin(createdObject);
     }
   }
 
   function unpinTransaction(transaction) {
     for (let event of transaction.objectEvents) {
+      event.object[meta].inTransaction--;
       unpin(event.object);
     }
     for (let event of transaction.imageCreationEvents) {
-      unpin(event.object[meta].object);
+      const createdImage = event.object;
+      const createdObject = createdImage[meta].object; 
+      createdObject[meta].inTransaction--;
+      unpin(createdObject);
     }
   }
 
