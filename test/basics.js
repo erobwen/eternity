@@ -7,7 +7,7 @@ const log = console.log;
 function logg() {
   log("-------------------------------------------------");
 }
-const { create, whileLoaded, logToFile } = world;
+const { create, whileLoaded, loadAndPin, unpin, logToFile } = world;
 const meta = "eternity";
 const { endTransaction } = world;
 
@@ -76,25 +76,31 @@ describe("basic operations", function() {
       
     await persistentReset();
   });
+
+
+  it('should save refered objects recursivley', async function () {
+   let A = create({name : 'A'});
+   let B = create({name : 'B'});
+   B.bitsAndPieces = 256;
+   A.B = B;
+   persistent.A = A;   
+    
+   await volatileReset();
+    
+   await loadAndPin(persistent.A);
+   await loadAndPin(persistent.A.B);
+
+   assert.equal(256, persistent.A.B.bitsAndPieces);
+
+   unpin(persistent.A);
+   unpin(persistent.A.B);
+
+   await persistentReset();
+  });
 });
 
   
- //  it('should save refered objects recursivley', function () {
-  //  // log("=============================");
-  //  // log(eternity.mockMongoDB.getAllRecordsParsed(), 3);
-    
-  //  let A = create({name : 'A'});
-  //  let B = create({name : 'B'});
-  //  B.bitsAndPieces = 256;
-  //  A.B = B;
-  //  persistent.A = A;   
-    
-  //  volatileReset();
-    
-  //  assert.equal(256, persistent.A.B.bitsAndPieces);
 
-  //  persistentReset();
-  // });
   
   
   // it('should save refered objects recursivley, in steps', function () {

@@ -671,8 +671,8 @@ function createWorld(configuration) {
       const value = object[property]; 
       if (value[meta] && !value[meta].image) {
         const referedObject = value;
-        const referedImage = referedObject[meta].image;
         createImageForObjectRecursive(referedObject);
+        const referedImage = referedObject[meta].image;
 
         // Only create gc parent properties for now   
         referedImage._eternityPersistentParent = image;
