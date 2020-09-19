@@ -637,7 +637,6 @@ function createWorld(configuration) {
               referedImage._eternityNewPersistedRoot = true;
               referedImage._eternityPersistentParent = image;
               referedImage._eternityPersistentParentProperty = event.property; 
-              // state.gc.persistentParentOfNewPersistentRootList.addLast(image);
               // Note: Wait with setting the property until later. Now we only prepare the images of the refered data structure.
             }
           }          
@@ -768,7 +767,6 @@ function createWorld(configuration) {
         const persistentParentObject = image._eternityPersistentParent[meta].object;
         const persistentParentImage = persistentParentObject[meta].image;
         await loadAndPin(persistentParentObject); // Consider: can there be a situation where this is deallocated already? What happens then?
-        // state.gc.persistentParentOfNewPersistentRootList.remove(persistentParentImage);
         if (!persistentParentImage._eternityPersistentParent && persistentParentImage !== world.persistent[meta].image) {
           // Parent is not attached, mark as just detatched it so we can continue propagate detatchment.
           state.gc.justDetatchedList.addLast(persistentParentImage);
