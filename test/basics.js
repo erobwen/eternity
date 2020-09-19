@@ -64,11 +64,11 @@ describe("basic operations", function() {
   it('should save refered objects', async function () {
     let A = create({name : 'A'});
     persistent.A = A;
-    logg("foo")
+    // logg("foo")
     await volatileReset();
-    logg("writing")
+    // logg("writing")
     await logToFile(world.mockMongoDB.getAllRecordsParsed(), 10, "./databaseDump.json");
-    logg("wrote")
+    // logg("wrote")
     A = persistent.A;
     await whileLoaded(A, () => {
       assert.equal("A", A.name);

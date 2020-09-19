@@ -502,13 +502,22 @@ function createWorld(configuration) {
   }
 
 
-  async function loadAndPin(object) {
+  async function loadAndPin(objectOrImage) {
+    let object;
+    if (isObject(objectOrImage)) {
+      object = objectOrImage; 
+    } else if (isImage(objectOrImage)) {
+      object = objectOrImage[meta].object;
+    }
+
     if (object[meta].image) {
       if (!object.loaded){
         await loadObject(object);
       } 
       pin(object);
     }  else {
+      // og(object);
+      // og(object[meta]);
       throw new Error("Cannot load and pin non-persistent object");
     }
   }
@@ -519,7 +528,14 @@ function createWorld(configuration) {
     unpin(object);
   }
 
-  function pin(object) {
+  function pin(objectOrImage) {
+    let object;
+    if (isObject(objectOrImage)) {
+      object = objectOrImage; 
+    } else if (isImage(objectOrImage)) {
+      object = objectOrImage[meta].object;
+    }
+
     object[meta].pins++;
     if (object[meta].pins === 1) state.pinnedObjects++;
     const image = object[meta].image;
@@ -527,7 +543,14 @@ function createWorld(configuration) {
     // state.activityList.removeFromActivityList(object);
   }
 
-  function unpin(object) {
+  function unpin(objectOrImage) {
+    let object;
+    if (isObject(objectOrImage)) {
+      object = objectOrImage; 
+    } else if (isImage(objectOrImage)) {
+      object = objectOrImage[meta].object;
+    }
+
     object[meta].pins--;
     if (object[meta].pins === 0) {
       state.pinnedObjects--;
@@ -598,7 +621,8 @@ function createWorld(configuration) {
 
     // if (state.imageEvents.length > 0) throw new Error("Internal Error: Image event buffer should be empty at this stage!");
     for (let event of objectEvents) {
-      const image = event.object[meta].image; 
+      const object = event.object; 
+      const image = object[meta].image; 
       if (image) {
         newTransaction.objectEvents.push(event);
 
@@ -612,6 +636,7 @@ function createWorld(configuration) {
               referedImage._eternityNewPersistedRoot = true;
               referedImage._eternityPersistentParent = image;
               referedImage._eternityPersistentParentProperty = event.property; 
+              // state.gc.persistentParentOfNewPersistentRootList.addLast(image);
               // Note: Wait with setting the property until later. Now we only prepare the images of the refered data structure.
             }
           }          
@@ -688,10 +713,12 @@ function createWorld(configuration) {
   async function pushTransactionToDatabase() {
     if (state.transactions.length > 0) {
       const transaction = state.transactions.shift();
+      
       await pushTransactionToImages(transaction);     
       const imageEvents = state.imageEvents; state.imageEvents = [];
-      transaction.imageEvents.forEach(event => imageEvents.push(event)); // Not needed really as these objects will be created...
-      await twoPhaseComit(transaction.imageCreationEvents, imageEvents);
+      imageEvents.forEach(event => transaction.imageEvents.push(event));
+
+      await twoPhaseComit(transaction.imageCreationEvents, transaction.imageEvents);
       unpinTransaction(transaction);
       setTimeout(transaction.resolvePromise, 0);
     }
@@ -729,9 +756,10 @@ function createWorld(configuration) {
         const persistentParentObject = image._eternityPersistentParent[meta].object;
         const persistentParentImage = persistentParentObject[meta].image;
         await loadAndPin(persistentParentObject); // Consider: can there be a situation where this is deallocated already? What happens then?
+        // state.gc.persistentParentOfNewPersistentRootList.remove(persistentParentImage);
         if (!persistentParentImage._eternityPersistentParent && persistentParentImage !== world.persistent[meta].image) {
-          // Parent is not attached, mark as just detatched it so we can continue propagate detatchment.  
-          state.gc.justDetatchedList.addLast(persistentParentObject);
+          // Parent is not attached, mark as just detatched it so we can continue propagate detatchment.
+          state.gc.justDetatchedList.addLast(persistentParentImage);
         }
         unpin(persistentParentObject);
       }
@@ -859,31 +887,6 @@ function createWorld(configuration) {
       state.rememberedImages++;
     }
 
-    // TODO: Find images to deallocate
-    // const imageDeallocations = {};
-    // Note, upon deallocation they need to be removed from any GC list. 
-    // for (let dbId in allImages) {
-    //   const image = allImages[dbId];
-      
-    //   if (image[meta].object[meta].pinned !== 0
-    //     && image._eternityIncomingPersistentCount === 0) {
-          
-    //     // Decouple from object 
-    //     let object = image[meta].object;
-    //     delete object[meta].image;
-    //     delete image[meta].object;
-
-    //     // Forget
-    //     delete state.dbIdToImageMap[dbId]; 
-    //     state.rememberedImages--;
-
-    //     // Setup for destruction
-    //     imageDeallocations[dbId] = true;
-    //     if (recordUpdates[dbId]) delete recordUpdates[dbId];
-    //     if (recordReplacements[dbId]) delete recordReplacements[dbId];
-    //   }
-    // }
-
     // Augment the update itself with the new ids. 
     const update = compileUpdate(imageCreationEvents, imageEvents);
 
@@ -926,9 +929,9 @@ function createWorld(configuration) {
       }
     }
 
+    const imageDeallocations = {};
     const recordReplacements = {};
     const recordUpdates = {};
-
     const allImages = {};
 
     // Replace all new records    
@@ -970,7 +973,33 @@ function createWorld(configuration) {
         }        
       }
     }
+    
+    // Find images to deallocate
+    for (let dbId in allImages) {
+      const image = allImages[dbId];
+      const object = image[meta].object;
+      
+      if (object[meta].pins === 0
+        && image._eternityIncomingPersistentCount === 0) {
+        
+        // ogg("DEALLOCATING IMAGE");
+        // og(object[meta]);
+        // og(image);
 
+        // Decouple from object 
+        delete object[meta].image;
+        delete image[meta].object;
+
+        // Forget
+        delete state.dbIdToImageMap[dbId]; 
+        state.rememberedImages--;
+
+        // Setup for destruction
+        imageDeallocations[dbId] = true;
+        if (recordUpdates[dbId]) delete recordUpdates[dbId];
+        if (recordReplacements[dbId]) delete recordReplacements[dbId];
+      }
+    }
     return {
       name: "update",
       recordReplacements,
