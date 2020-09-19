@@ -761,18 +761,6 @@ function createWorld(configuration) {
           await setPropertyOfImage(object, property, snapshot[property], null);        
         }
       }
-
-      // Setup gc state
-      if (image._eternityNewPersistedRoot) {
-        const persistentParentObject = image._eternityPersistentParent[meta].object;
-        const persistentParentImage = persistentParentObject[meta].image;
-        await loadAndPin(persistentParentObject); // Consider: can there be a situation where this is deallocated already? What happens then?
-        if (!persistentParentImage._eternityPersistentParent && persistentParentImage !== world.persistent[meta].image) {
-          // Parent is not attached, mark as just detatched it so we can continue propagate detatchment.
-          state.gc.justDetatchedList.addLast(persistentParentImage);
-        }
-        unpin(persistentParentObject);
-      }
     }
   }
 
@@ -992,10 +980,6 @@ function createWorld(configuration) {
       if (object[meta].pins === 0
         && image._eternityIncomingPersistentCount === 0) {
         
-        // ogg("DEALLOCATING IMAGE");
-        // og(object[meta]);
-        // og(image);
-
         // Decouple from object 
         delete object[meta].image;
         delete image[meta].object;
