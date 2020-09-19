@@ -83,17 +83,7 @@ function createWorld(configuration) {
     loadedObjects: 0,
     pinnedObjects: 0,
 
-    activityList: setupActivityList(meta, (object) => {
-      if (object[meta].isUnforgotten) {
-        return false; 
-      }
-      
-      if (!object[meta].image) {
-        return false;       
-      }
-      return true;
-      // Consider?: Add and remove to activity list as we persist/unpersist this object.... ??? 
-    })
+    activityList: setupActivityList(meta)
   }
   world.state = state; 
 
@@ -142,6 +132,9 @@ function createWorld(configuration) {
       // log(event, 2);
       if (event.object[meta].world !== objectWorld) throw new Error("Fatal: Wrong world!");
       // log(state.ignoreEvents);
+
+      // TODO: register incoming counts. Forget images.. 
+
       if (state.ignoreObjectEvents === 0 && state.ignoreEvents === 0) {
         // log(event);
         state.objectEvents.push(event);
@@ -439,6 +432,22 @@ function createWorld(configuration) {
     state.ignoreEvents--;
   }
 
+  function unloadObject(object) {
+    const image = object[meta].image;
+    state.ignoreEvents++; // No events to push   
+    for (let property of object) {
+      delete object[property]
+    }
+    for (let property of image}) {
+      // if (!property.startsWith(metaPrefix)) {
+      delete image[property]
+      // }
+    }
+    object.loaded = false; // Possibly Trigger reactions.
+    state.ignoreEvents--;
+  }
+
+
   async function loadAndPin(object) {
     if (object[meta].image) {
       if (!object.loaded){
@@ -459,13 +468,30 @@ function createWorld(configuration) {
   function pin(object) {
     object[meta].pins++;
     if (object[meta].pins === 1) state.pinnedObjects++;
+    state.activityList.removeFromActivityList(object);
   }
 
   function unpin(object) {
     object[meta].pins--;
-    if (object[meta].pins === 0) state.pinnedObjects--;
+    if (object[meta].pins === 0) {
+      state.pinnedObjects--;
+    }
     state.activityList.registerActivity(object);
+    tryUnload();
   } 
+
+  function tryUnload() {
+    const pinned = state.pinnedObjects;
+    const unpinned = state.activityList.count;
+    const unpinnedLimit = 10000; 
+    // const totalLoaded = pinned + unpinned;
+    // const memoryLimit = 10000 + pinned;
+    if (state.activityList.count > unpinnedLimit) {
+      const object = state.activityList.getLast();
+      unloadObject(object);
+      // try forgetting objects somehow
+    }
+  }
 
 
   /****************************************************
@@ -506,6 +532,9 @@ function createWorld(configuration) {
     // log(state.transactions, 4)
       
       pinTransaction(transaction);
+
+      // Unload all or some non-pinned objects. 
+
       state.objectEvents = [];
     });
   }
@@ -652,10 +681,12 @@ function createWorld(configuration) {
 
       // Setup gc state
       if (image._eternityNewPersistedRoot) {
+        await loadAndPin(image._eternityPersistentParent); // Consider: can there be a situation where this is deallocated already? What happens then?
         if (!image._eternityPersistentParent._eternityPersistentParent) {
           // Parent is not attached, re detatch it so we can continue propagate detatchment.  
           state.gc.justDetatchedList.addLast(image._eternityPersistentParent[meta].object);
         }
+        unpin(image._eternityPersistentParent);
       }
     }
   }
