@@ -593,10 +593,12 @@ function createWorld(configuration) {
 
   // Note: You typically do not need to wait for the promise returned, unless you want to be sure that the data has been stored persistently. 
   // If not, the changes will be queued upp and persisted gradually, which is fine in most cases.
-  async function transaction(action) { // action can not be async. 
+  
+  // Note II: The action argument can not be async. This means all data needed in the transaction needs to be loaded beforehand. 
+  async function transaction(action) { 
     if (state.objectEvents.length > 0) endTransaction();
-    action();
-    return endTransaction();
+    action(); // We do not wait for action, as it is not allowed to be async. 
+    return await endTransaction();
   }
 
   // Note: You typically do not need to wait for the promise returned, unless you want to be sure that the data has been stored persistently. 
