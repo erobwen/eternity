@@ -597,7 +597,8 @@ function createWorld(configuration) {
   // Note II: The action argument can not be async. This means all data needed in the transaction needs to be loaded beforehand. 
   async function transaction(action) { 
     if (state.objectEvents.length > 0) endTransaction();
-    action(); // We do not wait for action, as it is not allowed to be async. 
+    const actionReturnValue = action(); // We do not wait for action, as it is not allowed to be async. 
+    if (actionReturnValue instanceof Promise) throw new Error("A transaction may not be async! it has to happen all at once. If you need to load data, do it before starting the transaction.");
     return await endTransaction();
   }
 
