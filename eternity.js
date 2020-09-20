@@ -117,9 +117,10 @@ function createWorld(configuration) {
   const objectWorld = getCausalityWorld({
     name: "objectWorld",
     objectMetaProperty: meta,
-    // onWriteGlobal: (handler, target) => {
-    //   return true; 
-    // },
+    onWriteGlobal: (handler, target) => {
+      if (handler.meta.immutable) return false; 
+      return true; 
+    },
     // onReadGlobal: (handler, target) => {
     //   return true;
     //   // handler.meta
@@ -327,7 +328,7 @@ function createWorld(configuration) {
       log("initialize empty database...");
       [state.persistentDbId, state.updateDbId, state.collectionDbId] = 
         await Promise.all([
-          mockMongoDB.saveNewRecord({ name: "persistent", _eternityIncomingPersistentCount : 0}),
+          mockMongoDB.saveNewRecord({ name: "persistent", _eternityIncomingPersistentCount : 0, _eternityOutgoingPersistentCount : 0}),
           mockMongoDB.saveNewRecord({ name: "updatePlaceholder" }),
           mockMongoDB.saveNewRecord({ name: "garbageCollection" })]);
       await setupBaseObjects("initialize");
@@ -401,6 +402,7 @@ function createWorld(configuration) {
     if (dbId === null) {
       // Creating a new image for saving
       image._eternityIncomingPersistentCount = 0;
+      image._eternityOutgoingPersistentCount = 0;
     } else if (typeof(dbId) === "number") {
       // Creating a new image for loading
       setImageDbId(image, dbId);
@@ -595,7 +597,7 @@ function createWorld(configuration) {
 
   // Note: You typically do not need to wait for the promise returned, unless you want to be sure that the data has been stored persistently. 
   // If not, the changes will be queued upp and persisted gradually, which is fine in most cases.
-  async function endTransaction() {
+  async function endTransaction(express) {
     if (state.stoppingDataBaseWorker) throw new Error("Cannot end transaction when database is stopped!");
     return new Promise((resolve, reject) => { 
       const objectEvents = state.objectEvents; 
@@ -604,7 +606,11 @@ function createWorld(configuration) {
       const transaction = preCreateImagesWithSnapshot(objectEvents);
       transaction.resolvePromise = resolve;
       transaction.rejectPromise = reject;
-      state.transactions.push(transaction);
+      if (express){
+        state.transactions.unshift(transaction);
+      } else {
+        state.transactions.push(transaction);
+      }
       
       pinTransaction(transaction);
       state.objectEvents = [];
@@ -732,14 +738,15 @@ function createWorld(configuration) {
   async function pushTransactionToImages(transaction) {
     // Do the settings and deletes
     for (let event of transaction.objectEvents) {
-      if (!typeof(event.object[meta].image) {
+      const object = event.object;
+      if (!typeof(object[meta].image)) {
         continue; // Object has been dealloated while transaction was waiting to be pushed.
       } else {
         if (event.type === 'set') {
-          setPropertyOfImage(event.object, event.property, event.newValue, event.oldValue);
+          setPropertyOfImage(object, event.property, event.newValue, event.oldValue);
         } else if (event.type === 'delete') {
-          await unsettingPropertyOfImage(event.object, event.property, event.oldValue);
-          const image = event.object[meta].image;
+          await unsettingPropertyOfImage(object, event.property, event.oldValue);
+          const image = object[meta].image;
           delete image[event.property];
         }
       }
@@ -755,6 +762,18 @@ function createWorld(configuration) {
         if (property !== "loaded") {
           await setPropertyOfImage(object, property, snapshot[property], null);        
         }
+      }
+
+      // Setup gc state
+      if (image._eternityNewPersistedRoot) {
+        const persistentParentObject = image._eternityPersistentParent[meta].object;
+        const persistentParentImage = persistentParentObject[meta].image;
+        await loadAndPin(persistentParentObject); // Consider: can there be a situation where this is deallocated already? What happens then?
+        if (!persistentParentImage._eternityPersistentParent && persistentParentImage !== world.persistent[meta].image) {
+          // Parent is not attached, mark as just detatched it so we can continue propagate detatchment.
+          state.gc.justDetatchedList.addLast(image);
+        }
+        unpin(persistentParentObject);
       }
     }
   }
@@ -779,6 +798,7 @@ function createWorld(configuration) {
 
   // Unsetting property, used both for delete and for previous value in a normal set. 
   async function unsettingPropertyOfImage(objectWithImage, property, oldValue) {
+    const image = objectWithImage[meta].image; 
     if (oldValue && oldValue[meta]) {
       const referedObject = oldValue;
       const referedImage = oldValue[meta].image;
@@ -807,6 +827,7 @@ function createWorld(configuration) {
 
       delete referedImage[reverseProperty];
       referedImage._eternityIncomingPersistentCount--;
+      image._eternityOutgoingPersistentCount--;
 
       unpin(referedObject);
     }
@@ -814,7 +835,7 @@ function createWorld(configuration) {
 
   async function setPropertyOfImage(objectWithImage, property, value, oldValue) {
     const image = objectWithImage[meta].image;
-    if (image[meta].world !== imageWorld) throw new Error("not a proper image");
+    if (!isImage(image)) throw new Error("not a proper image");
 
     // Unset previous value
     await unsettingPropertyOfImage(objectWithImage, property, oldValue);
@@ -824,13 +845,16 @@ function createWorld(configuration) {
     if (value !== null && typeof(value) === "object" && value[meta]) {
       const referedObject = value;           
       const referedImage = referedObject[meta].image;
+
+      // Refered image has been deallocated. 
       if (!referedImage) {
         state.ignoreEvents++; // Ignore events, since we do not want this deletion to be propagated again downwards.
-        setTimeout(() => {delete object[property]}, 0); // Change the object itself, since we cannot make this property setting.
+        setTimeout(() => {delete object[property];}, 0); // Change the object itself, since we cannot make this property setting.
         // Note: Do a proper delete for potential observers to catch this. But do it in a timeout so we dont have the data base worker go into UI or other stuff. 
         state.ignoreEvents--;
         return; // Ignore property setting since the refered image has been deallocated. 
       }
+
       await loadAndPin(referedObject);
 
       // Reattatch if unattatched
@@ -851,8 +875,10 @@ function createWorld(configuration) {
       }
       referedImage[encodeIncomingReference(property, distinguisher)] = image;
       referedImage._eternityIncomingPersistentCount++;
+      image._eternityOutgoingPersistentCount++;
 
       unpin(referedObject);
+      
       imageValue = referedImage;
     } else {
       imageValue = value;
@@ -866,7 +892,7 @@ function createWorld(configuration) {
   *  Pushing image events to database
   ***************************************************/
 
-  async pushImageChangesToDatabase(transaction) {
+  async function pushImageChangesToDatabase(transaction) {
     if (!transaction) {
       transaction = {
         imageCreationEvents: [],
@@ -996,8 +1022,9 @@ function createWorld(configuration) {
       const image = allImages[dbId];
       const object = image[meta].object;
       
-      if (!image[meta].protectedPersistent &&  
-        && image._eternityIncomingPersistentCount === 0) {
+      if (!image[meta].protectedPersistent  
+        && image._eternityIncomingPersistentCount === 0
+        && image._eternityOutgoingPersistentCount === 0) {
         
         // Decouple from object 
         delete object[meta].image;

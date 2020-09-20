@@ -3,6 +3,7 @@
     "id": "_id_0_di_", 
     "name": "persistent", 
     "_eternityIncomingPersistentCount": 0, 
+    "_eternityOutgoingPersistentCount": 1, 
     "A": "_db_id:3:Object:Object"
   }, 
   { "id": "_id_1_di_", "name": "updatePlaceholder" }, 
@@ -28,6 +29,7 @@
   {
     "id": "_id_3_di_", 
     "_eternityIncomingPersistentCount": 1, 
+    "_eternityOutgoingPersistentCount": 0, 
     "_eternityNewPersistedRoot": true, 
     "_eternityPersistentParent": "_db_id:0:Object:Object", 
     "_eternityPersistentParentProperty": "A", 
