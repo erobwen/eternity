@@ -131,7 +131,7 @@ function createWorld(configuration) {
     onEventGlobal: event => {
       if (event.object[meta].world !== objectWorld) throw new Error("Fatal: Wrong world!");
 
-      // updateIncomingCounters(event);
+      updateIncomingCounters(event);
       if (state.ignoreObjectEvents === 0 && state.ignoreEvents === 0) {
         state.objectEvents.push(event);
       }
@@ -181,6 +181,10 @@ function createWorld(configuration) {
     name: "imageWorld",
     // emitEvents: true,
     objectMetaProperty: meta,
+    onWriteGlobal: (handler, target) => {
+      if (handler.meta.immutable) return false; 
+      return true; 
+    },
     onEventGlobal: event => {
       if (event.object[meta].world !== imageWorld) throw new Error("Fatal: Wrong world!");
       // og("onEventGlobal (image)")
@@ -210,7 +214,7 @@ function createWorld(configuration) {
   async function volatileReset(databaseStoppedAlready) {
     // Stop and flush all to database
     if (!databaseStoppedAlready) {
-      logg("volatileReset:")
+      // logg("volatileReset:")
       await endTransaction();
       await stopDatabase();
     }
@@ -230,7 +234,7 @@ function createWorld(configuration) {
   }
     
   async function persistentReset() {
-    logg("persistentReset:")
+    // logg("persistentReset:")
     await endTransaction();
     await stopDatabase();
     await mockMongoDB.clearDatabase();
@@ -276,7 +280,7 @@ function createWorld(configuration) {
       } else if (somethingToCollect){
         flushesSinceCollect = 0;
         await releaseControl(0);
-        // await state.gc.oneStepCollection();
+        await state.gc.oneStepCollection();
         await pushImageChangesToDatabase();
       } else {
         await releaseControl(0);
@@ -293,7 +297,7 @@ function createWorld(configuration) {
   }
 
   async function startDatabase() {
-    logg("startDatabase:");
+    // logg("startDatabase:");
     // og(state.imageEvents.length);
 
     async function setupBaseObjects(initialize) {
@@ -325,7 +329,7 @@ function createWorld(configuration) {
 
     if ((await mockMongoDB.getRecordsCount()) === 0) {
       // Initialize empty database
-      log("initialize empty database...");
+      // log("initialize empty database...");
       [state.persistentDbId, state.updateDbId, state.collectionDbId] = 
         await Promise.all([
           mockMongoDB.saveNewRecord({ name: "persistent", _eternityIncomingPersistentCount : 0, _eternityOutgoingPersistentCount : 0}),
@@ -334,7 +338,7 @@ function createWorld(configuration) {
       await setupBaseObjects("initialize");
     } else {
       // Reconnect existing database
-      log("reconnect database...");
+      // log("reconnect database...");
       state.persistentDbId = 0;
       state.updateDbId = 1;
       state.collectionDbId = 2;
@@ -572,7 +576,7 @@ function createWorld(configuration) {
   function tryUnload() {
     const pinned = state.pinnedObjects;
     const unpinned = state.activityList.count;
-    const unpinnedLimit = 10000; 
+    const unpinnedLimit = 0; 
     // const totalLoaded = pinned + unpinned;
     // const memoryLimit = 10000 + pinned;
     if (state.activityList.count > unpinnedLimit) {
