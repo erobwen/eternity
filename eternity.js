@@ -167,7 +167,6 @@ function createWorld(configuration) {
       }
     } else if (event.type === "create") {
       event.object[meta].incomingReferences = 0;
-      event.object[meta].inTransaction = 0; 
       for (let property in event.object) {
         const initialValue = event.object[property];
         if (typeof(initialValue) === "object" && initialValue !== null && initialValue[meta]) {
@@ -277,6 +276,7 @@ function createWorld(configuration) {
         flushesSinceCollect = 0;
         await releaseControl(0);
         // await state.gc.oneStepCollection();
+        await pushImageChangesToDatabase();
       } else {
         await releaseControl(0);
       }
@@ -298,16 +298,19 @@ function createWorld(configuration) {
     async function setupBaseObjects(initialize) {
       // GC state
       state.gcStateImage = getImageFromDbId(state.collectionDbId, "Object", "Object");
+      state.gcStateImage[meta].protectedPersistent = true;
       state.gcStateObject = getPersistentObjectFromDbId(state.collectionDbId, "Object", "Object");
       await loadAndPin(state.gcStateObject);
 
       // Update object
       state.upsateImage = getImageFromDbId(state.updateDbId, "Object", "Object");
+      state.upsateImage[meta].protectedPersistent = true;
       state.updateObject = getPersistentObjectFromDbId(state.updateDbId, "Object", "Object");
       await loadAndPin(state.updateObject);
       
       // Persistent
       state.persistentImage = getImageFromDbId(state.persistentDbId, "Object", "Object");
+      state.persistentImage[meta].protectedPersistent = true;
       state.persistentObject = getPersistentObjectFromDbId(state.persistentDbId, "Object", "Object");
       await loadAndPin(state.persistentObject)
       world.persistent = state.persistentObject;
@@ -683,29 +686,23 @@ function createWorld(configuration) {
 
   function pinTransaction(transaction) {
     for (let event of transaction.objectEvents) {
-      const object = event.object; 
-      if (typeof(event.object[meta]) === "undefined") event.object[meta].inTransaction = 0;
-      event.object[meta].inTransaction++;
+      const object = event.object;
       pin(event.object);
     } 
     for (let event of transaction.imageCreationEvents) {
       const createdImage = event.object;
-      const createdObject = createdImage[meta].object;  
-      if (typeof(event.object[meta]) === "undefined") event.object[meta].inTransaction = 0;
-      createdObject[meta].inTransaction++;
+      const createdObject = createdImage[meta].object;
       pin(createdObject);
     }
   }
 
   function unpinTransaction(transaction) {
     for (let event of transaction.objectEvents) {
-      event.object[meta].inTransaction--;
       unpin(event.object);
     }
     for (let event of transaction.imageCreationEvents) {
       const createdImage = event.object;
-      const createdObject = createdImage[meta].object; 
-      createdObject[meta].inTransaction--;
+      const createdObject = createdImage[meta].object;
       unpin(createdObject);
     }
   }
@@ -714,6 +711,8 @@ function createWorld(configuration) {
   /****************************************************
   *  Pushing transactions to images
   ***************************************************/
+
+  // TODO: Take into account that images might have changed due to gc when the change is applied. 
 
   async function flushToDatabase() {
     while (state.transactions.length > 0) {
@@ -725,21 +724,17 @@ function createWorld(configuration) {
     if (state.transactions.length > 0) {
       const transaction = state.transactions.shift();
       
-      await pushTransactionToImages(transaction);     
-      const imageEvents = state.imageEvents; state.imageEvents = [];
-      imageEvents.forEach(event => transaction.imageEvents.push(event));
-
-      await twoPhaseComit(transaction.imageCreationEvents, transaction.imageEvents);
-      unpinTransaction(transaction);
-      setTimeout(transaction.resolvePromise, 0);
+      await pushTransactionToImages(transaction);
+      await pushImageChangesToDatabase(transaction);  
     }
   }
 
   async function pushTransactionToImages(transaction) {
     // Do the settings and deletes
     for (let event of transaction.objectEvents) {
-      if (typeof(event.object[meta].image) !== 'undefined') {
-
+      if (!typeof(event.object[meta].image) {
+        continue; // Object has been dealloated while transaction was waiting to be pushed.
+      } else {
         if (event.type === 'set') {
           setPropertyOfImage(event.object, event.property, event.newValue, event.oldValue);
         } else if (event.type === 'delete') {
@@ -747,7 +742,7 @@ function createWorld(configuration) {
           const image = event.object[meta].image;
           delete image[event.property];
         }
-      }      
+      }
     }
 
     // Fill the newly created images with object snapshots. 
@@ -829,7 +824,13 @@ function createWorld(configuration) {
     if (value !== null && typeof(value) === "object" && value[meta]) {
       const referedObject = value;           
       const referedImage = referedObject[meta].image;
-      if (!referedImage) throw new Error("Internal Error: Expected an image for the object");
+      if (!referedImage) {
+        state.ignoreEvents++; // Ignore events, since we do not want this deletion to be propagated again downwards.
+        setTimeout(() => {delete object[property]}, 0); // Change the object itself, since we cannot make this property setting.
+        // Note: Do a proper delete for potential observers to catch this. But do it in a timeout so we dont have the data base worker go into UI or other stuff. 
+        state.ignoreEvents--;
+        return; // Ignore property setting since the refered image has been deallocated. 
+      }
       await loadAndPin(referedObject);
 
       // Reattatch if unattatched
@@ -864,6 +865,23 @@ function createWorld(configuration) {
   /****************************************************
   *  Pushing image events to database
   ***************************************************/
+
+  async pushImageChangesToDatabase(transaction) {
+    if (!transaction) {
+      transaction = {
+        imageCreationEvents: [],
+        imageEvents: []
+      } 
+    }
+
+    const imageEvents = state.imageEvents; state.imageEvents = [];
+    imageEvents.forEach(event => transaction.imageEvents.push(event));
+
+    await twoPhaseComit(transaction.imageCreationEvents, transaction.imageEvents);
+    unpinTransaction(transaction);
+    setTimeout(transaction.resolvePromise, 0);
+  }
+
 
   async function twoPhaseComit(imageCreationEvents, imageEvents) {
     // ogg("twoPhaseComit");
@@ -973,11 +991,12 @@ function createWorld(configuration) {
     }
     
     // Find images to deallocate
+    // For a pinned object, it should be allowed to deallocate or purge, but not forget.
     for (let dbId in allImages) {
       const image = allImages[dbId];
       const object = image[meta].object;
       
-      if (object[meta].pins === 0
+      if (!image[meta].protectedPersistent &&  
         && image._eternityIncomingPersistentCount === 0) {
         
         // Decouple from object 
