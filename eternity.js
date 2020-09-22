@@ -19,7 +19,8 @@ const defaultConfiguration = {
   causalityConfiguration : {},
   allowPlainObjectReferences : true,
   classRegistry: {},
-  maxFlushToCollectRatio: 10
+  maxFlushToCollectRatio: 10, 
+  autoEndTransactionWhenNotStartedTransaction: true 
 }
     
 function createWorld(configuration) {
@@ -62,6 +63,7 @@ function createWorld(configuration) {
   const state = {
     objectEvents: [],
     transactions: [],
+    startedTransaction: false, 
 
     imageEvents: [],
     imageCreationEvents: [],
@@ -88,8 +90,10 @@ function createWorld(configuration) {
   world.state = state; 
 
   /****************************************************
-  *   Database encoding/decoding
+  *   Database 
   ***************************************************/
+
+  const mockMongoDB = createDatabase(JSON.stringify(configuration));
 
   function encodeDbReference(dbId, objectClassName, imageClassName) {
     return "_db_id:" + dbId + ":" + objectClassName + ":" + imageClassName;
@@ -108,11 +112,10 @@ function createWorld(configuration) {
     };
   }
 
-  /****************************************************
-  *   2 Worlds and a database
-  ***************************************************/
 
-  const mockMongoDB = createDatabase(JSON.stringify(configuration));
+  /****************************************************
+  *   Object world
+  ***************************************************/
 
   const objectWorld = getCausalityWorld({
     name: "objectWorld",
@@ -136,6 +139,10 @@ function createWorld(configuration) {
       updateIncomingCounters(event);
       if (state.ignoreObjectEvents === 0 && state.ignoreEvents === 0) {
         state.objectEvents.push(event);
+      }
+
+      if (state.startedTransaction && autoEndTransactionWhenNotStartedTransaction) {
+        endTransaction();
       }
     }
   });
@@ -178,6 +185,11 @@ function createWorld(configuration) {
       }
     }   
   }
+
+
+  /****************************************************
+  *   Image world
+  ***************************************************/
 
   const imageWorld = getCausalityWorld({
     name: "imageWorld",
@@ -603,16 +615,34 @@ function createWorld(configuration) {
   // If not, the changes will be queued upp and persisted gradually, which is fine in most cases.
   
   // Note II: The action argument can not be async. This means all data needed in the transaction needs to be loaded beforehand. 
-  async function transaction(action) { 
-    if (state.objectEvents.length > 0) endTransaction();
+  async function transaction(action) {
+    startTransaction(); 
     const actionReturnValue = action(); // We do not wait for action, as it is not allowed to be async. 
     if (actionReturnValue instanceof Promise) throw new Error("A transaction may not be async! it has to happen all at once. If you need to load data, do it before starting the transaction.");
     return await endTransaction();
   }
 
+  function anyPersistentEvent(events) {
+    let result = false;
+    events.forEach(event => {
+      if (event.object[meta].image) result = true; 
+    })
+    return result; 
+  }
+
+  function startTransaction() {
+    if (state.objectEvents.length > 0) endTransaction();
+    state.startedTransaction = true;     
+  }
+
   // Note: You typically do not need to wait for the promise returned, unless you want to be sure that the data has been stored persistently. 
   // If not, the changes will be queued upp and persisted gradually, which is fine in most cases.
   async function endTransaction(express) {
+    state.startedTransaction = false; 
+    if (!anyPersistentEvent(state.objectEvents)) {
+      state.objectEvents.length = 0; 
+      return Promise.resolve();      
+    }
     if (state.stoppingDataBaseWorker) throw new Error("Cannot end transaction when database is stopped!");
     return new Promise((resolve, reject) => { 
       const objectEvents = state.objectEvents; 
@@ -628,6 +658,7 @@ function createWorld(configuration) {
       }
       
       pinTransaction(transaction);
+      
       state.objectEvents = [];
     });
   }
