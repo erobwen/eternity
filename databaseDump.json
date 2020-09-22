@@ -28,11 +28,11 @@
   }, 
   {
     "id": "_id_3_di_", 
+    "_eternityPersistentParent": "_db_id:0:Object:Object", 
+    "_eternityPersistentParentProperty": "A", 
     "_eternityIncomingPersistentCount": 1, 
     "_eternityOutgoingPersistentCount": 0, 
     "_eternityNewPersistedRoot": true, 
-    "_eternityPersistentParent": "_db_id:0:Object:Object", 
-    "_eternityPersistentParentProperty": "A", 
     "name": "A", 
     "_eternityIncoming:A:": "_db_id:0:Object:Object"
   }

@@ -118,8 +118,10 @@ function createWorld(configuration) {
     name: "objectWorld",
     objectMetaProperty: meta,
     onWriteGlobal: (handler, target) => {
-      if (handler.meta.immutable) return false; 
-      return true; 
+      // Allow write if not persistent, connected or in gc process
+      const object = handler.meta.proxy;
+      const image = object[meta].image; 
+      return !image || image[meta].target._eternityPersistentParent || image[meta].protectedPersistent || (state.gc && state.gc.inCollectionProcess(object));
     },
     // onReadGlobal: (handler, target) => {
     //   return true;
@@ -182,8 +184,9 @@ function createWorld(configuration) {
     // emitEvents: true,
     objectMetaProperty: meta,
     onWriteGlobal: (handler, target) => {
-      if (handler.meta.immutable) return false; 
-      return true; 
+      return target._eternityPersistentParent 
+      || handler.meta.protectedPersistent 
+      || (state.gc && state.gc.inCollectionProcess(handler.meta.object));
     },
     onEventGlobal: event => {
       if (event.object[meta].world !== imageWorld) throw new Error("Fatal: Wrong world!");
@@ -397,8 +400,13 @@ function createWorld(configuration) {
     forgetImageWithDbId(object[meta].image[meta].dbId);
   }
 
-  function createImage(dbId, objectClassName, imageClassName) {
-    const image = imageWorld.create(createTargetWithClass(objectClassName));
+  function createImage(dbId, objectClassName, imageClassName, parent, parentProperty) {
+    const target = createTargetWithClass(objectClassName)
+    if (parent) {
+      target._eternityPersistentParent = parent;
+      target._eternityPersistentParentProperty = parentProperty;
+    }
+    const image = imageWorld.create(target);
     image[meta].createdAsImage = true; 
     image[meta].objectClassName = objectClassName;
     image[meta].imageClassName = imageClassName;
@@ -646,13 +654,11 @@ function createWorld(configuration) {
         if (event.type === "set" && event.newValue !== null && event.newValue[meta]) {
           const referedObject = event.newValue[meta];
           if (referedObject) {
-            const referedImage = event.newValue[meta].image;
-            if (referedObject && !event.newValue[meta].image) {
-              createImageForObjectRecursive(event.newValue);         
-              const referedImage = event.newValue[meta].image; 
-              referedImage._eternityNewPersistedRoot = true;
-              referedImage._eternityPersistentParent = image;
-              referedImage._eternityPersistentParentProperty = event.property; 
+            let referedImage = event.newValue[meta].image;
+            if (referedObject && !referedImage) {
+              createImageForObjectRecursive(event.newValue, image, event.property);      
+              referedImage = event.newValue[meta].image; 
+              referedImage[meta].target._eternityNewPersistedRoot = true;
               // Note: Wait with setting the property until later. Now we only prepare the images of the refered data structure.
             }
           }          
@@ -669,11 +675,11 @@ function createWorld(configuration) {
   }
 
 
-  function createImageForObjectRecursive(object) {
+  function createImageForObjectRecursive(object, parent, parentProperty) {
     if (object[meta].image) throw new Error("Object already has an image");
     const className = object.constructor.name;
     const imageClassName = (object instanceof Array) ? "Array" : "Object"; 
-    const image = createImage(null, className, imageClassName);
+    const image = createImage(null, className, imageClassName, parent, parentProperty);
     object[meta].image = image;
     image[meta].object = object;
     state.ignoreEvents++;
@@ -687,7 +693,7 @@ function createWorld(configuration) {
       const value = object[property]; 
       if (value[meta] && !value[meta].image) {
         const referedObject = value;
-        createImageForObjectRecursive(referedObject);
+        createImageForObjectRecursive(referedObject, object, property);
         const referedImage = referedObject[meta].image;
 
         // Only create gc parent properties for now   
