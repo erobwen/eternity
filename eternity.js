@@ -3,7 +3,7 @@ import { argumentsToArray, configSignature, mergeInto } from "./lib/utility.js";
 import { objectlog } from "./lib/objectlog.js";
 import { createDatabase } from "./mockMongoDB.js";
 import { setupActivityList } from "./lib/activityList.js";
-import { setupGC } from "./lib/flameFrontGC.js";
+import { setupGC } from "./lib/reconnectGC.js";
 
 const log = objectlog.log;
 const logg = objectlog.logg.bind(objectlog);
