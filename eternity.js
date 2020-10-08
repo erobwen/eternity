@@ -80,8 +80,6 @@ function createWorld(configuration) {
     gcStateImage: null,
     gc: null,
 
-    stoppingDataBaseWorker: false,
-
     loadedObjects: 0,
     pinnedObjects: 0,
 
@@ -542,7 +540,9 @@ function createWorld(configuration) {
 
     if (object[meta].image) {
       if (!object.loaded){
+        // Push invalidator... 
         await loadObject(object);
+        // continue invalidator.... 
       } 
       pin(object);
     }  else {
@@ -1149,6 +1149,21 @@ function createWorld(configuration) {
       }); 
     });
   }
+
+  /****************************************************
+  *  Persistent invalidate 
+  ***************************************************/
+
+  function persistentInvalidate(action, invalidationAction) {
+    const invalidator = {
+      action,
+      invalidateAction,
+    }
+    state.isRecording++; 
+    action();
+    state.isRecording--; 
+  }
+
 
   /****************************************************
   *  Return world 
