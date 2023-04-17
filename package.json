@@ -26,6 +26,6 @@
     "require-uncached": "^1.0.3"
   },
   "devDependencies": {
-    "bower-json": "^0.8.1"
+    "bower-json": "^0.8.4"
   }
 }
